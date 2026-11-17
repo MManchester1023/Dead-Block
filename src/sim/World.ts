@@ -110,15 +110,17 @@ export class World {
         this.registerHive(hive);
       }
 
-    // initial infestation: zombies scattered through the starter zone
-    const motel = this.districts.get('motel')!;
-    const count = Math.round(motel.infestation * 0.9);
-    for (let i = 0; i < count; i++) {
-      const r = motel.def.rect;
-      const p = this.grid.nearestFree({ x: this.rng.range(r.x + 4, r.x + r.w - 2), y: this.rng.range(r.y + 2, r.y + r.h - 2) });
-      const roll = this.rng.next();
-      const kind = roll < 0.06 ? 'bloater' : roll < 0.3 ? 'runner' : 'walker';
-      this.spawnZombie(kind, p);
+    // initial infestation: each district seeds its own population mix
+    for (const d of this.districts.values()) {
+      const count = Math.round(d.infestation * d.def.density);
+      const kinds = Object.entries(d.def.mix);
+      for (let i = 0; i < count; i++) {
+        const r = d.def.rect;
+        const p = this.grid.nearestFree({ x: this.rng.range(r.x + 4, r.x + r.w - 2), y: this.rng.range(r.y + 2, r.y + r.h - 2) });
+        let roll = this.rng.next();
+        const kind = kinds.find(([, wgt]) => (roll -= wgt) < 0)?.[0] ?? 'walker';
+        this.spawnZombie(kind, p);
+      }
     }
   }
 
@@ -298,7 +300,11 @@ export class World {
 
   makeNoise(pos: Vec2, loudness: number): void {
     if (!isEnabled('noise')) return;
-    this.noiseEvents.push({ pos: { ...pos }, loudness, age: 0 });
+    // merge with a fresh sound from the same spot (a squad's volley is one noise, not eight)
+    const m2 = BALANCE.noise.mergeRadius ** 2;
+    const same = this.noiseEvents.find((e) => e.age === 0 && (e.pos.x - pos.x) ** 2 + (e.pos.y - pos.y) ** 2 <= m2);
+    if (same) same.loudness = Math.max(same.loudness, loudness) + Math.min(loudness, same.loudness) * 0.1;
+    else this.noiseEvents.push({ pos: { ...pos }, loudness, age: 0 });
     const d = this.districtAt(pos);
     if (d && d.def.id !== 'base') d.noise = Math.min(BALANCE.noise.pulseThreshold, d.noise + loudness * 0.12);
   }

@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.1** | §14 "Target look for the finished game" (art direction from reference images, scale, crowd tech, camera rotation). §16 adds the open production questions. MVP: gunfire is now heard well beyond sight. |
 
 Where earlier wording conflicts with a v4 rule, the v4 rule wins. Every v4 change is marked **[v4]**.
 
@@ -495,6 +496,28 @@ The art direction is a 3D isometric world with pixel-inspired styling: more real
 
 **Palette:** desaturated greys, browns, muddy teal, olive and tan for military units; sickly yellow-green for zombies. Red is reserved for infestation and danger.
 
+### Target look for the finished game [v4.1]
+
+The current MVP visuals (code-built boxes) are placeholders for testing. The finished game aims for a **detailed, sun-lit miniature city seen from a high isometric angle**, based on reference images supplied in November 2026. Concretely:
+
+- **Real scale.** Soldiers are small next to the world: a two-storey house is several times a soldier's height, and streets are wide multi-lane roads with sidewalks, crosswalks, streetlights and parked cars. The city should feel big and the squads should feel vulnerable in it.
+- **Detailed, readable buildings.** Suburban houses with pitched tile or shingle roofs, porches, balconies, garages and fences; flat-roofed apartments and commercial blocks with rooftop clutter (AC units, solar panels); warehouses, an airfield and a desert outskirts biome. Palm and leafy trees, hedges, scrub, lawns.
+- **Lighting carries the mood.** One strong sun with long, crisp shadows; a warm/neutral midday and an orange-brown dusk grade; at night, floodlights, searchlights, flares, muzzle flashes and fires do the lighting (ties into §14 day/night and the flare launcher).
+- **Massive crowds.** Hordes are dense carpets of individual zombies: hundreds on screen routinely, **thousands** at a Last Stand. Blood spatter on asphalt, bodies and debris persist.
+- **Spectacle that stays readable.** Tank muzzle blasts, red tracer streams, explosion fireballs with sparks, rising black smoke columns from wrecks, dust clouds, helicopter rotor wash and fast-ropes, jets with afterburners on strike runs, artillery pieces with visible crews.
+- **Fortified bases look built.** Tall modular walls with walkways and turret blocks, sandbag rings, gun pits, floodlight towers, vehicle gates.
+- **Labels on units.** Small callsign tags with health pips over squads, vehicles and aircraft (e.g. `SQ-14`, `TK-1`, `UH-3`), and distance markers for off-screen SOS/objectives.
+- **Camera.** Smoothly **rotatable** in 90° or free steps (compass readout), plus zoom from street level to a wide overview.
+
+**UI direction** (standard RTS conventions, styled to fit): a bottom strip of unit cards (portrait, callsign, health pips, filter tabs for ground/air), a support panel listing call-ins with remaining uses, a minimap with compass and legend, a top-centre day clock with "dusk in mm:ss", and a contextual construction bar (walls, defence, fire support, supply, lighting) with blueprints and placement help.
+
+**What this means for production** (decisions needed; see §16):
+
+1. **Art assets.** Code-generated boxes won't get there. The look needs modelled and textured 3D assets: buildings, vehicles, aircraft, props, soldiers and zombies with animation. Options: model in-house (e.g. Blender), license asset packs that match the style, or commission an artist. Whichever we choose, the renderer will load glTF models in place of the placeholder meshes; sim code doesn't change.
+2. **World scale.** Fix **1 world unit = 1 metre** before building more content. The 64 × 64 starter zones then need to grow (a suburban block in the reference is ~100 m+), or "64 × 64" is re-read as tiles of several metres each.
+3. **Crowd tech.** Thousands of zombies needs GPU-instanced, vertex-animated zombie meshes plus flow-field pathing, with the simulation in a Web Worker. This is the single biggest performance item and is the most likely trigger for the "move to desktop" decision in §15.
+4. **Camera rotation** affects input (screen→world), labels and building see-through/cutaway; add it before the UI hardens.
+
 ### Day/night cycle [v4]
 
 *(Moved up from "deferred"; now a planned feature.)*
@@ -586,6 +609,9 @@ These are left open on purpose so they don't block the core design or the protot
 - **[v4]** Artillery vehicles: whether the howitzer and/or HIMARS-style unit make the cut, and their unlocks.
 - **[v4]** Building destruction thresholds (HP per building class, fire spread rate).
 - **[v4]** Tall wall cost, build time and what can destroy them.
+- **[v4.1]** Art pipeline: in-house models vs. licensed packs vs. commissioned art (§14 target look).
+- **[v4.1]** World scale (1 unit = 1 m) and how large starter zones become at that scale.
+- **[v4.1]** Crowd target (hundreds routine, thousands at a Last Stand) and whether that forces the desktop build.
 
 ---
 
@@ -671,6 +697,13 @@ Every feature, ranked by importance to the game being fun and shippable. The MVP
 26. Bosses
 27. Human enemy faction (Airport, Downtown Core)
 28. Howitzer / HIMARS-style artillery vehicles (if kept)
+
+### Visual production track (runs alongside the tiers) [v4.1]
+- V1. Lock world scale; camera rotation; glTF model loading behind the current placeholder meshes
+- V2. Instanced, animated zombie crowds + flow-field pathing in a Web Worker
+- V3. First real asset set: suburban houses, roads/props, soldiers, zombies
+- V4. Lighting pass: sun shadows, dusk grade, night lights/flares, smoke columns, fire
+- V5. UI restyle toward the §14 direction (unit-card strip, support panel, minimap, day clock)
 
 ### Tier 4: Polish and attachment
 29. Armory weapon customization and Elite cosmetics

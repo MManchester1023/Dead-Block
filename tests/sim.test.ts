@@ -82,6 +82,34 @@ describe('world rules', () => {
     expect(eng.alive).toBe(true); // it ran from its own blast
   });
 
+  describe('gunfire is heard beyond sight (doc §9 noise)', () => {
+    // squad on the main road, zombie tucked behind the building at x42–49, y20–29 (19 tiles away, no line of sight)
+    const setup = (shoot: boolean) => {
+      const w = new World({ populate: false, seed: 5 });
+      const sq = w.spawnSquad('rifle', { x: 45.5, y: 36.5 });
+      w.issueOrder([sq], { type: 'hold', pos: sq.pos });
+      const hidden = w.spawnZombie('runner', { x: 45.5, y: 17.5 })!;
+      if (shoot) w.spawnZombie('walker', { x: 52, y: 36.5 }); // something to shoot at
+      let closest = Infinity;
+      for (let i = 0; i < 30 * 15; i++) {
+        w.step(1 / 30);
+        if (hidden.alive) closest = Math.min(closest, Math.hypot(hidden.pos.x - sq.pos.x, hidden.pos.y - sq.pos.y));
+        else closest = 0; // it came close enough to be shot
+      }
+      return { closest, sees: w.grid.lineClear(sq.pos, { x: 45.5, y: 17.5 }) };
+    };
+
+    it('the hidden zombie really is out of sight', () => {
+      expect(setup(false).sees).toBe(false);
+    });
+    it('stays put when nobody shoots', () => {
+      expect(setup(false).closest).toBeGreaterThan(12);
+    });
+    it('comes around the building toward the shots', () => {
+      expect(setup(true).closest).toBeLessThan(9);
+    });
+  });
+
   it('hives get tougher as they mature and never regress (doc §9)', () => {
     const w = new World({ populate: true });
     const h = w.hives[0];

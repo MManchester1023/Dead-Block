@@ -64,7 +64,7 @@ Rules that keep later features cheap to add:
 
 ## Honest status / known gaps
 
-- Balance is first-pass. A naive "attack-move everyone at the hive" bot wins about 1 in 3 seeds. A player using cover, sandbags and a third squad should do better. All numbers live in `config/balance.ts` and `config/units.ts`.
+- Balance is first-pass. A scripted "bounding overwatch" push (advance, let the noise draw the wave in, kill it, advance) clears the hive in 5 of 6 seeds; charging straight in mostly fails because the whole zone hears it. All numbers live in `config/balance.ts` and `config/units.ts`.
 - Not in the MVP yet (by design; see doc §21): fog of war, power stations, the seven-mission tutorial, direct control (TAB shows a "coming later" toast), save/load, audio.
 - Zombie crowds steer directly and use A* only when stuck. That's cheap (~0.1 ms per sim tick with 60+ zombies) but they can look dumb around building corners.
 - Buildings don't receive shadows (it avoided shadow acne on software GL). Units and the ground still do.

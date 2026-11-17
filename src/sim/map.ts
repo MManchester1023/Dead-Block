@@ -41,6 +41,9 @@ export interface DistrictDef {
   /** Spawn site for the district's hive, if any. */
   hiveSites: Vec2[];
   initialInfestation: number;
+  /** Starting zombies per infestation point, and the mix (doc §2 table: who lives where). */
+  density: number;
+  mix: Record<string, number>;
 }
 
 export interface CityMap {
@@ -154,8 +157,10 @@ export function buildStarterMap(seed = 7): CityMap {
   for (const y of [15, 28, 55]) addCar(rng.chance(0.5) ? 87 : 89, y, false);
 
   const districts: DistrictDef[] = [
-    { id: 'base', name: 'Main Base', rect: baseRect, starter: true, hiveSites: [], initialInfestation: 0 },
-    { id: 'motel', name: 'Roadside Motel', rect: { x: 38, y: 4, w: 64, h: 64 }, starter: true, hiveSites: [{ x: 96, y: 58 }], initialInfestation: 65 },
+    { id: 'base', name: 'Main Base', rect: baseRect, starter: true, hiveSites: [], initialInfestation: 0, density: 0, mix: {} },
+    { id: 'motel', name: 'Roadside Motel', rect: { x: 38, y: 4, w: 64, h: 64 }, starter: true, hiveSites: [{ x: 96, y: 58 }], initialInfestation: 65,
+      // doc §2: "Starter district; Walkers" — a few early Runners and one or two Bloaters as a taste
+      density: 0.7, mix: { walker: 0.88, runner: 0.09, bloater: 0.03 } },
   ];
 
   return {

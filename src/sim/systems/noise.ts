@@ -9,9 +9,9 @@ import { lure } from './zombies';
 export function updateNoise(w: World, dt: number): void {
   for (const ev of w.noiseEvents) {
     if (ev.age > 0) continue;
-    const r = ev.loudness * BALANCE.noise.hearingRadiusPerLoudness * 3;
+    const r = Math.min(BALANCE.noise.maxHearingRadius, ev.loudness * BALANCE.noise.hearingRadiusPerLoudness);
     for (const z of w.zombieHash.query(ev.pos, r * 1.4)) {
-      const heard = r * z.def.hearing;
+      const heard = Math.min(BALANCE.noise.maxHearingRadius, r * z.def.hearing);
       if ((z.pos.x - ev.pos.x) ** 2 + (z.pos.y - ev.pos.y) ** 2 <= heard * heard) lure(z, ev.pos, 'investigate');
     }
   }

@@ -47,7 +47,10 @@ export function updateHives(w: World, dt: number): void {
 
 function spawnAt(w: World, h: Hive): void {
   const roll = w.rng.next();
-  const kind = roll < 0.05 + h.stage * 0.01 ? 'bloater' : roll < 0.25 + h.stage * 0.05 ? 'runner' : 'walker';
+  // mostly Walkers while young; Runners and Bloaters creep in as the hive matures
+  const bloater = 0.02 + 0.02 * (h.stage - 1);
+  const runner = bloater + 0.06 + 0.07 * (h.stage - 1);
+  const kind = roll < bloater ? 'bloater' : roll < runner ? 'runner' : 'walker';
   const a = w.rng.range(0, Math.PI * 2);
   const p = w.grid.nearestFree({ x: h.pos.x + Math.cos(a) * 2, y: h.pos.y + Math.sin(a) * 2 });
   const z = w.spawnZombie(kind, p, h.id);
@@ -83,7 +86,7 @@ export function pulse(w: World, h: Hive, bonus = 0): void {
   }
   while (sent < size) {
     const a = w.rng.range(0, Math.PI * 2);
-    const z = w.spawnZombie(w.rng.chance(0.3) ? 'runner' : 'walker', w.grid.nearestFree({ x: h.pos.x + Math.cos(a) * 2.5, y: h.pos.y + Math.sin(a) * 2.5 }), h.id);
+    const z = w.spawnZombie(w.rng.chance(0.1 + 0.07 * (h.stage - 1)) ? 'runner' : 'walker', w.grid.nearestFree({ x: h.pos.x + Math.cos(a) * 2.5, y: h.pos.y + Math.sin(a) * 2.5 }), h.id);
     if (!z) break;
     h.spawned.add(z.id);
     lure(z, target, 'pulse');

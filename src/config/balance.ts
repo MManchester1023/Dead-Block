@@ -19,22 +19,25 @@ export const BALANCE = {
   noise: {
     decayPerSec: 4, // district noise meter decay
     pulseThreshold: 100,
-    hearingRadiusPerLoudness: 1.0, // world units per loudness point
+    // Gunshots carry well beyond sight (zombie sight is ~7). Rifle (2.2) ≈ 24 tiles, MG (3.2) ≈ 35.
+    hearingRadiusPerLoudness: 11, // world units per loudness point
+    maxHearingRadius: 60,
+    mergeRadius: 3, // same-tick sounds this close merge into one louder event
   },
 
   horde: {
     pulseIntervalSec: 240,
-    firstPulseDelaySec: 300,
+    firstPulseDelaySec: 360,
     basePulseSize: 12,
     perStagePulseSize: 6,
   },
 
   hive: {
     hpByStage: [500, 750, 1000, 1250], // grows as it matures — kill it early
-    stageDurationSec: [300, 360, 420], // time to advance stage 1→2, 2→3, 3→4
-    spawnIntervalSec: [7, 5, 3.5, 2],
-    spawnGroup: [2, 3, 4, 5],
-    localCap: [16, 28, 40, 60],
+    stageDurationSec: [420, 360, 420], // time to advance stage 1→2, 2→3, 3→4
+    spawnIntervalSec: [9, 5, 3.5, 2],
+    spawnGroup: [1, 3, 4, 5],
+    localCap: [12, 28, 40, 60],
     globalZombieCap: 260,
   },
 

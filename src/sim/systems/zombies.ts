@@ -55,6 +55,12 @@ export function updateZombies(w: World, dt: number): void {
       continue;
     }
 
+    // heard something behind a building? get a real path instead of face-planting into the wall
+    if (!z.path.length && z.goal && dest === z.goal && pathBudget > 0 && dist(z.pos, dest) > 4 && !w.grid.lineClear(z.pos, dest)) {
+      pathBudget--;
+      z.path = findPath(w.grid, z.pos, dest, 3000) ?? [];
+    }
+
     // steer along an A* path if we have one, else beeline
     let wp = dest;
     if (z.path.length) {
@@ -160,7 +166,10 @@ export function lure(z: Zombie, pos: Vec2, state: 'investigate' | 'pulse'): void
   if (z.state === 'pulse' && state === 'investigate') return;
   const j = (((z.id * 2654435761) >>> 0) / 4294967296 - 0.5) * 3;
   const k = (((z.id * 40503) % 997) / 997 - 0.5) * 3;
-  z.goal = { x: pos.x + j, y: pos.y + k };
+  const goal = { x: pos.x + j, y: pos.y + k };
+  // sustained fire from the same spot shouldn't wipe the path every tick
+  const moved = !z.goal || (z.goal.x - goal.x) ** 2 + (z.goal.y - goal.y) ** 2 > 16;
+  z.goal = goal;
   z.state = state;
-  z.path = [];
+  if (moved) z.path = [];
 }
