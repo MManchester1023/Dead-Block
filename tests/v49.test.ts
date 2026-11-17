@@ -88,4 +88,30 @@ describe('v4.9 playtest round 5', () => {
     expect(w.commandCap).toBe(BALANCE.economy.commandCap);
     expect(BALANCE.economy.commandCap / 2).toBeGreaterThan(4);
   });
+
+  it('searching a building takes ~5 s at the door and pays out once (#46)', () => {
+    const w = new World({ populate: false });
+    const b = w.map.buildings.find((x) => w.districtAt({ x: x.rect.x + x.rect.w / 2, y: x.rect.y + x.rect.h / 2 })?.def.id === 'motel')!;
+    w.buildingState.set(b.id, { searched: false, nest: 0 });
+    const sq = w.spawnSquad('rifle', { x: b.rect.x - 6, y: b.rect.y + b.rect.h / 2 });
+    expect(w.orderSearch([sq], b)).toBeNull();
+    for (let i = 0; i < 30 * 3; i++) w.step(1 / 30);
+    expect(w.buildingState.get(b.id)!.searched).toBe(false); // still at the door
+    for (let i = 0; i < 30 * 12 && !w.buildingState.get(b.id)!.searched; i++) w.step(1 / 30);
+    expect(w.buildingState.get(b.id)!.searched).toBe(true);
+    expect(w.orderSearch([sq], b)).toBe('Already searched');
+  });
+
+  it('dead holed up in a building come out when a squad gets close (#65)', () => {
+    const w = new World({ populate: false });
+    const b = w.map.buildings.find((x) => w.districtAt({ x: x.rect.x + x.rect.w / 2, y: x.rect.y + x.rect.h / 2 })?.def.id === 'motel')!;
+    w.buildingState.set(b.id, { searched: false, nest: 3 });
+    let burst = 0;
+    w.events.on('nestBurst', (e) => (burst += e.count));
+    const sq = w.spawnSquad('rifle', { x: b.rect.x - 3, y: b.rect.y + b.rect.h / 2 });
+    for (let i = 0; i < 20; i++) w.step(1 / 30);
+    expect(burst).toBe(3);
+    expect(w.zombies.filter((z) => z.alive).every((z) => z.targetId === sq.id)).toBe(true);
+    expect(w.buildingState.get(b.id)!.nest).toBe(0);
+  });
 });

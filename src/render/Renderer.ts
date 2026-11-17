@@ -448,6 +448,18 @@ export class Renderer {
       if (this.tracers.length < 1000) this.tracers.push({ a: e.from, b: e.to, life: e.heavy ? 0.12 : 0.06, heavy: !!e.heavy });
     });
     ev.on('explosion', (e) => this.spawnExplosion(e.pos, e.radius, e.type === 'toxic' ? 0x8fbf3a : 0xffa040));
+    // a searched building gets a spray-painted X by the door (v4.9 #46)
+    ev.on('buildingSearched', (e) => {
+      const mat = new THREE.MeshBasicMaterial({ color: e.found === 'zombies' ? 0xd2443a : 0xe0802a, transparent: true, opacity: 0.85, depthWrite: false });
+      const x = new THREE.Group();
+      for (const a of [Math.PI / 4, -Math.PI / 4]) {
+        const bar = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.28), mat);
+        bar.rotation.set(-Math.PI / 2, 0, a);
+        x.add(bar);
+      }
+      x.position.set(e.pos.x, 0.07, e.pos.y);
+      this.scene.add(x);
+    });
     ev.on('zombieKilled', (e) => {
       this.spawnSplat(e.pos);
       if (this.crowds) {

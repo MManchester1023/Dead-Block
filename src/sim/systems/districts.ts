@@ -3,7 +3,29 @@ import { isEnabled } from '../../config/features';
 import { Hive, Structure } from '../entities';
 import type { World } from '../World';
 
+/** v4.9 (#65): squads brushing past, or gunfire next to, a building with dead inside brings them out. */
+function updateNests(w: World, dt: number): void {
+  w.nestTimer -= dt;
+  if (w.nestTimer > 0) return;
+  w.nestTimer = 0.5;
+  const S = BALANCE.search;
+  for (const b of w.map.buildings) {
+    const st = w.buildingState.get(b.id);
+    if (!st || st.nest <= 0) continue;
+    const r = b.rect;
+    const near = (p: { x: number; y: number }, m: number) => p.x > r.x - m && p.x < r.x + r.w + m && p.y > r.y - m && p.y < r.y + r.h + m;
+    const sq = w.squads.find((s) => s.alive && near(s.pos, S.nestTriggerRange) && s.currentOrder?.type !== 'search');
+    if (sq) {
+      w.releaseNest(b, sq.pos);
+      continue;
+    }
+    const loud = w.noiseEvents.find((e) => e.age < 0.6 && e.loudness >= 1.5 && near(e.pos, S.nestNoiseRange));
+    if (loud) w.releaseNest(b, loud.pos);
+  }
+}
+
 export function updateDistricts(w: World, dt: number): void {
+  updateNests(w, dt);
   for (const d of w.districts.values()) {
     if (d.def.id === 'base') continue;
     const hives = w.hives.filter((h) => h.alive && h.districtId === d.def.id);

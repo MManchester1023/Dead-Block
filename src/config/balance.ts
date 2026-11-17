@@ -62,6 +62,20 @@ export const BALANCE = {
     globalZombieCap: 1500, // sim handles ~2.5k at ~6 ms/tick; renderer crowds are sized for 2k
   },
 
+  // v4.9 (#46, #65): searching houses, and zombies holed up inside some of them
+  search: {
+    timeSec: 5,
+    emptyChance: 0.3,
+    supplies: [4, 12],
+    moneyChance: 0.3,
+    money: [8, 20],
+    nestChance: 0.25, // share of buildings in infested districts with a few dead holed up inside
+    nestSize: [1, 4],
+    nestTriggerRange: 5, // metres from the walls: a squad this close disturbs them
+    nestNoiseRange: 14, // gunfire this close to the walls brings them out too
+    loudness: 0.8,
+  },
+
   infestation: {
     perKill: { walker: 0.5, runner: 0.6, bloater: 1.5 } as Record<string, number>,
     hiveDestroyed: 45,

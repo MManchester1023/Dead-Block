@@ -315,7 +315,7 @@ export class Hud {
       : mode.kind === 'attackMove' ? 'Attack-move: click a destination'
       : mode.kind === 'charge' ? 'Click a hive to plant a demo charge'
       : mode.kind === 'deconstruct' ? 'Click something your engineers built to take it down (unstarted: full refund, built: half)'
-      : `${sq.length} selected · right-click a zombie to focus it · Shift+right-click queues · Ctrl+1–9 groups`;
+      : `${sq.length} selected · right-click a zombie to focus it · right-click a building to search it · Shift+right-click queues`;
     if (!this.selection.querySelector('.cards')) {
       this.cache.delete(this.selection);
       this.selection.innerHTML = '<div class="cards"></div><div class="cmds"></div><p class="hint"></p>';
@@ -363,7 +363,7 @@ export class Hud {
         <div><h3>Controls</h3>
           <ul>
             <li><kbd>LMB</kbd> select · drag to box-select · <kbd>Shift</kbd> add</li>
-            <li><kbd>RMB</kbd> move · on a zombie = attack it · on a car/sandbags = take cover · on hive = charge it</li>
+            <li><kbd>RMB</kbd> move · on a zombie = attack it · on a car/sandbags = take cover · on hive = charge it · on a building = search it (5 s, sometimes supplies, sometimes company)</li>
             <li><kbd>Ctrl</kbd>+<kbd>A</kbd> attack-move · <kbd>H</kbd> hold · <kbd>Ctrl</kbd>+<kbd>S</kbd> stop</li>
             <li><kbd>Shift</kbd>+<kbd>RMB</kbd> queue waypoints · <kbd>Ctrl</kbd>+<kbd>1-9</kbd> groups</li>
             <li>Engineers: <kbd>F</kbd> sandbags · <kbd>G</kbd> wire · <kbd>T</kbd> MG nest · <kbd>O</kbd> outpost · <kbd>C</kbd> demo charge · <kbd>X</kbd> deconstruct · <kbd>R</kbd> rotate</li>

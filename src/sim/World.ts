@@ -4,7 +4,7 @@ import { dist, inRect, norm, sub, type Vec2 } from '../core/math';
 import { BALANCE, DIFFICULTY, type DifficultyTier } from '../config/balance';
 import { isEnabled } from '../config/features';
 import { STRUCTURES, UNITS, ZOMBIES } from '../config/units';
-import { buildStarterMap, type CityMap, type DistrictDef } from './map';
+import { buildStarterMap, type BuildingDef, type CityMap, type DistrictDef } from './map';
 import { NavGrid } from './grid';
 import { FlowFields } from './flowfield';
 import { SpatialHash } from './spatial';
@@ -92,7 +92,19 @@ export class World {
 
   // ---------- setup ----------
 
+  /** Per-building state for searching and nests (v4.9 #46, #65). */
+  buildingState = new Map<number, { searched: boolean; nest: number }>();
+  nestTimer = 0;
+
   private populate(): void {
+    // a share of buildings in infested districts have a few dead holed up inside (fixed per seed)
+    const S = BALANCE.search;
+    for (const b of this.map.buildings) {
+      const d = this.districtAt({ x: b.rect.x + b.rect.w / 2, y: b.rect.y + b.rect.h / 2 });
+      const infested = !!d && d.def.id !== 'base' && d.infestation > 0;
+      const nest = infested && this.rng.chance(S.nestChance) ? this.rng.int(S.nestSize[0], S.nestSize[1]) : 0;
+      this.buildingState.set(b.id, { searched: false, nest });
+    }
     const m = this.map;
     const b = m.baseCells; // structures snap to nav cells
     this.addStructure('commandPost', { x: b.x + 3, y: b.y + 4 }, true);
@@ -447,6 +459,72 @@ export class World {
       }
     this.removeStructure(s);
     this.events.emit('structureDismantled', { id: s.id, defId: s.def.id, pos: s.pos, refund });
+  }
+
+  /** Building under a point (metres), if any. */
+  buildingAt(p: Vec2): BuildingDef | undefined {
+    return this.map.buildings.find((b) => p.x >= b.rect.x && p.y >= b.rect.y && p.x < b.rect.x + b.rect.w && p.y < b.rect.y + b.rect.h);
+  }
+
+  /** Search a building for supplies (v4.9 #46): ~5 s at the door, interrupted by getting hit. */
+  orderSearch(squads: Squad[], b: BuildingDef, queue = false): string | null {
+    const st = this.buildingState.get(b.id);
+    if (!st) return 'Nothing to search there';
+    if (st.searched) return 'Already searched';
+    const c = { x: b.rect.x + b.rect.w / 2, y: b.rect.y + b.rect.h / 2 };
+    this.issueOrder(squads, { type: 'search', pos: c, targetId: b.id }, queue);
+    return null;
+  }
+
+  finishSearch(s: Squad, b: BuildingDef): void {
+    const st = this.buildingState.get(b.id);
+    if (!st || st.searched) return;
+    st.searched = true;
+    const S = BALANCE.search;
+    const door = { ...s.pos };
+    if (st.nest > 0) {
+      this.releaseNest(b, door);
+      this.events.emit('buildingSearched', { buildingId: b.id, pos: door, found: 'zombies' });
+      return;
+    }
+    const r = this.rng.next();
+    let found = 'nothing';
+    if (r >= S.emptyChance) {
+      const sup = this.rng.int(S.supplies[0], S.supplies[1]);
+      this.addSupplies(sup);
+      found = `+${sup} supplies`;
+      if (this.rng.chance(S.moneyChance)) {
+        const m = this.rng.int(S.money[0], S.money[1]);
+        this.money += m;
+        found += `, +$${m}`;
+      }
+    }
+    this.events.emit('buildingSearched', { buildingId: b.id, pos: door, found });
+    this.events.emit('radio', { speaker: s.name, text: found === 'nothing' ? 'Building clear. Nothing worth taking.' : `Building clear. Found ${found.replace(/^\+/, '')}.`, tone: found === 'nothing' ? 'info' : 'good' });
+  }
+
+  /** Zombies holed up in a building spill out of the door nearest `near` (v4.9 #65). */
+  releaseNest(b: BuildingDef, near: Vec2): void {
+    const st = this.buildingState.get(b.id);
+    if (!st || st.nest <= 0) return;
+    const count = st.nest;
+    st.nest = 0;
+    // nearest point on the walls, pushed just outside
+    const ex = Math.max(b.rect.x, Math.min(b.rect.x + b.rect.w, near.x));
+    const ey = Math.max(b.rect.y, Math.min(b.rect.y + b.rect.h, near.y));
+    const out = norm(sub(near, { x: ex, y: ey }));
+    const door = this.grid.nearestFree({ x: ex + out.x * 1.5, y: ey + out.y * 1.5 });
+    const prey = this.squadHash.query(door, 30).filter((q) => q.alive).sort((a, c) => dist(a.pos, door) - dist(c.pos, door))[0];
+    for (let i = 0; i < count; i++) {
+      const z = this.spawnZombie('walker', { x: door.x + this.rng.range(-1, 1), y: door.y + this.rng.range(-1, 1) });
+      if (z && prey) {
+        z.targetId = prey.id;
+        z.state = 'chase';
+        z.aggro = BALANCE.zombie.aggroTimeSec;
+      }
+    }
+    this.events.emit('nestBurst', { buildingId: b.id, pos: door, count });
+    this.events.emit('radio', { speaker: prey?.name ?? 'Overwatch', text: count > 2 ? 'Contact! They were holed up inside!' : "One of them was inside! Contact front!", tone: 'warn' });
   }
 
   /** Send squads back to the Barracks to stand down (v4.9 #55). Frees command and upkeep, refunds a little. */

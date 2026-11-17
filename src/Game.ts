@@ -153,6 +153,15 @@ export class Game {
       return;
     }
 
+    // right-click a building outside the base: search it for supplies (v4.9 #46)
+    const bld = w.buildingAt(p);
+    if (bld && w.districtAt(p)?.def.id !== 'base') {
+      const err = w.orderSearch(sq, bld, queue);
+      if (err) this.toast(err);
+      else this.renderer.marker({ x: bld.rect.x + bld.rect.w / 2, y: bld.rect.y + bld.rect.h / 2 }, 0xd0c070);
+      return;
+    }
+
     const cover = w.structures.find((s) => s.built && s.def.cover && dist(s.pos, p) < s.radius + 1.5);
     if (cover && cover.def.id !== 'mgNest') {
       sq.forEach((s) => {

@@ -1,3 +1,4 @@
+import { BALANCE } from '../../config/balance';
 import { dist, norm, sub, type Vec2 } from '../../core/math';
 import { ABILITIES } from '../../config/units';
 import { Hive, Structure, type Squad } from '../entities';
@@ -53,6 +54,9 @@ export function updateOrders(w: World, dt: number): void {
           break;
         case 'repair':
           doRepair(w, s, dt);
+          break;
+        case 'search':
+          doSearch(w, s, dt);
           break;
         case 'disband':
           // v4.9 (#55): walk into the Barracks and stand down
@@ -253,6 +257,38 @@ function doCharge(w: World, s: Squad, dt: number): void {
  * Walk up to a target until within `reach`. If terrain (cars, rubble) stops us short, accept
  * "as close as we can get" within a small tolerance instead of standing there forever.
  */
+/** v4.9 (#46): walk to the nearest wall, stand at the door for a few seconds, see what's inside. */
+function doSearch(w: World, s: Squad, dt: number): void {
+  const o = s.currentOrder!;
+  const b = w.map.buildings.find((x) => x.id === o.targetId);
+  const st = b && w.buildingState.get(b.id);
+  if (!b || !st || st.searched) {
+    s.orders.shift();
+    s.buildProgress = 0;
+    return;
+  }
+  const edge = { x: Math.max(b.rect.x, Math.min(b.rect.x + b.rect.w, s.pos.x)), y: Math.max(b.rect.y, Math.min(b.rect.y + b.rect.h, s.pos.y)) };
+  const res = approach(w, s, edge, 0.5, 3.5, dt);
+  if (res === 'moving') return;
+  if (res === 'blocked') {
+    w.events.emit('radio', { speaker: s.name, text: "Can't find a way in.", tone: 'warn' });
+    s.orders.shift();
+    return;
+  }
+  s.path = [];
+  s.facing = Math.atan2(edge.y - s.pos.y, edge.x - s.pos.x);
+  if (s.lastHit >= w.time - dt * 1.5) {
+    s.buildProgress = 0; // getting hit at the door starts it over
+    return;
+  }
+  if (s.buildProgress === 0) w.makeNoise(s.pos, BALANCE.search.loudness);
+  s.buildProgress += dt;
+  if (s.buildProgress < BALANCE.search.timeSec) return;
+  s.buildProgress = 0;
+  s.orders.shift();
+  w.finishSearch(s, b);
+}
+
 function approach(w: World, s: Squad, target: Vec2, radius: number, reach: number, dt: number): 'moving' | 'inReach' | 'blocked' {
   if (dist(s.pos, target) <= reach) return 'inReach';
   const arrived = moveToward(w, s, approachPoint(w, s, target, radius), dt, ARRIVE);

@@ -28,6 +28,8 @@ export interface GameEvents {
   smoke: { pos: Vec2; color: number; duration: number };
   radio: { speaker: string; text: string; tone?: 'info' | 'warn' | 'good' | 'bad' };
   toxicCloud: { pos: Vec2; radius: number; duration: number };
+  buildingSearched: { buildingId: number; pos: Vec2; found: string };
+  nestBurst: { buildingId: number; pos: Vec2; count: number };
   victory: { reason: string };
   defeat: { reason: string };
 }
