@@ -345,15 +345,15 @@ export class World {
   damageSquad(sq: Squad, amount: number, type: DamageType, source?: Vec2): void {
     const reduction = type === 'toxic' || type === 'explosive' ? 0 : sq.inCover;
     let dmg = amount * (1 - reduction);
-    // hit the member nearest the source (the one in front)
-    const alive = sq.members.filter((m) => m.alive);
-    if (!alive.length) return;
+    if (!sq.alive) return;
     sq.lastHit = this.time;
-    const victim = source ? alive.reduce((a, b) => (dist(a.pos, source) < dist(b.pos, source) ? a : b)) : this.rng.pick(alive);
-    victim.hp -= dmg;
-    if (victim.hp <= 0) {
+    sq.pool = Math.max(0, sq.pool - dmg);
+    // one shared pool (v4.9 #50): a soldier drops each time it crosses a member's share; the one
+    // nearest the source (the one in front) goes first
+    while (sq.aliveCount > sq.membersSupported) {
+      const alive = sq.members.filter((m) => m.alive);
+      const victim = source ? alive.reduce((a, b) => (dist(a.pos, source) < dist(b.pos, source) ? a : b)) : this.rng.pick(alive);
       victim.alive = false;
-      victim.hp = 0;
       this.events.emit('memberKilled', { squadId: sq.id, squadName: sq.name, pos: { ...victim.pos }, facing: victim.facing, unitId: sq.def.id });
       if (!sq.alive) {
         this.events.emit('squadWiped', { squadId: sq.id, squadName: sq.name });
@@ -447,6 +447,31 @@ export class World {
       }
     this.removeStructure(s);
     this.events.emit('structureDismantled', { id: s.id, defId: s.def.id, pos: s.pos, refund });
+  }
+
+  /** Send squads back to the Barracks to stand down (v4.9 #55). Frees command and upkeep, refunds a little. */
+  orderDisband(squads: Squad[]): string | null {
+    const b = this.structures.find((s) => s.alive && s.def.id === 'barracks');
+    if (!b) return 'No Barracks to return to';
+    const door = this.grid.nearestFree({ x: b.pos.x + b.radius + 1, y: b.pos.y });
+    for (const s of squads) {
+      s.orders = [{ type: 'disband', pos: door }];
+      s.path = [];
+      s.targetId = null;
+      s.holding = false;
+    }
+    return null;
+  }
+
+  standDown(s: Squad): void {
+    if (!s.alive) return;
+    const k = BALANCE.economy.disbandRefund;
+    const refund = { money: Math.round(s.def.cost.money * k), supplies: Math.round(s.def.cost.supplies * k) };
+    this.money += refund.money;
+    this.supplies = Math.min(this.supplyCap, this.supplies + refund.supplies);
+    for (const m of s.members) m.alive = false;
+    this.byId.delete(s.id);
+    this.events.emit('radio', { speaker: 'Barracks', text: `${s.name} stood down. +$${refund.money} and +${refund.supplies} supplies back in stores.`, tone: 'info' });
   }
 
   orderDeconstruct(engineers: Squad[], s: Structure, queue = false): string | null {

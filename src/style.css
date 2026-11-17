@@ -98,6 +98,15 @@ details summary { cursor: pointer; color: var(--dim); font-size: 11px; margin-to
 .pips { display: flex; gap: 3px; margin: 3px 0; }
 .pip { width: 12px; height: 6px; background: var(--good); border: 1px solid #000; }
 .pip.mid { background: var(--warn); } .pip.low { background: var(--bad); } .pip.dead { background: #222; }
+/* v4.9: one shared health bar per squad; the pips after it are soldiers still standing */
+.pips { flex-wrap: wrap; align-items: center; }
+.hpbar { flex: 1 0 100%; height: 6px; background: #222; border: 1px solid #000; }
+.hpbar i { display: block; height: 100%; background: var(--good); }
+.hpbar i.mid { background: var(--warn); } .hpbar i.low { background: var(--bad); }
+.pips .pip { width: 7px; height: 7px; border-radius: 50%; background: var(--tan); }
+.pips .pip.dead { background: #222; }
+.squad-label .hpbar { flex-basis: 34px; height: 4px; }
+.squad-label .pips .pip { width: 4px; height: 4px; }
 
 /* world-space labels */
 .squad-label, .hive-label, .district-label, .struct-label { position: absolute; left: 0; top: 0; white-space: nowrap; text-shadow: 0 1px 0 #000, 0 0 3px #000; }

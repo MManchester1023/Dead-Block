@@ -864,13 +864,9 @@ export class Renderer {
   }
 
   private squadLabelHtml(s: Squad, sel: boolean): string {
-    const pips = s.members
-      .map((m) => {
-        const k = m.alive ? m.hp / m.maxHp : 0;
-        const cls = !m.alive ? 'dead' : k < 0.35 ? 'low' : k < 0.7 ? 'mid' : '';
-        return `<span class="pip ${cls}"></span>`;
-      })
-      .join('');
+    const k = s.hp / s.maxHp;
+    const bar = `<span class="hpbar"><i class="${k < 0.35 ? 'low' : k < 0.7 ? 'mid' : ''}" style="width:${(k * 100).toFixed(0)}%"></i></span>`;
+    const pips = bar + s.members.map((m) => `<span class="pip ${m.alive ? '' : 'dead'}"></span>`).join('');
     const st = squadStatus(s, this.world);
     const cover = st.tone === 'idle' && st.text === 'IDLE' ? '' : `<span class="status ${st.tone}">${st.text}</span>`;
     const lvl = s.level ? `<span class="tag lvl">${s.levelName.toUpperCase()}</span>` : '';

@@ -6,8 +6,6 @@ import { type Faction, type Order, ThreatClass, type Targetable } from './types'
 
 export interface Member {
   index: number;
-  hp: number;
-  maxHp: number;
   alive: boolean;
   cooldown: number;
   /** Formation slot relative to squad center. */
@@ -63,12 +61,18 @@ export class Squad implements Targetable {
   lastHit = -1;
   selected = false;
   moving = false;
+  /**
+   * One shared health pool for the whole squad (v4.9, playtest #50). Soldiers drop out each time the
+   * pool crosses one member's share, so a hurt squad also shoots less. Nothing refills it on its own:
+   * only medics / a Med Bay (later tiers).
+   */
+  pool: number;
+  poolMax: number;
 
   constructor(public def: UnitDef, public name: string, public pos: Vec2) {
+    this.pool = this.poolMax = def.memberHp * def.members;
     this.members = Array.from({ length: def.members }, (_, i) => ({
       index: i,
-      hp: def.memberHp,
-      maxHp: def.memberHp,
       alive: true,
       cooldown: (i / def.members) * def.weapon.cooldown, // staggered volleys
       offset: FORMATION_SLOTS[i % FORMATION_SLOTS.length],
@@ -85,10 +89,14 @@ export class Squad implements Targetable {
     return this.members.reduce((n, m) => n + (m.alive ? 1 : 0), 0);
   }
   get hp(): number {
-    return this.members.reduce((n, m) => n + (m.alive ? m.hp : 0), 0);
+    return this.pool;
   }
   get maxHp(): number {
-    return this.members.reduce((n, m) => n + m.maxHp, 0);
+    return this.poolMax;
+  }
+  /** How many soldiers the current pool supports (rounds up: a sliver of health keeps one standing). */
+  get membersSupported(): number {
+    return this.pool <= 0 ? 0 : Math.ceil((this.pool / this.poolMax) * this.members.length - 1e-9);
   }
   get levelName(): string {
     return BALANCE.combat.levels[this.level].name;

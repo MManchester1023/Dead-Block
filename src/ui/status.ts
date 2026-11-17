@@ -26,6 +26,8 @@ export function squadStatus(s: Squad, w: World): { text: string; tone: StatusTon
       return { text: s.moving ? 'TO DISMANTLE' : 'DISMANTLING', tone: 'work' };
     case 'charge':
       return { text: s.moving ? 'TO THE HIVE' : 'PLANTING CHARGE', tone: 'work' };
+    case 'disband':
+      return { text: 'STANDING DOWN', tone: 'move' };
   }
   const base = s.inCover ? 'IN COVER' : s.holding ? 'HOLDING' : '';
   if (firing) return { text: base ? `${base} · FIRING` : 'FIRING', tone: 'fight' };

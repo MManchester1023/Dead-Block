@@ -130,11 +130,8 @@ export function gainXp(w: World, s: Squad, amount: number): void {
     const prev = levels[s.level];
     s.level++;
     const next = levels[s.level];
-    for (const m of s.members) {
-      const newMax = (m.maxHp / prev.hp) * next.hp;
-      if (m.alive) m.hp += newMax - m.maxHp;
-      m.maxHp = newMax;
-    }
+    // tougher, but a promotion is not a heal (v4.9 #48): only the cap grows
+    s.poolMax = (s.poolMax / prev.hp) * next.hp;
     w.events.emit('levelUp', { squadId: s.id, squadName: s.name, level: next.name });
   }
 }

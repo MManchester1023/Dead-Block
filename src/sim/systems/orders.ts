@@ -54,6 +54,10 @@ export function updateOrders(w: World, dt: number): void {
         case 'repair':
           doRepair(w, s, dt);
           break;
+        case 'disband':
+          // v4.9 (#55): walk into the Barracks and stand down
+          if (moveToward(w, s, o.pos, dt, 2.5)) w.standDown(s);
+          break;
         default:
           s.orders.shift();
       }
@@ -85,7 +89,8 @@ export function moveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: n
   }
   const wp = s.path[0];
   const d = dist(s.pos, wp);
-  const step = Math.min(d, s.def.speed * dt * (w.grid.slowAt(s.pos) < 1 ? 0.75 : 1));
+  // v4.9 (#49): wire slows soldiers as much as zombies; plan your own lanes through it
+  const step = Math.min(d, s.def.speed * dt * w.grid.slowAt(s.pos));
   const dir = norm(sub(wp, s.pos));
   // always move through collision (no snapping onto a waypoint that hugs an obstacle)
   const blocked = moveWithCollision(w.grid, s.pos, dir.x * step, dir.y * step, BODY);

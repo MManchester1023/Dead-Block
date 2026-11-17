@@ -52,12 +52,18 @@ describe('world rules', () => {
     expect(w.squads.map((s) => s.def.id).sort()).toEqual(['engineer', 'rifle', 'rifle']);
   });
 
-  it('loses members individually and wipes permanently', () => {
+  it('shares one health pool, drops soldiers at thresholds and wipes permanently (v4.9)', () => {
     const w = new World({ populate: false });
     const sq = w.spawnSquad('rifle', M(10, 36));
-    w.damageSquad(sq, 1000, 'melee');
+    const share = sq.poolMax / sq.members.length;
+    w.damageSquad(sq, share * 0.5, 'melee'); // half a soldier's worth: everyone still standing
+    expect(sq.aliveCount).toBe(4);
+    w.damageSquad(sq, share * 0.6, 'melee'); // crossed 75%: one drops
     expect(sq.aliveCount).toBe(3);
-    for (let i = 0; i < 3; i++) w.damageSquad(sq, 1000, 'melee');
+    w.damageSquad(sq, share * 1.9, 'melee'); // below 25%+: down to one
+    expect(sq.aliveCount).toBe(1);
+    expect(sq.hp).toBeGreaterThan(0);
+    w.damageSquad(sq, 1000, 'melee');
     expect(sq.alive).toBe(false);
     w.step(1 / 30);
     expect(w.squads.includes(sq)).toBe(false);
@@ -201,7 +207,7 @@ describe('world rules', () => {
     it('zombie aggro is time-based: it keeps hunting a squad that runs out of sight', () => {
       const w = new World({ populate: false, seed: 4 });
       const sq = w.spawnSquad('rifle', M(15, 36));
-      sq.members.forEach((m) => (m.hp = m.maxHp = 1e6)); // survive the test
+      sq.pool = sq.poolMax = 1e6; // survive the test
       const z = w.spawnZombie('walker', { x: sq.pos.x + 8, y: sq.pos.y })!;
       for (let i = 0; i < 15; i++) w.step(1 / 30); // it spots us
       expect(z.state).toBe('chase');

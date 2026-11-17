@@ -106,6 +106,7 @@ export class Hud {
       case 'attackMove': g.setMode({ kind: 'attackMove' }); break;
       case 'hold': g.hold(); break;
       case 'stop': g.stop(); break;
+      case 'disband': g.disband(); break;
       case 'pause': g.togglePause(); break;
       case 'speed': g.setSpeed(Number(arg)); break;
       case 'focus': {
@@ -239,7 +240,9 @@ export class Hud {
     const cards = sq
       .slice(0, 6)
       .map((s) => {
-        const pips = s.members.map((m) => `<span class="pip ${!m.alive ? 'dead' : m.hp / m.maxHp < 0.35 ? 'low' : m.hp / m.maxHp < 0.7 ? 'mid' : ''}"></span>`).join('');
+        const k = s.hp / s.maxHp;
+        const bar = `<span class="hpbar"><i class="${k < 0.35 ? 'low' : k < 0.7 ? 'mid' : ''}" style="width:${(k * 100).toFixed(0)}%"></i></span>`;
+        const pips = bar + s.members.map((m) => `<span class="pip ${m.alive ? '' : 'dead'}"></span>`).join('');
         const st = squadStatus(s, g.world);
         const lv = BALANCE.combat.levels;
         const next = lv[s.level + 1];
@@ -257,7 +260,7 @@ export class Hud {
       return `<button class="cmd ${afford ? '' : 'disabled'} ${active ? 'on' : ''}" data-act="${act}"><kbd>${key}</kbd>${label}${c}</button>`;
     };
     const mode = g.mode;
-    let cmds = btn('attackMove', 'Attack-move', 'A', undefined, mode.kind === 'attackMove') + btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'S');
+    let cmds = btn('attackMove', 'Attack-move', 'A', undefined, mode.kind === 'attackMove') + btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'S') + `<button class="cmd" data-act="disband" title="Walk back to the Barracks and stand down: frees command and upkeep, refunds ${BALANCE.economy.disbandRefund * 100}% of the cost">Disband</button>`;
     if (eng) {
       const b = (id: string, key: string) => btn(`build:${id}`, STRUCTURES[id].name, key, STRUCTURES[id].cost, mode.kind === 'build' && mode.defId === id);
       cmds += '<div class="sep"></div>' + b('sandbags', 'F') + b('wire', 'G') + b('mgNest', 'T') + b('outpost', 'O') + btn('charge', 'Demo Charge', 'C', ABILITIES.demoCharge.cost, mode.kind === 'charge') + btn('deconstruct', 'Deconstruct', 'X', undefined, mode.kind === 'deconstruct');

@@ -236,6 +236,15 @@ export class Game {
     this.changed();
   }
 
+  disband(): void {
+    const sq = this.selectedSquads;
+    if (!sq.length) return;
+    const err = this.world.orderDisband(sq);
+    if (err) this.toast(err);
+    else this.toast(`${sq.length > 1 ? `${sq.length} squads` : sq[0].name} heading back to stand down`);
+    this.changed();
+  }
+
   stop(): void {
     this.world.stop(this.selectedSquads);
     this.changed();
