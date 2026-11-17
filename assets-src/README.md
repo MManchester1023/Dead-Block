@@ -10,6 +10,8 @@ Authors and licences for every file are in `../CREDITS.md`. Planned uses are in 
 | Use | Files |
 |---|---|
 | Zombie bodies (style match for the crowd) | `zombie (1).glb`, `zombie (2).glb`, `zombie.glb`, `zombie_woman.glb`, `puller.glb`, `bloater.glb`, `zombie_crawl.glb`, `zombie_screamanimation.glb`, `polyart_zombies_with_animations_free_pack.glb` |
+| Bloater candidate (only an idle animation; 50k triangles, needs heavy simplifying) | `fat_zombie_idle_animated.glb` |
+| Power station (region 3, power system) | `emergency_power_station_ps1.glb` (38 triangles, low-poly; ready to use) |
 | Boss candidate | `tankzombie.glb` |
 | Soldiers (no animations; need retargeting) | `military_rts_character_1_cc0.glb`, `rts_mercenaries_1_cc0.glb`, `rts_mercenaries_2_cc0.glb` |
 | Aircraft (call-ins, flyovers) | `a-10_thunderbolt_ii.glb`, `bell_huey_helicopter.glb`, `boeing_ch-47_chinook.glb`, `eurocopter_tiger_attack_helicopter.glb`, `helicopter.glb`, `helicopter_military.glb`, `low-poly_fighter_jet.glb`, `mq-9_reaper_drone__game_ready_military_asset.glb` |

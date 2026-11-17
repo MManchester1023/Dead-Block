@@ -40,3 +40,5 @@ Everything else in the city (buildings, vehicles, trees, street furniture, groun
 | Zombie Scream | Juangamer | CC-BY-4.0 |
 | Zombie Woman | samsikua | CC-BY-4.0 |
 | Zombie (`zombieidle.glb`) | pxltiger | CC-BY-4.0 |
+| [Emergency Power Station (PS1)](https://sketchfab.com/3d-models/emergency-power-station-ps1-389f5331f49744dfa82a45fabb75d740) | S1lMoon | CC-BY-4.0 |
+| [fat zombie idle (animated)](https://sketchfab.com/3d-models/fat-zombie-idle-animated-ab45b1f5bf0947fa8a3f2d349f47e0ba) | vicente betoret ferrero | CC-BY-4.0 |
