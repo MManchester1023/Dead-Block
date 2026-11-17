@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.11** | Tutorial region 2 built: Gas Station Strip (§17). Roadmap Tier 1 #10 done; next up is region 3. |
 | **v4.10** | Playtest rounds 4–5 implemented except #54, #58, #64. §21 roadmap re-ranked: every open item (including parked playtest notes) is now in one ordered list, with done items marked. Uploaded models catalogued (§21 visual track). |
 | **v4.9** | Round 5 design decisions recorded: one shared squad health pool (§5), three tutorial regions instead of seven (§17), medics keep their place in the roadmap, "Shriekers" in #59 meant Bloaters. |
 | **v4.8** | Playtest round 5 logged (§22): 20 notes from a two-person playtest, with likely causes, proposed fixes and the design conflicts they raise. No code changes in this revision. |
@@ -658,7 +659,7 @@ These are left open on purpose so they don't block the core design or the protot
 **Three tutorial regions** (replaces the earlier seven-mission plan). Two small regions, then one big one, each harder than the last:
 
 1. **Region 1 (small):** Roadside Motel, the current 192 × 192 m zone. Basics: camera, selection, movement, cover, noise, fortifying, recruiting, support, killing a hive, securing.
-2. **Region 2 (small):** a second small zone with more zombies and a stronger hive.
+2. **Region 2 (small): Gas Station Strip** ✔ v4.11. 192 × 192 m east of the motel, on the same main road. Two gas stations (pump islands are low cover, canopies are walkable), a strip mall facing a big parking lot, a truck-stop diner, a car wash, houses and a small apartment block; the hive sits in the far south-east lot. Easy difficulty tier (tougher, more numerous dead than the motel, more Runners, a busier hive). Until the motel is secured it's behind a chain-link fence with jersey barriers across the road, dimmed on screen, and empty: no zombies, hive or noise. Securing the motel cuts the wire, seeds the district and wakes its hive. Scripted bots: careful advancing wins 6/6 (engineers usually lost at the hive); charging straight in is wiped 6/6.
 3. **Region 3 (big):** a larger map, the final exam before the open world.
 
 **Regions attach as you go.** Clearing a region opens the road from HQ to the next one; the new region is added next to the existing map, not loaded as a separate level, so the city stays one continuous world (§2). Until a region is attached, its edge is closed.
@@ -718,8 +719,8 @@ Every feature, ranked by importance to the game being fun and shippable. **Work 
 9. ✔ Per-district difficulty tiers (tutorial → easy → standard)
 
 ### Tier 1: The campaign loop (next)
-10. **Tutorial region 2** (small, harder): a fixed, hand-authored map that attaches to the city when Roadside Motel is cleared, reachable from HQ (#58, §17). *This is the next thing to build: it proves "clear a region → the next one opens".*
-11. **Tutorial region 3** (big): the final tutorial map, attached after region 2; then the open-world unlock (#58, §17)
+10. ✔ **Tutorial region 2: Gas Station Strip** (v4.11). Fenced off east of the motel until the motel is secured, then the wire is cut, the region is seeded and its hive wakes (#58, §17)
+11. **Tutorial region 3** (big): the final tutorial map, attached after region 2; then the open-world unlock (#58, §17). *Next thing to build.*
 12. **Healing: Medic Team and Med Bay.** No passive healing (#48), so a long campaign needs a way to recover. Kept at its §6 unlock point, but needed by region 3 at the latest
 13. **Guard towers**: engineer-built, one squad garrisons it for extra range and sight over cars and walls; zombies have to tear it down (#54). Uses the existing `garrisonedIn` hook
 14. ✔ Region takeover → hive (§19)

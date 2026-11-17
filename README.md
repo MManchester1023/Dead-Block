@@ -26,7 +26,7 @@ npm run build
 
 ## What's in the MVP (roadmap Tier 0, plus a few Tier 1 items)
 
-- Real scale (**1 unit = 1 m**, 3 m nav grid): the main base plus the 192 × 192 m **Roadside Motel** starter zone. Q/E rotates the camera. Seamless zoom from street level to an operations-map view (`M`).
+- Real scale (**1 unit = 1 m**, 3 m nav grid): the main base plus two 192 × 192 m tutorial regions: **Roadside Motel**, then **Gas Station Strip**, which stays fenced off until the motel is secured. Q/E rotates the camera. Seamless zoom from street level to an operations-map view (`M`).
 - Fixed-step simulation that keeps running across zoom levels, with pause and 1×/2×/4× speed.
 - **Rifle Squads** and **Engineer Teams** with individual members. Members die one at a time; a wiped squad is gone for good.
 - **Threat-priority focus fire** (doc §5 v4): lock a target and finish it; danger-close threats break the lock; otherwise bosses > specials > normals.

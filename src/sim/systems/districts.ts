@@ -12,6 +12,7 @@ function updateNests(w: World, dt: number): void {
   for (const b of w.map.buildings) {
     const st = w.buildingState.get(b.id);
     if (!st || st.nest <= 0) continue;
+    if (w.districtAt({ x: b.rect.x + b.rect.w / 2, y: b.rect.y + b.rect.h / 2 })?.locked) continue;
     const r = b.rect;
     const near = (p: { x: number; y: number }, m: number) => p.x > r.x - m && p.x < r.x + r.w + m && p.y > r.y - m && p.y < r.y + r.h + m;
     const sq = w.squads.find((s) => s.alive && near(s.pos, S.nestTriggerRange) && s.currentOrder?.type !== 'search');
@@ -27,7 +28,7 @@ function updateNests(w: World, dt: number): void {
 export function updateDistricts(w: World, dt: number): void {
   updateNests(w, dt);
   for (const d of w.districts.values()) {
-    if (d.def.id === 'base') continue;
+    if (d.def.id === 'base' || d.locked) continue;
     const hives = w.hives.filter((h) => h.alive && h.districtId === d.def.id);
     if (hives.length) {
       // doc §2: infestation can't hit zero while a hive lives, and it slowly creeps back
@@ -62,6 +63,8 @@ export function updateDistricts(w: World, dt: number): void {
         d.infestation = 0;
         w.commandCap += BALANCE.economy.commandPerSecuredDistrict;
         w.events.emit('districtSecured', { districtId: d.def.id, name: d.def.name });
+        // the next tutorial region opens (doc §17)
+        for (const n of w.districts.values()) if (n.locked && n.def.unlockAfter === d.def.id) w.unlockDistrict(n.def.id);
         if (d.def.starter && [...w.districts.values()].every((x) => x.secured))
           w.events.emit('victory', { reason: `${d.def.name} is secured. The first block is ours.` });
       }

@@ -194,3 +194,65 @@ export function makeCar(p: PropDef): THREE.Mesh {
   mesh.rotation.y = (p.h > p.w ? Math.PI / 2 : 0) + ((p.id % 7) - 3) * 0.05 + (p.id % 2 ? Math.PI : 0);
   return mesh;
 }
+
+/** A gas-pump island (v4.10, Gas Station Strip): kerbed island, two pump cabinets, bollards. */
+export function makePumpIsland(p: PropDef): THREE.Mesh {
+  const B = new Batch();
+  const L = p.w * 3; // footprint in metres (2 cells)
+  B.box(L - 0.4, 0.2, 1.6, 0xb8b4a8, 0, 0.1, 0); // kerbed island
+  for (const x of [-L / 4, L / 4]) {
+    B.box(0.8, 1.6, 0.55, 0xd8d4c8, x, 1.0, 0); // pump cabinet
+    B.box(0.82, 0.35, 0.57, p.color, x, 1.55, 0); // branded top
+    B.box(0.5, 0.35, 0.05, 0x2b3438, x, 1.1, 0.29); // display
+    B.box(0.06, 0.5, 0.06, 0x1c1c1c, x + 0.3, 0.9, 0.3); // nozzle
+  }
+  for (const x of [-L / 2 + 0.25, L / 2 - 0.25]) B.box(0.18, 0.8, 0.18, 0xd8b030, x, 0.5, 0); // bollards
+  const mesh = B.build();
+  mesh.position.set(p.pos.x, 0, p.pos.y);
+  if (p.h > p.w) mesh.rotation.y = Math.PI / 2;
+  return mesh;
+}
+
+/** Forecourt canopy: a flat roof on four posts with a branded fascia (walkable underneath). */
+export function drawCanopy(B: Batch, r: { x: number; y: number; w: number; h: number }): void {
+  const cx = r.x + r.w / 2;
+  const cz = r.y + r.h / 2;
+  const H = 5.2;
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) B.box(0.4, H, 0.4, 0xd8d4c8, cx + sx * (r.w / 2 - 2), H / 2, cz + sz * (r.h / 2 - 1.5));
+  B.box(r.w, 0.35, r.h, 0xe8e6e0, cx, H + 0.2, cz); // roof slab
+  B.box(r.w + 0.1, 0.7, r.h + 0.1, 0xb83a2a, cx, H + 0.55, cz); // fascia band
+  B.box(r.w - 0.5, 0.12, r.h - 0.5, 0xf4f2ea, cx, H - 0.02, cz); // light panel underside
+}
+
+/** The fence line closing off a locked tutorial region: chain-link with jersey barriers across the roads. */
+export function makeBorder(map: CityMap, r: { x: number; y: number; w: number; h: number }): THREE.Mesh {
+  const B = new Batch();
+  const vertical = r.h > r.w;
+  const len = vertical ? r.h : r.w;
+  const at = (s: number) => (vertical ? { x: r.x + r.w / 2, z: r.y + s } : { x: r.x + s, z: r.y + r.h / 2 });
+  const tile = (x: number, z: number) => map.tiles[Math.floor(z / map.cell) * map.cols + Math.floor(x / map.cell)];
+  const ry = vertical ? Math.PI / 2 : 0;
+  for (let s = 0; s < len; s += 3) {
+    const p = at(s + 1.5);
+    const road = tile(p.x, p.z) === Tile.Road;
+    if (road) {
+      B.box(2.8, 0.85, 0.6, 0xb8b4aa, p.x, 0.42, p.z, ry); // jersey barrier
+      B.box(2.8, 0.12, 0.62, 0xc84a2a, p.x, 0.75, p.z, ry); // red stripe
+    } else {
+      const q = at(s);
+      B.box(0.1, 2.4, 0.1, 0x6a6a66, q.x, 1.2, q.z); // post
+      B.box(3, 2.1, 0.03, 0x8a8a84, p.x, 1.2, p.z, ry); // mesh panel
+      B.box(3, 0.06, 0.06, 0x6a6a66, p.x, 2.35, p.z, ry); // top rail
+    }
+  }
+  // a "ROAD CLOSED" sign on the main road
+  const mid = map.roads.find((x) => x.axis === 'h');
+  if (mid) {
+    const p = vertical ? { x: r.x - 2, z: mid.rect.y + mid.rect.h / 2 } : { x: r.x, z: r.y };
+    B.box(0.1, 1.6, 0.1, 0x3a3a3a, p.x, 0.8, p.z - 1.2);
+    B.box(0.1, 1.6, 0.1, 0x3a3a3a, p.x, 0.8, p.z + 1.2);
+    B.box(0.08, 0.9, 3, 0xe0b030, p.x, 1.9, p.z);
+    B.box(0.1, 0.25, 2.8, 0x1c1c1c, p.x, 1.9, p.z);
+  }
+  return B.build();
+}

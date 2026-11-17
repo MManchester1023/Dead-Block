@@ -236,6 +236,6 @@ export const ROADSIDE_MOTEL_TUTORIAL: TutorialStep[] = [
   {
     id: 'done',
     title: 'Block secured',
-    text: 'That’s the core loop: <b>move, clear, secure, reinforce</b>. In the full game the seven starter zones each add something new before the city opens up. Good work, Commander.',
+    text: 'That’s the core loop: <b>move, clear, secure, reinforce</b>.<br><br>Securing the motel opened the fence on the east road: <b>Gas Station Strip</b> is region 2 of 3. More dead, a faster hive, more Runners. Same drill. Good work, Commander.',
   },
 ];

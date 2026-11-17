@@ -33,7 +33,8 @@ export interface BuildingDef {
 
 export interface PropDef {
   id: number;
-  kind: 'car';
+  /** 'pump' = a gas-pump island (v4.10): low cover, not crushable. */
+  kind: 'car' | 'pump';
   pos: Vec2; // centre, metres
   w: number; // metres (real car footprint, ~4.6 × 1.9)
   h: number;
@@ -63,6 +64,13 @@ export interface DistrictDef {
   /** Starting zombies per infestation point, and the mix (doc §2 table: who lives where). */
   density: number;
   mix: Record<string, number>;
+  /**
+   * Tutorial regions (§17, v4.10): closed off by a fence line (`border`, metres) until the district
+   * `unlockAfter` is secured. Locked districts have no zombies, hive or noise until then.
+   */
+  locked?: boolean;
+  unlockAfter?: string;
+  border?: Rect;
 }
 
 /** Everything in metres except `tiles` / `cols` / `rows` / `*Cells`, which are nav-grid cells. */
@@ -80,17 +88,21 @@ export interface CityMap {
   districts: DistrictDef[];
   baseRect: Rect;
   baseGate: Rect;
+  /** Gas-station canopies (metres): roofs on posts, purely visual, walkable underneath. */
+  canopies: Rect[];
   rally: Vec2;
 }
 
 /**
- * MVP slice of the city: the main base plus one starter zone (Roadside Motel), doc §15.
- * Authored on the nav grid (64 × 64 cells = 192 × 192 m at 3 m cells), then converted to metres.
- * The map is one continuous grid; later districts get appended to the east/north as the city grows.
+ * The opening of the city: the main base, tutorial region 1 (Roadside Motel) and tutorial region 2
+ * (Gas Station Strip, east of the motel, fenced off until the motel is secured), doc §15, §17.
+ * Authored on the nav grid (each region 64 × 64 cells = 192 × 192 m at 3 m cells), then converted to
+ * metres. Hand-placed and identical every run (doc §2); the RNG only varies cosmetics (colours, which
+ * of two lanes a stalled car sits in), always from the same seed.
  */
 export function buildStarterMap(seed = 7): CityMap {
   const rng = new Rng(seed);
-  const width = 104;
+  const width = 170; // v4.10: was 104 (motel only); region 2 occupies x 104–167
   const height = 72;
   const tiles = new Uint8Array(width * height).fill(Tile.Dirt);
   const set = (x: number, y: number, t: Tile) => {
@@ -122,7 +134,7 @@ export function buildStarterMap(seed = 7): CityMap {
   fill({ x: baseRect.x + baseRect.w, y: 33, w: 1, h: 6 }, Tile.BaseConcrete);
   // north-south roads in the zone
   // north-south avenues run the full height of the map (off both edges) so the city reads as continuing
-  for (const rx of [56, 86]) {
+  for (const rx of [56, 86, 132]) {
     fill({ x: rx - 1, y: 0, w: 1, h: height }, Tile.Sidewalk);
     fill({ x: rx, y: 0, w: 4, h: height }, Tile.Road);
     fill({ x: rx + 4, y: 0, w: 1, h: height }, Tile.Sidewalk);
@@ -133,6 +145,11 @@ export function buildStarterMap(seed = 7): CityMap {
     { x: 40, y: 40, w: 14, h: 6 },
     { x: 91, y: 50, w: 11, h: 14 },
     { x: 66, y: 40, w: 16, h: 4 },
+    // region 2: gas station forecourts, strip-mall lot, diner lot
+    { x: 106, y: 20, w: 22, h: 13 },
+    { x: 140, y: 39, w: 24, h: 12 },
+    { x: 138, y: 19, w: 27, h: 13 },
+    { x: 107, y: 47, w: 12, h: 6 },
   ];
   lots.forEach((r) => fill(r, Tile.Parking));
 
@@ -161,6 +178,22 @@ export function buildStarterMap(seed = 7): CityMap {
   addB({ x: 92, y: 22, w: 8, h: 8 }, 'houses', 2);
   addB({ x: 92, y: 41, w: 9, h: 6 }, 'warehouse', 2);
 
+  // ---- tutorial region 2: Gas Station Strip (doc §2: pumps and convenience stores; Walkers) ----
+  addB({ x: 107, y: 7, w: 8, h: 7 }, 'houses', 1);
+  addB({ x: 118, y: 7, w: 8, h: 8 }, 'houses', 2);
+  addB({ x: 107, y: 21, w: 8, h: 5 }, 'shop', 1); // gas station A: convenience store
+  addB({ x: 138, y: 9, w: 26, h: 8 }, 'shop', 1); // strip mall, facing its lot
+  addB({ x: 108, y: 41, w: 9, h: 6 }, 'shop', 1); // truck-stop diner
+  addB({ x: 121, y: 42, w: 8, h: 7 }, 'warehouse', 1); // car wash
+  addB({ x: 141, y: 44, w: 8, h: 5 }, 'shop', 1); // gas station B: convenience store
+  addB({ x: 107, y: 57, w: 8, h: 8 }, 'houses', 1);
+  addB({ x: 119, y: 57, w: 8, h: 8 }, 'houses', 2);
+  addB({ x: 140, y: 56, w: 9, h: 9 }, 'apartment', 3);
+  const canopyCells: Rect[] = [
+    { x: 116, y: 26, w: 11, h: 5 },
+    { x: 150, y: 41, w: 11, h: 5 },
+  ];
+
   // abandoned cars: in lots and stalled on roads (cover, doc §5)
   const props: PropDef[] = [];
   const carColors = [0x8b3a2f, 0x3f5a6b, 0xb0a890, 0x2f2f2f, 0x5b6b3a, 0x9a8a5a, 0x6b4a6b];
@@ -177,6 +210,11 @@ export function buildStarterMap(seed = 7): CityMap {
     for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) blockedByProp.add(y * width + x);
     props.push({ id: 10000 + props.length, kind: 'car', pos: { x: x0 + w / 2, y: y0 + h / 2 }, w, h, cells: { x: x0, y: y0, w, h }, color: rng.pick(carColors), cover: 0.4, crushable: true });
   };
+  // gas-pump islands under the canopies: 2 cells long, low cover
+  const addPump = (cx: number, cy: number) => {
+    for (const x of [cx, cx + 1]) blockedByProp.add(cy * width + x);
+    props.push({ id: 10000 + props.length, kind: 'pump', pos: { x: cx + 1, y: cy + 0.5 }, w: 2, h: 1, cells: { x: cx, y: cy, w: 2, h: 1 }, color: 0xb83a2a, cover: 0.3, crushable: false });
+  };
   for (let x = 64; x < 77; x += 3) {
     if (rng.chance(0.75)) addCar(x + 1, 16, false);
     if (rng.chance(0.6)) addCar(x + 1, 27, false);
@@ -187,12 +225,25 @@ export function buildStarterMap(seed = 7): CityMap {
   for (const x of [36, 41, 47, 52, 63, 70, 79, 92, 99]) addCar(x, rng.chance(0.5) ? 35 : 37, true);
   for (const y of [12, 22, 45, 58]) addCar(rng.chance(0.5) ? 57 : 59, y, false);
   for (const y of [15, 28, 55]) addCar(rng.chance(0.5) ? 87 : 89, y, false);
+  // region 2: pumps, stalled traffic, abandoned cars at the pumps and in the lots
+  for (const [x, y] of [[118, 28], [122, 28], [152, 43], [156, 43]]) addPump(x, y);
+  for (const x of [108, 114, 121, 127, 139, 146, 153, 161, 166]) addCar(x, rng.chance(0.5) ? 35 : 37, true);
+  for (const y of [10, 22, 46, 60]) addCar(rng.chance(0.5) ? 133 : 135, y, false);
+  for (const [x, y] of [[119, 30], [124, 26], [153, 45], [110, 31], [145, 41]]) addCar(x, y, true);
+  for (let x = 140; x < 163; x += 3) {
+    if (rng.chance(0.6)) addCar(x + 1, 21, false);
+    if (rng.chance(0.45)) addCar(x + 1, 29, false);
+  }
+  for (let i = 0; i < 3; i++) addCar(rng.int(109, 117), rng.int(48, 51), true);
 
   const districts: DistrictDef[] = [
     { id: 'base', name: 'Main Base', rect: baseRect, starter: true, hiveSites: [], initialInfestation: 0, difficulty: 0, density: 0, mix: {} },
     { id: 'motel', name: 'Roadside Motel', rect: { x: 38, y: 4, w: 64, h: 64 }, starter: true, hiveSites: [{ x: 96, y: 58 }], initialInfestation: 65, difficulty: 0,
       // doc §2: "Starter district; Walkers" — a few early Runners and one or two Bloaters as a taste
       density: 0.7, mix: { walker: 0.88, runner: 0.09, bloater: 0.03 } },
+    // tutorial region 2 (doc §17): a little harder (Easy tier), opens when the motel is secured
+    { id: 'gasStrip', name: 'Gas Station Strip', rect: { x: 104, y: 4, w: 64, h: 64 }, starter: true, hiveSites: [{ x: 159, y: 61 }], initialInfestation: 70, difficulty: 1,
+      density: 0.75, mix: { walker: 0.85, runner: 0.12, bloater: 0.03 }, locked: true, unlockAfter: 'motel', border: { x: 103, y: 0, w: 1, h: height } },
   ];
 
   // ---- cells → metres ----
@@ -211,12 +262,14 @@ export function buildStarterMap(seed = 7): CityMap {
   for (const d of districts) {
     d.rect = m(d.rect);
     d.hiveSites = d.hiveSites.map(mv);
+    if (d.border) d.border = m(d.border);
   }
 
   const roads: RoadDef[] = [
     { rect: m({ x: ROAD_X, y: 34, w: width - ROAD_X, h: 4 }), axis: 'h' },
     { rect: m({ x: 56, y: 0, w: 4, h: height }), axis: 'v' },
     { rect: m({ x: 86, y: 0, w: 4, h: height }), axis: 'v' },
+    { rect: m({ x: 132, y: 0, w: 4, h: height }), axis: 'v' },
   ];
 
   return {
@@ -233,6 +286,7 @@ export function buildStarterMap(seed = 7): CityMap {
     baseCells: baseRect,
     baseRect: m(baseRect),
     baseGate: m({ x: 29, y: 33, w: 1, h: 6 }),
+    canopies: canopyCells.map(m),
     rally: mv({ x: 25, y: 36 }),
   };
 }

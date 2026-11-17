@@ -21,6 +21,7 @@ export interface GameEvents {
   structureDismantled: { id: number; defId: string; pos: Vec2; refund: { money: number; supplies: number } };
   districtSecured: { districtId: string; name: string };
   districtLost: { districtId: string; name: string };
+  districtUnlocked: { districtId: string; name: string };
   unitProduced: { id: number; defId: string; name: string };
   newDay: { day: number; upkeep: number; paid: boolean };
   levelUp: { squadId: number; squadName: string; level: string };

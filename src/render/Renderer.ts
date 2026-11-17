@@ -10,7 +10,7 @@ import { CameraRig } from './CameraRig';
 import { PAL } from './palette';
 import { buildGroundTexture } from './procgen/ground';
 import { buildCity } from './procgen/buildings';
-import { drawDecor, makeCar, scatterDecor } from './procgen/props';
+import { drawDecor, makeCar, scatterDecor, makePumpIsland, drawCanopy, makeBorder } from './procgen/props';
 import { Batch } from './procgen/batch';
 import { models } from './ModelLibrary';
 import { squadStatus } from '../ui/status';
@@ -36,6 +36,7 @@ const SOLDIER_SCALE = 1.6;
 const MAX_ZOMBIES = 320;
 
 /** World (x, y) → scene (x, h, y). The renderer only reads the simulation; it never mutates it. */
+const SHADOW_HALF = 200; // metres either side of the camera target that get sun shadows
 const CRATE_FALL_SEC = 6;
 const FLYOVER_SPEED = 55; // m/s across the ground: slower than a real C-130 so you can watch it pass
 
@@ -81,6 +82,7 @@ export class Renderer {
   private corpses: { key: string; x: number; z: number; facing: number; t0: number; sx: number; sy: number; tint?: number }[] = [];
   private animClock = 0;
   private rallyFlag: THREE.Group;
+  private borders = new Map<string, THREE.Mesh>();
   private flyovers = new Map<number, { mesh: THREE.Mesh; dir: Vec2; done: boolean }>();
   private ghostArrow: THREE.Mesh;
   private ghostRange: THREE.Mesh;
@@ -109,10 +111,11 @@ export class Renderer {
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(4096, 4096);
     const sc = this.sun.shadow.camera;
-    sc.left = -225;
-    sc.right = 225;
-    sc.top = 180;
-    sc.bottom = -180;
+    // v4.10: the map is ~510 m wide now, so the shadow box follows the camera instead of covering it all
+    sc.left = -SHADOW_HALF;
+    sc.right = SHADOW_HALF;
+    sc.top = SHADOW_HALF;
+    sc.bottom = -SHADOW_HALF;
     sc.far = 600;
     this.sun.shadow.bias = -0.0005;
     this.sun.shadow.normalBias = 0.2;
@@ -214,7 +217,29 @@ export class Renderer {
     }
     this.scene.add(city.build());
 
+    // gas-station canopies: their own fading meshes, so units under them stay visible
+    for (const r of m.canopies) {
+      const cb = new Batch();
+      drawCanopy(cb, r);
+      const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+      const mesh = cb.build(mat);
+      this.scene.add(mesh);
+      this.buildings.push({ mesh, mat, box: new THREE.Box3(new THREE.Vector3(r.x, 0, r.y), new THREE.Vector3(r.x + r.w, 6, r.y + r.h)), opacity: 1 });
+    }
+
+    // fences closing off tutorial regions that haven't opened yet (doc §17)
+    for (const d of m.districts) {
+      if (!d.locked || !d.border) continue;
+      const fence = makeBorder(m, d.border);
+      this.scene.add(fence);
+      this.borders.set(d.id, fence);
+    }
+
     for (const p of m.props) {
+      if (p.kind === 'pump') {
+        this.scene.add(makePumpIsland(p));
+        continue;
+      }
       const model = models.instance('car');
       if (model) {
         model.position.set(p.pos.x, 0, p.pos.y);
@@ -448,6 +473,15 @@ export class Renderer {
       if (this.tracers.length < 1000) this.tracers.push({ a: e.from, b: e.to, life: e.heavy ? 0.12 : 0.06, heavy: !!e.heavy });
     });
     ev.on('explosion', (e) => this.spawnExplosion(e.pos, e.radius, e.type === 'toxic' ? 0x8fbf3a : 0xffa040));
+    // a tutorial region opens: the fence comes down in a cloud of dust
+    ev.on('districtUnlocked', (e) => {
+      const fence = this.borders.get(e.districtId);
+      if (!fence) return;
+      this.scene.remove(fence);
+      this.borders.delete(e.districtId);
+      const b = this.world.districts.get(e.districtId)?.def.border;
+      if (b) for (let y = b.y + 6; y < b.y + b.h; y += 24) this.spawnSmoke({ x: b.x + b.w / 2, y }, 0x9a8a6a, 3);
+    });
     // a searched building gets a spray-painted X by the door (v4.9 #46)
     ev.on('buildingSearched', (e) => {
       const mat = new THREE.MeshBasicMaterial({ color: e.found === 'zombies' ? 0xd2443a : 0xe0802a, transparent: true, opacity: 0.85, depthWrite: false });
@@ -703,6 +737,14 @@ export class Renderer {
     this.animClock += simDt;
     const w = this.world;
     this.rig.apply(realDt);
+    {
+      // keep the sun's shadow box centred on what the camera looks at (snapped to texels to avoid shimmer)
+      const step = (SHADOW_HALF * 2) / 4096;
+      const tx = Math.round(this.rig.target.x / step) * step;
+      const tz = Math.round(this.rig.target.z / step) * step;
+      this.sun.position.set(tx - 66, 210, tz + 114);
+      this.sun.target.position.set(tx, 0, tz);
+    }
     this.rallyFlag.position.set(w.map.rally.x, 0, w.map.rally.y);
     this.rallyFlag.rotation.y = Math.sin(this.time * 1.3) * 0.15;
     if (this.crowds) this.renderCrowds(simDt);
@@ -831,13 +873,19 @@ export class Renderer {
       const mat = ov.material as THREE.MeshBasicMaterial;
       // a faint tint at street level (keep the asphalt grey), a clear read on the ops map
       const k = this.rig.strategic ? 1 : 0.25;
-      mat.opacity = (d.secured ? 0.07 : 0.04 + (d.infestation / 100) * 0.26) * k;
-      mat.color.set(d.secured ? 0x5d8a4a : PAL.infest);
+      if (d.locked) {
+        // not open yet: dimmed, so the playable area reads clearly
+        mat.opacity = this.rig.strategic ? 0.55 : 0.5;
+        mat.color.set(0x111316);
+      } else {
+        mat.opacity = (d.secured ? 0.07 : 0.04 + (d.infestation / 100) * 0.26) * k;
+        mat.color.set(d.secured ? 0x5d8a4a : PAL.infest);
+      }
       const lab = this.districtLabels.get(id)!;
       lab.style.display = this.rig.strategic ? 'block' : 'none';
       if (this.rig.strategic)
         this.placeLabel(lab, { x: d.def.rect.x + d.def.rect.w / 2, y: d.def.rect.y + d.def.rect.h / 2 }, 0, () =>
-          `<div class="dname">${d.def.name}</div><div>${d.secured ? 'SECURED' : `${Math.ceil(d.infestation)}% infested`}</div>`,
+          `<div class="dname">${d.def.name}</div><div>${d.locked ? 'RESTRICTED · opens when the previous region is secured' : d.secured ? 'SECURED' : `${Math.ceil(d.infestation)}% infested`}</div>`,
         );
     }
 

@@ -227,6 +227,11 @@ export class Hud {
     if (this.collapsed.has('districts')) return this.set(this.districts, html);
     for (const d of w.districts.values()) {
       if (d.def.id === 'base') continue;
+      if (d.locked) {
+        const after = d.def.unlockAfter ? w.districts.get(d.def.unlockAfter)?.def.name : null;
+        html += `<div class="district locked"><div class="row"><b>${d.def.name}</b><span class="muted">LOCKED</span></div><label>${after ? `Opens when ${after} is secured` : 'Not open yet'}</label></div>`;
+        continue;
+      }
       const hive = w.hives.filter((h) => h.alive && h.districtId === d.def.id);
       const status = d.secured ? '<span class="good">SECURED</span>' : d.cleared ? '<span class="warn">CLEAR — build outpost</span>' : '<span class="bad">INFESTED</span>';
       html += `<div class="district">
@@ -241,16 +246,21 @@ export class Hud {
 
   private renderObjectives(): void {
     const w = this.game.world;
-    const motel = w.districts.get('motel')!;
-    const hiveDown = w.hives.filter((h) => h.districtId === 'motel').every((h) => !h.alive);
+    // the current tutorial region: the first open district that isn't secured yet (doc §17)
+    const regions = [...w.districts.values()].filter((d) => d.def.id !== 'base');
+    const cur = regions.find((d) => !d.locked && !d.secured) ?? regions[regions.length - 1];
+    const id = cur.def.id;
+    const hiveDown = w.hives.filter((h) => h.districtId === id).every((h) => !h.alive);
+    const step = regions.indexOf(cur) + 1;
     const items = [
       [hiveDown, 'Destroy the hive <small>(engineer demo charge — bullets won\'t do it)</small>'],
-      [motel.cleared || motel.secured, `Clear Roadside Motel to 0% <small>(${Math.ceil(motel.infestation)}%)</small>`],
-      [motel.secured, 'Build an outpost there with engineers'],
+      [cur.cleared || cur.secured, `Clear ${cur.def.name} to 0% <small>(${Math.ceil(cur.infestation)}%)</small>`],
+      [cur.secured, 'Build an outpost there with engineers'],
     ] as const;
+    const region = `<div class="row small"><span>Region ${step} of ${regions.length}: <b>${cur.def.name}</b></span></div>`;
     const head = `<h3 class="collapsible" data-act="collapse:objectives">${this.collapsed.has('objectives') ? '▸' : '▾'} Objectives</h3>`;
     if (this.collapsed.has('objectives')) return this.set(this.objectives, head);
-    this.set(this.objectives, `${head}${items.map(([done, t]) => `<div class="obj ${done ? 'done' : ''}">${done ? '☑' : '☐'} ${t}</div>`).join('')}`);
+    this.set(this.objectives, `${head}${region}${items.map(([done, t]) => `<div class="obj ${done ? 'done' : ''}">${done ? '☑' : '☐'} ${t}</div>`).join('')}`);
   }
 
   private renderSelection(): void {

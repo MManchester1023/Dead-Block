@@ -28,6 +28,8 @@ export interface DistrictState {
   secured: boolean;
   outpostId: number | null;
   cleared: boolean;
+  /** Tutorial region not opened yet (v4.10): fenced off, empty, ignored by the systems. */
+  locked: boolean;
 }
 
 export interface NoiseEvent {
@@ -85,7 +87,9 @@ export class World {
     }
     for (const p of this.map.props) this.grid.setRect(p.cells.x, p.cells.y, p.cells.w, p.cells.h, true, p.id);
     for (const d of this.map.districts)
-      this.districts.set(d.id, { def: d, infestation: d.initialInfestation, noise: 0, noiseHold: 0, secured: d.id === 'base', outpostId: null, cleared: d.initialInfestation === 0 });
+      this.districts.set(d.id, { def: d, infestation: d.initialInfestation, noise: 0, noiseHold: 0, secured: d.id === 'base', outpostId: null, cleared: d.initialInfestation === 0, locked: !!d.locked });
+    // locked tutorial regions are fenced off until they open
+    for (const d of this.map.districts) if (d.locked && d.border) this.setBorder(d, true);
 
     if (opts.populate !== false) this.populate();
   }
@@ -127,25 +131,43 @@ export class World {
     this.spawnSquad('rifle', { x: 66, y: 114 });
     this.spawnSquad('engineer', { x: 54, y: 108 });
 
-    for (const d of m.districts)
-      for (const site of d.hiveSites) {
-        const hive = new Hive({ ...site }, d.id, BALANCE.hive.hpByStage[0], DIFFICULTY[d.difficulty].firstPulseDelaySec);
-        this.hives.push(hive);
-        this.registerHive(hive);
-      }
+    // hives and the starting dead, for every district that's open (locked ones seed when they open)
+    for (const d of this.districts.values()) if (!d.locked) this.seedDistrict(d);
+  }
 
-    // initial infestation: each district seeds its own population mix
-    for (const d of this.districts.values()) {
-      const count = Math.round(d.infestation * d.def.density * this.tier(d.def.id).density);
-      const kinds = Object.entries(d.def.mix);
-      for (let i = 0; i < count; i++) {
-        const r = d.def.rect;
-        const p = this.grid.nearestFree({ x: this.rng.range(r.x + 12, r.x + r.w - 6), y: this.rng.range(r.y + 6, r.y + r.h - 6) });
-        let roll = this.rng.next();
-        const kind = kinds.find(([, wgt]) => (roll -= wgt) < 0)?.[0] ?? 'walker';
-        this.spawnZombie(kind, p);
-      }
+  /** Hives plus the district's own starting population mix. */
+  private seedDistrict(d: DistrictState): void {
+    for (const site of d.def.hiveSites) {
+      const hive = new Hive({ ...site }, d.def.id, BALANCE.hive.hpByStage[0], DIFFICULTY[d.def.difficulty].firstPulseDelaySec);
+      this.hives.push(hive);
+      this.registerHive(hive);
     }
+    const count = Math.round(d.infestation * d.def.density * this.tier(d.def.id).density);
+    const kinds = Object.entries(d.def.mix);
+    const r = d.def.rect;
+    for (let i = 0; i < count; i++) {
+      const p = this.grid.nearestFree({ x: this.rng.range(r.x + 12, r.x + r.w - 6), y: this.rng.range(r.y + 6, r.y + r.h - 6) });
+      let roll = this.rng.next();
+      const kind = kinds.find(([, wgt]) => (roll -= wgt) < 0)?.[0] ?? 'walker';
+      this.spawnZombie(kind, p);
+    }
+  }
+
+  private setBorder(d: DistrictDef, closed: boolean): void {
+    const b = d.border!;
+    const c = this.grid.cell;
+    this.grid.setRect(Math.round(b.x / c), Math.round(b.y / c), Math.round(b.w / c), Math.round(b.h / c), closed);
+  }
+
+  /** Open a tutorial region (doc §17): cut the fence, seed it, wake its hive. */
+  unlockDistrict(id: string): void {
+    const d = this.districts.get(id);
+    if (!d || !d.locked) return;
+    d.locked = false;
+    if (d.def.border) this.setBorder(d.def, false);
+    this.seedDistrict(d);
+    this.events.emit('districtUnlocked', { districtId: id, name: d.def.name });
+    this.events.emit('radio', { speaker: 'Command', text: `Engineers have cut the wire on the east road. ${d.def.name} is open. Same drill: find the hive, kill it, plant an outpost.`, tone: 'warn' });
   }
 
   // ---------- entity management ----------
@@ -340,7 +362,7 @@ export class World {
     if (same) same.loudness = Math.max(same.loudness, loudness) + Math.min(loudness, same.loudness) * 0.1;
     else this.noiseEvents.push({ pos: { ...pos }, loudness, age: 0 });
     const d = this.districtAt(pos);
-    if (d && d.def.id !== 'base') {
+    if (d && d.def.id !== 'base' && !d.locked) {
       d.noise = Math.min(BALANCE.noise.pulseThreshold, d.noise + loudness * 0.12);
       d.noiseHold = BALANCE.noise.holdSec;
     }
