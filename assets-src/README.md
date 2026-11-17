@@ -32,5 +32,7 @@ Engineer: still needs a working loop (e.g. hammering / kneeling and working).
 
 ### `mixamo/to-rig/`
 
+`female_zombie.zip`: the female zombie (all parts, ~17,700 triangles, three textures), same treatment.
+
 `military_rts_character_1.zip`: the Military RTS Character 1 soldier (middle detail level, ~2,700 triangles) converted to OBJ + texture, Y-up, T-pose, feet on the ground, facing +Z. **Mixamo doesn't accept .glb**, so this zip is what to upload to Mixamo's auto-rigger. It will be used for both riflemen and engineers (engineers recoloured).
 
