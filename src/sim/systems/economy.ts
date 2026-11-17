@@ -2,16 +2,23 @@ import { BALANCE } from '../../config/balance';
 import { UNITS } from '../../config/units';
 import type { World } from '../World';
 
+/** Current income rates per minute, for the HUD. */
+export function incomeRates(w: World): { money: number; supplies: number } {
+  const E = BALANCE.economy;
+  const secured = [...w.districts.values()].filter((d) => d.secured && d.def.id !== 'base').length;
+  return { money: secured * E.securedDistrictMoneyPerMin, supplies: E.baseSuppliesPerMin + secured * E.securedDistrictSuppliesPerMin };
+}
+
 export function updateEconomy(w: World, dt: number): void {
   const E = BALANCE.economy;
   const securedCount = [...w.districts.values()].filter((d) => d.secured && d.def.id !== 'base').length;
   w.money += (securedCount * E.securedDistrictMoneyPerMin * dt) / 60;
+  w.addSupplies(((E.baseSuppliesPerMin + securedCount * E.securedDistrictSuppliesPerMin) * dt) / 60);
 
   w.dayTimer += dt;
   if (w.dayTimer >= E.dayLengthSec) {
     w.dayTimer -= E.dayLengthSec;
     w.day++;
-    w.addSupplies(E.baseSuppliesPerDay + securedCount * E.securedDistrictSuppliesPerDay);
     // daily upkeep (doc §11): one predictable payment per active unit per day
     const upkeep = w.squads.reduce((n, s) => n + (s.alive ? s.def.upkeep : 0), 0);
     let paid = true;

@@ -24,6 +24,7 @@ export interface GameEvents {
   unitProduced: { id: number; defId: string; name: string };
   newDay: { day: number; upkeep: number; paid: boolean };
   levelUp: { squadId: number; squadName: string; level: string };
+  bleed: { pos: Vec2; from?: Vec2; heavy: boolean };
   smoke: { pos: Vec2; color: number; duration: number };
   radio: { speaker: string; text: string; tone?: 'info' | 'warn' | 'good' | 'bad' };
   toxicCloud: { pos: Vec2; radius: number; duration: number };

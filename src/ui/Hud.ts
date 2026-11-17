@@ -4,6 +4,8 @@ import { ABILITIES, STRUCTURES, UNITS } from '../config/units';
 import { isEnabled } from '../config/features';
 import type { Game } from '../Game';
 import { Radio } from './Radio';
+import { squadStatus } from './status';
+import { incomeRates } from '../sim/systems/economy';
 import { SUPPORT } from '../config/support';
 import { supportBlocked } from '../sim/systems/support';
 
@@ -145,11 +147,12 @@ export class Hud {
     const g = this.game;
     const dayPct = (w.dayTimer / BALANCE.economy.dayLengthSec) * 100;
     const upkeep = w.squads.reduce((n, s) => n + s.def.upkeep, 0);
+    const inc = incomeRates(w);
     const speeds = [1, 2, 4].map((s) => `<button class="${g.speed === s ? 'on' : ''}" data-act="speed:${s}">${s}×</button>`).join('');
     this.set(this.top, `
       <div class="brand">DEAD BLOCK <span>COMMAND</span></div>
-      <div class="res" title="Money — the hard resource"><b>$</b>${Math.floor(w.money)}</div>
-      <div class="res" title="Supplies (cap)"><b>▣</b>${Math.floor(w.supplies)}<small>/${w.supplyCap}</small></div>
+      <div class="res" title="Money: the hard resource. Income from secured districts, kills, clears and hives."><b>$</b>${Math.floor(w.money)}<small class="rate">${inc.money ? `+${inc.money}/min` : ''}</small></div>
+      <div class="res" title="Supplies (cap). Income from the base depot, secured districts and kills."><b>▣</b>${Math.floor(w.supplies)}<small>/${w.supplyCap}</small><small class="rate">+${inc.supplies}/min</small></div>
       <div class="res" title="Command used / cap"><b>★</b>${w.commandUsed}<small>/${w.commandCap}</small></div>
       <div class="res day" title="Upkeep is charged at the end of each day">
         Day ${w.day}<div class="bar"><i style="width:${dayPct.toFixed(1)}%"></i></div><small>upkeep −${upkeep}</small>
@@ -219,13 +222,13 @@ export class Hud {
       .slice(0, 6)
       .map((s) => {
         const pips = s.members.map((m) => `<span class="pip ${!m.alive ? 'dead' : m.hp / m.maxHp < 0.35 ? 'low' : m.hp / m.maxHp < 0.7 ? 'mid' : ''}"></span>`).join('');
-        const order = s.holding ? 'Holding' : s.currentOrder ? { move: 'Moving', attackMove: 'Attack-moving', cover: 'To cover', build: 'Building', charge: 'Planting charge', hold: 'Holding', patrol: 'Patrol', attack: 'Attacking target', deconstruct: 'Deconstructing', repair: 'Repairing' }[s.currentOrder.type] : 'Idle';
+        const st = squadStatus(s, g.world);
         const lv = BALANCE.combat.levels;
         const next = lv[s.level + 1];
         const xp = next ? `${s.xp}/${next.xp} xp` : 'max';
-        return `<div class="card"><div class="row"><b>${esc(s.name)}</b><small>${s.def.name}</small></div>
+        return `<div class="card"><div class="row"><b>${esc(s.name)}</b><span class="status ${st.tone}">${st.text}</span></div><div class="row small"><span>${s.def.name}</span></div>
           <div class="pips">${pips}</div>
-          <div class="row small"><span>${s.levelName} · ${xp}</span><span>${order}${s.inCover ? ' · cover' : ''}</span></div>
+          <div class="row small"><span>${s.levelName} · ${xp}</span></div>
           <div class="row small"><span>Kills ${s.kills}</span><span>Upkeep ${s.def.upkeep}/day</span></div></div>`;
       })
       .join('');

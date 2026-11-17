@@ -75,9 +75,11 @@ describe('v4.4 playtest round 2', () => {
     const spot = M(20, 36);
     expect(callSupport(w, 'supplyDrop', spot)).toBeNull();
     for (let i = 0; i < 30 * 12; i++) w.step(1 / 30);
-    expect(w.supplies).toBe(30); // landed, nobody there yet
+    expect(w.crates.length).toBe(1); // landed, nobody there yet
+    const before = w.supplies;
     w.spawnSquad('rifle', spot);
     w.step(1 / 30);
-    expect(w.supplies).toBe(75);
+    expect(w.supplies - before).toBeCloseTo(45, 0);
+    expect(w.crates.length).toBe(0);
   });
 });

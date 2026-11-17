@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.5** | Playtest round 3 (§22): continuous supply income (fixes outposts becoming unaffordable), Quonset barracks and roofed MG nest, tough base walls, full-length avenues, status badges, blood. Model-dependent notes parked. |
 | **v4.4** | Playtest round 2 (§22): fixed hand-authored world layout confirmed (§2), engine/porting notes (§23), repair and resume building, Command Post support powers, shooter aggro, kill salvage, wider gunfire hearing, calmer hives, crowds of hundreds to thousands. Animated CC0 characters (Quaternius) with flipbook crowd rendering. |
 | **v4.3** | Art direction: isometric first, pixel art dropped (only a loose influence). First procedural city pass: houses, apartments, motel, shops, warehouse, trees, streetlights, vehicles, painted roads. Optional glTF model overrides. |
 | **v4.2** | Playtest feedback round 1 (§22): force-attack, middle-mouse camera rotation, rifle range, time-then-distance zombie aggro, HUD click fix, looser squads, weaker basic zombies, engineer deconstruction, car wheels, 12-minute days. Plus hive alarm and 3 s charge planting. |
@@ -446,7 +447,8 @@ Two resources: **money** and **supplies**. Money is harder to get and is the mai
 | Money ($) | Secured-district income, one-time clear rewards, civilian evacuations, searched buildings | Recruiting units and vehicles, construction, air-support calls |
 | Supplies | Base/outpost income, supply crates, cleared buildings, district rewards | Unit production, daily upkeep, repairs, restoring lost members, **outpost stock [v4]** |
 
-- **Kill salvage [v4.4].** Every kill pays a little: Walkers and Runners $1 + 0.5 supplies, Bloaters $4 + 2, Screamers $3 + 1, Brutes $10 + 4. Fighting pays for itself a bit; holding a secured district still pays far better.
+- **Kill salvage [v4.4].** Every kill pays a little: Walkers and Runners $1 + 1 supply, Bloaters $4 + 3, Screamers $3 + 2, Brutes $10 + 6 [v4.5]. Fighting pays for itself a bit; holding a secured district still pays far better.
+- **Supply income is continuous [v4.5]** (+9/min from the base depot, +5/min per secured district), not a lump at day's end, so the 12-minute day never starves the opening.
 - Each active unit costs supplies once per in-game day. This is a predictable upkeep payment, not a constant drain during combat.
 - Supplies are not spent on ammo or fuel.
 - Vehicles still RTB for servicing and rearming where relevant. RTB is a behavior, not a fuel minigame.
@@ -796,4 +798,19 @@ First hands-on playtest of the browser MVP (November 2026). Every note, and what
 - **What keeps it portable:** the strict rule that the sim never touches rendering, all numbers in config, the event bus between sim and presentation, and tests on the sim. Keep following these.
 
 **When to decide.** Stay in the browser while the core is being found (fast iteration, nothing to install, easy to share). The real trigger is the crowd target: if thousands of zombies plus lighting and effects can't hold a steady frame rate on mid-range hardware after moving the sim to a Web Worker, that's the point to port. A middle option, if the only goal is "a desktop app", is wrapping the browser build (Electron/Tauri) with no port at all.
+
+### Round 3 [v4.5]
+
+| # | Note | Status |
+|---|---|---|
+| 22 | Infantry idle movement should be more realistic | **Waiting on better 3D models** (needs richer idle/look-around/fidget animations than the current pack has). |
+| 23 | Engineers should play a building animation while erecting structures | **Waiting on better 3D models.** Currently they use the pack's "pick up" animation as a stand-in. |
+| 24 | MG emplacement model is missing its roof | **Done.** Sandbag ring with a rear entrance, corrugated roof on posts, bags on top. |
+| 25 | Units in cover should look like they're in cover (leaning against it) | Open. Needs crouch/lean-on-cover poses (also benefits from better models); positioning members along the cover edge can come first. |
+| 26 | Zombies should bleed when shot and when dying | **Done.** Droplet sprays thrown away from the shooter on every hit; a dark pool spreads under each body and dries over ~45 s. |
+| 27 | Still not getting supplies from kills; after building a few things you can't afford an outpost | **Fixed.** Kills did pay (0.5 supplies per Walker), but too little to notice. The real cause: v4.2 made days 12 min long while supply income only arrived at day's end, so for the first 12 minutes almost no supplies came in. Now supplies trickle in continuously (+9/min base, +5/min per secured district), Walkers/Runners salvage 1 supply each, and the top bar shows income rates. Upkeep is still paid once per day. |
+| 28 | Barracks model is only half rendered | **Fixed.** The Quonset hut was rotated half underground; rebuilt with ribs, door and windows. |
+| 29 | Concrete main-base walls should have a lot of health | **Done.** 3,000 → 15,000 HP per section. |
+| 30 | The text saying what a unit is actively doing should be more obvious | **Done.** A coloured status badge (MOVING, ENGAGING, BUILDING, IN COVER · FIRING, PLANTING CHARGE…) on each unit card and above each squad in the world; blue = moving, orange = fighting, yellow = working. |
+| 31 | Not all roads in the test level go to the edge of the map | **Fixed.** Both avenues now run the full height of the map. |
 

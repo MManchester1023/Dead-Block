@@ -348,6 +348,7 @@ export class World {
 
   damageZombie(z: Zombie, amount: number, type: DamageType, attacker?: Targetable): void {
     z.hp -= amount;
+    if (amount >= 1 && type !== 'toxic' && type !== 'fire') this.events.emit('bleed', { pos: { ...z.pos }, from: attacker ? { ...attacker.pos } : undefined, heavy: amount > 25 });
     // getting shot makes it angry at the shooter (v4.4: Bloaters sometimes just stood there)
     if (attacker && attacker.alive && z.alive && z.state !== 'attack') {
       const cur = this.get(z.targetId);

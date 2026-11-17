@@ -13,6 +13,7 @@ import { buildCity } from './procgen/buildings';
 import { drawDecor, makeCar, scatterDecor } from './procgen/props';
 import { Batch } from './procgen/batch';
 import { models } from './ModelLibrary';
+import { squadStatus } from '../ui/status';
 import { Crowd, type Clip, type Flipbook } from './characters';
 
 interface SquadView {
@@ -279,7 +280,20 @@ export class Renderer {
         }
         break;
       case 'mgNest': {
-        add(new THREE.CylinderGeometry(2.4, 2.6, 1.0, 10, 1, true), PAL.sandbag, 0.5);
+        // sandbag ring (two courses, gap at the back for the crew), roof on four posts (v4.5)
+        for (let i = 0; i < 14; i++) {
+          const a = (i / 14) * Math.PI * 2;
+          if (Math.abs(Math.cos(a) + 1) < 0.15) continue; // entrance at the back (-x)
+          for (const [y, r, s] of [[0.22, 2.3, 1], [0.62, 2.25, 0.92]]) {
+            const bag = add(new THREE.BoxGeometry(1.1 * s, 0.42, 0.75), new THREE.Color(PAL.sandbag).offsetHSL(0, 0, (i % 3) * 0.02 - (y > 0.5 ? 0.05 : 0)).getHex(), y, Math.cos(a) * r, Math.sin(a) * r);
+            bag.rotation.y = -a + Math.PI / 2;
+          }
+        }
+        for (const [px, pz] of [[1.7, 1.7], [1.7, -1.7], [-1.7, 1.7], [-1.7, -1.7]]) add(new THREE.BoxGeometry(0.15, 2.5, 0.15), 0x5a4a32, 1.25, px, pz);
+        add(new THREE.BoxGeometry(4.4, 0.12, 4.4), 0x6e7262, 2.55); // corrugated sheet roof
+        for (let k = -2; k <= 2; k++) add(new THREE.BoxGeometry(4.4, 0.06, 0.12), 0x5e6254, 2.63, 0, k * 0.85);
+        add(new THREE.BoxGeometry(3.6, 0.4, 3.6), PAL.sandbag, 2.82); // bags on the roof against shrapnel
+        add(new THREE.BoxGeometry(0.25, 0.9, 0.25), 0x2a2a2a, 0.75); // tripod post
         const gun = new THREE.Group();
         const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.3, 0.3), new THREE.MeshLambertMaterial({ color: 0x2a2a2a }));
         const barrel = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.1, 0.1), new THREE.MeshLambertMaterial({ color: 0x1b1b1b }));
@@ -302,10 +316,23 @@ export class Renderer {
         add(new THREE.BoxGeometry(0.2, 10, 0.2), 0x2a2a2a, 10, w / 3, 0);
         add(new THREE.BoxGeometry(2.4, 0.12, 2.4), 0xb0b0a0, 14.5, w / 3, 0);
         break;
-      case 'barracks':
-        add(new THREE.CylinderGeometry(h / 2, h / 2, w, 10, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateX(Math.PI / 2), 0x5d6b3a, 0);
-        add(new THREE.BoxGeometry(0.2, 2.6, 2.2), 0x3a3a2a, 1.3, w / 2, 0);
+      case 'barracks': {
+        // Quonset hut: half-cylinder along X, arc up (v4.5: was rotated half underground)
+        const r = Math.min(h / 2, 4);
+        const len = w - 1;
+        add(new THREE.BoxGeometry(w, 0.3, h), 0x7a7a72, 0.15); // slab
+        add(new THREE.CylinderGeometry(r, r, len, 18, 1, false, 0, Math.PI).rotateZ(Math.PI / 2), 0x5d6b3a, 0.3);
+        for (let k = 0; k <= 6; k++) add(new THREE.CylinderGeometry(r + 0.04, r + 0.04, 0.12, 18, 1, true, 0, Math.PI).rotateZ(Math.PI / 2), 0x4e5a30, 0.3, -len / 2 + (k * len) / 6); // ribs
+        add(new THREE.BoxGeometry(0.2, 2.6, 2.2), 0x3a3a2a, 1.6, len / 2 + 0.05, 0); // door
+        add(new THREE.BoxGeometry(0.25, 0.3, 2.8), 0x4a4a3a, 3.05, len / 2 + 0.05, 0); // door hood
+        for (const sz of [1, -1]) for (let k = 0; k < 3; k++) {
+          const x = -len / 3 + (k * len) / 3;
+          const win = add(new THREE.BoxGeometry(1.2, 0.8, 0.1), 0x2e3c46, 2.4, x, sz * (r * 0.72));
+          win.rotation.x = sz * 0.75;
+        }
+        for (const sz of [1.6, -1.6]) add(new THREE.BoxGeometry(0.9, 0.9, 0.9), PAL.sandbag, 0.75, len / 2 + 1.2, sz);
         break;
+      }
       case 'supplyDepot':
         for (let i = 0; i < 14; i++) add(new THREE.BoxGeometry(1.8, 1.4, 1.8), i % 3 ? 0x7a6a4a : 0x5a6a3a, 0.7 + (i > 9 ? 1.4 : 0), -w / 2 + 1.5 + (i % 5) * 2.1, Math.floor((i % 10) / 5) * 2.2 - 1.5);
         add(new THREE.BoxGeometry(w, 0.15, h), 0x6a6050, 0.08);
@@ -369,6 +396,7 @@ export class Renderer {
     });
     ev.on('toxicCloud', (e) => this.spawnCloud(e.pos, e.radius, e.duration));
     ev.on('smoke', (e) => this.spawnSmoke(e.pos, e.color, e.duration));
+    ev.on('bleed', (e) => this.spawnBleed(e.pos, e.from, e.heavy));
   }
 
   private addFx(obj: THREE.Object3D, life: number, update: Fx['update']): void {
@@ -391,12 +419,65 @@ export class Renderer {
     this.addFx(scorch, 60, (_t, fx) => ((scorch.material as THREE.MeshBasicMaterial).opacity = 0.55 * Math.min(1, fx.life / 10)));
   }
 
+  /** Death: a dark pool that spreads out under the body and slowly dries (v4.5). */
   private spawnSplat(p: Vec2): void {
-    if (this.fx.length > 600) return;
-    const s = new THREE.Mesh(new THREE.CircleGeometry(0.6 + Math.random() * 0.5, 6), new THREE.MeshBasicMaterial({ color: PAL.blood, transparent: true, opacity: 0.7, depthWrite: false }));
+    if (this.fx.length > 700) return;
+    const r = 0.7 + Math.random() * 0.6;
+    const s = new THREE.Mesh(new THREE.CircleGeometry(1, 9), new THREE.MeshBasicMaterial({ color: 0x3e0c08, transparent: true, opacity: 0.8, depthWrite: false }));
     s.rotation.x = -Math.PI / 2;
-    s.position.set(p.x, 0.04, p.y);
-    this.addFx(s, 40, (_t, fx) => ((s.material as THREE.MeshBasicMaterial).opacity = 0.7 * Math.min(1, fx.life / 8)));
+    s.rotation.z = Math.random() * 6;
+    s.position.set(p.x + (Math.random() - 0.5) * 0.4, 0.04 + Math.random() * 0.01, p.y + (Math.random() - 0.5) * 0.4);
+    s.scale.set(0.2, 0.2 * (0.7 + Math.random() * 0.5), 1);
+    this.addFx(s, 45, (_t, fx) => {
+      const k = Math.min(1, (fx.max - fx.life) / 1.6); // spreads over ~1.6 s
+      s.scale.x = r * (0.2 + 0.8 * k);
+      s.scale.y = r * 0.85 * (0.2 + 0.8 * k);
+      (s.material as THREE.MeshBasicMaterial).opacity = 0.8 * Math.min(1, fx.life / 10);
+    });
+  }
+
+  private activeSprays = 0;
+  /** Hit: a spurt of droplets thrown away from the shooter, plus a few spots on the ground (v4.5). */
+  private spawnBleed(p: Vec2, from: Vec2 | undefined, heavy: boolean): void {
+    if (this.activeSprays > 90 || this.fx.length > 700) return;
+    this.activeSprays++;
+    const away = from ? Math.atan2(p.y - from.y, p.x - from.x) : Math.random() * Math.PI * 2;
+    const g = new THREE.Group();
+    const n = heavy ? 9 : 5;
+    const drops: { m: THREE.Mesh; vx: number; vy: number; vz: number }[] = [];
+    const mat = new THREE.MeshBasicMaterial({ color: 0x7a1410 });
+    for (let i = 0; i < n; i++) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.09), mat);
+      const a = away + (Math.random() - 0.5) * 1.1;
+      const sp = 1.5 + Math.random() * (heavy ? 3.5 : 2.2);
+      drops.push({ m, vx: Math.cos(a) * sp, vy: 1 + Math.random() * 2, vz: Math.sin(a) * sp });
+      m.position.set(0, 1.2 + Math.random() * 0.3, 0);
+      g.add(m);
+    }
+    g.position.set(p.x, 0, p.y);
+    let last = 0;
+    let done = false;
+    this.addFx(g, 0.6, (t, fx) => {
+      const dt = last ? Math.min(0.05, t - last) : 0.016;
+      last = t;
+      for (const d of drops) {
+        d.vy -= 9.8 * dt;
+        d.m.position.x += d.vx * dt;
+        d.m.position.y = Math.max(0.03, d.m.position.y + d.vy * dt);
+        d.m.position.z += d.vz * dt;
+      }
+      if (fx.life <= 0.02 && !done) {
+        done = true;
+        this.activeSprays--;
+      }
+    });
+    if (Math.random() < 0.5) {
+      // a couple of spots where it landed
+      const spot = new THREE.Mesh(new THREE.CircleGeometry(0.18 + Math.random() * 0.15, 6), new THREE.MeshBasicMaterial({ color: 0x4a0e0a, transparent: true, opacity: 0.75, depthWrite: false }));
+      spot.rotation.x = -Math.PI / 2;
+      spot.position.set(p.x + Math.cos(away) * 1.2, 0.035, p.y + Math.sin(away) * 1.2);
+      this.addFx(spot, 25, (_t, fx) => ((spot.material as THREE.MeshBasicMaterial).opacity = 0.75 * Math.min(1, fx.life / 6)));
+    }
   }
 
   private spawnCloud(p: Vec2, r: number, dur: number): void {
@@ -731,9 +812,10 @@ export class Renderer {
         return `<span class="pip ${cls}"></span>`;
       })
       .join('');
-    const cover = s.inCover ? '<span class="tag">COVER</span>' : '';
+    const st = squadStatus(s, this.world);
+    const cover = st.tone === 'idle' && st.text === 'IDLE' ? '' : `<span class="status ${st.tone}">${st.text}</span>`;
     const lvl = s.level ? `<span class="tag lvl">${s.levelName.toUpperCase()}</span>` : '';
-    return `<div class="sname ${sel ? 'sel' : ''}">${s.name}${lvl}${cover}</div><div class="pips">${pips}</div>`;
+    return `<div class="sname ${sel ? 'sel' : ''}">${s.name}${lvl}</div>${cover ? `<div>${cover}</div>` : ''}<div class="pips">${pips}</div>`;
   }
 
   private labelCache = new WeakMap<HTMLElement, string>();

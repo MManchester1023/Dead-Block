@@ -40,6 +40,7 @@ kbd { display: inline-block; min-width: 16px; padding: 0 3px; margin-right: 4px;
 .brand span { color: var(--bad); }
 .res { font-size: 14px; font-weight: 600; white-space: nowrap; }
 .res b { color: var(--tan); margin-right: 4px; }
+.res .rate { margin-left: 6px; color: var(--good); font-size: 11px; }
 .res.day { font-size: 12px; min-width: 130px; }
 .res.day .bar { margin: 2px 0 0; }
 .top-res { display: flex; gap: 18px; align-items: center; }
@@ -87,6 +88,13 @@ details summary { cursor: pointer; color: var(--dim); font-size: 11px; margin-to
 .hud-radio .line.bad b { color: var(--bad); }
 .hud-radio .line.good b { color: var(--good); }
 
+.status { display: inline-block; padding: 1px 6px; font: 600 11px var(--display); letter-spacing: 1px; border: 1px solid; border-radius: 2px; white-space: nowrap; }
+.status.idle { color: #a8a698; border-color: #5a5a50; background: #2a2a24; }
+.status.move { color: #bfe0ff; border-color: #4a7aa8; background: #1e2e3e; }
+.status.fight { color: #ffd8a0; border-color: #c8743a; background: #3e2414; }
+.status.work { color: #ffe9a0; border-color: #c8a83a; background: #3a3214; }
+.status.bad { color: #ffc0b8; border-color: #c84a3a; background: #3e1a14; }
+.squad-label .status { font-size: 10px; padding: 0 4px; margin: 1px 0; }
 .pips { display: flex; gap: 3px; margin: 3px 0; }
 .pip { width: 12px; height: 6px; background: var(--good); border: 1px solid #000; }
 .pip.mid { background: var(--warn); } .pip.low { background: var(--bad); } .pip.dead { background: #222; }

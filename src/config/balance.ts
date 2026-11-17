@@ -9,9 +9,10 @@ export const BALANCE = {
     supplyCap: 150,
     commandCap: 8,
     dayLengthSec: 720, // 12 real minutes per in-game day (playtest: 4 min felt far too fast)
-    baseSuppliesPerDay: 60,
+    // v4.5: supplies trickle in continuously (a lump at the end of a 12-minute day starved the opening)
+    baseSuppliesPerMin: 9,
     securedDistrictMoneyPerMin: 30,
-    securedDistrictSuppliesPerDay: 40,
+    securedDistrictSuppliesPerMin: 5,
     hiveBounty: 120,
     districtClearBounty: 200,
   },

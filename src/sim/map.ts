@@ -117,10 +117,11 @@ export function buildStarterMap(seed = 7): CityMap {
   fill({ x: 0, y: 38, w: width, h: 1 }, Tile.Sidewalk);
   fill({ x: 2, y: 34, w: 28, h: 4 }, Tile.BaseConcrete);
   // north-south roads in the zone
+  // north-south avenues run the full height of the map (off both edges) so the city reads as continuing
   for (const rx of [56, 86]) {
-    fill({ x: rx - 1, y: 4, w: 1, h: 64 }, Tile.Sidewalk);
-    fill({ x: rx, y: 4, w: 4, h: 64 }, Tile.Road);
-    fill({ x: rx + 4, y: 4, w: 1, h: 64 }, Tile.Sidewalk);
+    fill({ x: rx - 1, y: 0, w: 1, h: height }, Tile.Sidewalk);
+    fill({ x: rx, y: 0, w: 4, h: height }, Tile.Road);
+    fill({ x: rx + 4, y: 0, w: 1, h: height }, Tile.Sidewalk);
   }
   // motel parking + other lots
   const lots: Rect[] = [
@@ -210,8 +211,8 @@ export function buildStarterMap(seed = 7): CityMap {
 
   const roads: RoadDef[] = [
     { rect: m({ x: 0, y: 34, w: width, h: 4 }), axis: 'h' },
-    { rect: m({ x: 56, y: 4, w: 4, h: 64 }), axis: 'v' },
-    { rect: m({ x: 86, y: 4, w: 4, h: 64 }), axis: 'v' },
+    { rect: m({ x: 56, y: 0, w: 4, h: height }), axis: 'v' },
+    { rect: m({ x: 86, y: 0, w: 4, h: height }), axis: 'v' },
   ];
 
   return {

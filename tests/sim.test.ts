@@ -150,7 +150,8 @@ describe('world rules', () => {
     const before = w.supplies;
     for (let t = 0; t < BALANCE.economy.dayLengthSec * 30 + 2; t++) w.step(1 / 30);
     expect(w.day).toBe(2);
-    expect(w.supplies).toBe(Math.min(BALANCE.economy.supplyCap, before + BALANCE.economy.baseSuppliesPerDay) - 4);
+    const income = (BALANCE.economy.baseSuppliesPerMin * BALANCE.economy.dayLengthSec) / 60;
+    expect(w.supplies).toBeCloseTo(Math.min(BALANCE.economy.supplyCap, before + income) - 4, 0);
   });
 
   it('finds a path from the base out to the motel', () => {
