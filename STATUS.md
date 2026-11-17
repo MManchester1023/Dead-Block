@@ -6,10 +6,7 @@ Short version of the roadmap (design doc §21). Ranked by importance in my opini
 
 1. **Playtest region 3, the power station and the Med Bay**, and tune region 3's difficulty from that (the bots say it's beatable with losses; that needs a human check).
 2. **Open-world unlock**: what happens after region 3 is secured (the rest of the starter districts open up, §17).
-3. **Finish the model swap.** ✔ Riflemen and engineers now use Military RTS Character 1, rigged on Mixamo, with Mixamo animations. Still to do:
-   - **Female zombie**: rig `assets-src/models/mixamo/to-rig/female_zombie.zip` on Mixamo; needs a zombie walk and attack too.
-   - **Engineer working loop** (they idle while building for now) and their own look (currently the soldier, tinted).
-   - **A rifle idle that loads**: "Rifle Aiming Idle" from the shooter pack won't parse, so the idle is a held rifle-ready pose. Mixamo's "Rifle Idle" should work.
+3. **Last model bits.** ✔ Riflemen, engineers (with a working animation) and female zombies are now Mixamo-rigged models with Mixamo animations; no cartoon models left. Still open: a **zombie attack** animation for the female zombie (she uses her idle when attacking), and a distinct look for engineers (currently the soldier, tinted).
 4. **Confirm the walking-animation fix in a playtest** (round 7 #79). Fixed in code but not visually verified at full frame rate.
 5. **Save / load.** A persistent city needs it before the open world opens.
 6. **Medic Team**: field healing, the mobile partner to the Med Bay (could also be unlocked by power).

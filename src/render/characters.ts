@@ -12,7 +12,8 @@ import { HUMAN_HEIGHT } from '../config/world';
  * Draw calls = number of poses in use, no matter if it's 50 zombies or 2,000.
  *
  * Models (CREDITS.md): soldiers/engineers = "Military RTS Character 1" rigged on Mixamo with Mixamo
- * animations (v4.18); main zombie = pxltiger's "Zombie"; female zombie = Quaternius (CC0), for now. Material colours are
+ * animations (v4.18); main zombie = pxltiger's "Zombie"; female zombie = jeferson's "female zombie"
+ * rigged on Mixamo with Mixamo zombie animations (v4.18). Material colours are
  * baked into vertex colours so each pose is a single draw call (the source meshes have ~120 groups).
  */
 
@@ -41,6 +42,8 @@ export interface CharacterSpec {
   height?: number;
   /** Vertex-clustering cell size in metres (crowd LOD); omit to keep full detail. */
   simplify?: number;
+  /** Colour steps per channel that the clustering keeps apart (default 8; lower = fewer triangles). */
+  simplifyColors?: number;
   /** Animation names in this file, where they differ from the Quaternius names above. */
   clipNames?: Partial<Record<Clip, string>>;
   /** True if the death clip ends lying on the ground; otherwise the corpse is tipped over (#34). */
@@ -59,6 +62,10 @@ export interface CharacterSpec {
   tint?: number;
   /** Clips baked as a single held pose at this fraction of the clip (e.g. an idle from a firing clip). */
   clipHold?: Partial<Record<Clip, number>>;
+  /** Per-mesh base-colour textures, by skinned-mesh name (Mixamo drops material names and textures). */
+  textureByMesh?: Record<string, string>;
+  /** Per-mesh flat colours, by skinned-mesh name (eyes, lashes…). */
+  colorByMesh?: Record<string, number>;
 }
 
 export interface Flipbook {
@@ -95,6 +102,8 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
     );
   }
   const extTex = spec.texture ? await new THREE.TextureLoader().loadAsync(spec.texture) : null;
+  const meshTex: Record<string, THREE.Texture> = {};
+  for (const [mesh, url] of Object.entries(spec.textureByMesh ?? {})) meshTex[mesh] = await new THREE.TextureLoader().loadAsync(url);
 
   // every skinned part (Quaternius files are one mesh; Sketchfab exports are often split per limb)
   const parts: THREE.SkinnedMesh[] = [];
@@ -126,14 +135,16 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
       if (over !== undefined) c.set(over);
       else c.copy(m.color);
       // textured models (the Sketchfab glTFs): bake the texture colour at each vertex's UV
-      const map = extTex ?? m.map;
-      const tex = over === undefined && map && uv ? texSampler(map) : null;
+      const flat = spec.colorByMesh?.[sk.name];
+      const map = meshTex[sk.name] ?? extTex ?? m.map;
+      const tex = over === undefined && flat === undefined && map && uv ? texSampler(map) : null;
+      if (flat !== undefined) c.set(flat);
       for (let i = g.start; i < g.start + g.count; i++) {
         const v = idx ? idx.getX(i) : i;
         merged.push(v + off);
         if (tex) {
           tex(uv!.getX(v), uv!.getY(v), c);
-          if (!extTex) c.multiply(m.color);
+          if (!extTex && !meshTex[sk.name]) c.multiply(m.color);
         }
         if (spec.tint !== undefined) c.multiply(new THREE.Color(spec.tint));
         colors[(v + off) * 3] = c.r;
@@ -217,7 +228,7 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
       g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
       g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
       g.setIndex(mergedIndex);
-      if (rifle && fist) {
+      if (rifle && fist && clip !== 'work') { // hands are busy while working
         // place the rifle by the hand's position + orientation only (the bone matrix also carries the
         // FBX unit scale, which would make the gun ~100x too big)
         const hp = new THREE.Vector3();
@@ -230,7 +241,7 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
         g = mergeSimple(g, r);
       }
       if (spec.simplify) {
-        plan ??= makeClusterPlan(g, spec.simplify);
+        plan ??= makeClusterPlan(g, spec.simplify, spec.simplifyColors ?? 8);
         g = applyClusterPlan(plan, g);
       }
       g.computeVertexNormals();
@@ -307,7 +318,7 @@ interface ClusterPlan {
   colors: Float32Array;
 }
 
-function makeClusterPlan(g: THREE.BufferGeometry, cell: number): ClusterPlan {
+function makeClusterPlan(g: THREE.BufferGeometry, cell: number, colorSteps = 8): ClusterPlan {
   const pos = g.attributes.position.array as Float32Array;
   const col = g.attributes.color.array as Float32Array;
   const idx = g.index ? (g.index.array as ArrayLike<number>) : null;
@@ -319,7 +330,7 @@ function makeClusterPlan(g: THREE.BufferGeometry, cell: number): ClusterPlan {
   for (let v = 0; v < pos.length / 3; v++) {
     const x = pos[v * 3], y = pos[v * 3 + 1], z = pos[v * 3 + 2];
     // keep colours apart so faces/eyes don't smear into skin
-    const key = `${Math.round(x / cell)},${Math.round(y / cell)},${Math.round(z / cell)},${Math.round(col[v * 3] * 8)},${Math.round(col[v * 3 + 1] * 8)}`;
+    const key = `${Math.round(x / cell)},${Math.round(y / cell)},${Math.round(z / cell)},${Math.round(col[v * 3] * colorSteps)},${Math.round(col[v * 3 + 1] * colorSteps)}`;
     let id = map.get(key);
     if (id === undefined) {
       id = counts.length;
@@ -457,10 +468,9 @@ export class Crowd {
 
 // ---------------------------------------------------------------- the cast
 
-// "Rifle Aiming Idle" from the pack won't parse in FBXLoader ("Unknown property type"), so for now the
-// idle is the rifle-ready first frame of the firing clip, held (see clipHold)
+// Mixamo "Rifle Idle" (the shooter pack's "Rifle Aiming Idle" won't parse in FBXLoader)
 const SOLDIER_CLIPS: Partial<Record<Clip, string>> = {
-  idle: 'models/characters/soldier/shoot.fbx',
+  idle: 'models/characters/soldier/idle.fbx',
   walk: 'models/characters/soldier/walk.fbx',
   shoot: 'models/characters/soldier/shoot.fbx',
   death: 'models/characters/soldier/death.fbx',
@@ -475,20 +485,18 @@ export const CHARACTER_SPECS: CharacterSpec[] = [
     texture: 'models/characters/soldier/soldier_rts.png',
     clips: ['idle', 'walk', 'shoot', 'death'],
     clipFiles: SOLDIER_CLIPS,
-    clipHold: { idle: 0 },
     inPlace: true,
     deathFalls: true,
     rifle: true,
     rifleBone: 'mixamorigRightHand',
   },
   {
-    // same soldier, dustier; no working loop yet (falls back to idle while building)
+    // same soldier, dustier, with Mixamo "Working On Device" while building / repairing / planting
     key: 'engineer',
     url: 'models/characters/soldier/soldier_rts.fbx',
     texture: 'models/characters/soldier/soldier_rts.png',
-    clips: ['idle', 'walk', 'shoot', 'death'],
-    clipFiles: SOLDIER_CLIPS,
-    clipHold: { idle: 0 },
+    clips: ['idle', 'walk', 'shoot', 'death', 'work'],
+    clipFiles: { ...SOLDIER_CLIPS, work: 'models/characters/soldier/work.fbx' },
     inPlace: true,
     deathFalls: true,
     rifle: true,
@@ -505,11 +513,23 @@ export const CHARACTER_SPECS: CharacterSpec[] = [
     simplify: 0.05,
   },
   {
+    // v4.18: "female zombie" (jeferson, CC-BY-SA 4.0) rigged on Mixamo, with Mixamo zombie animations.
+    // No attack clip yet: attacks fall back to the idle.
     key: 'zombieF',
-    url: 'models/characters/Zombie_Female.fbx',
-    clips: ['idle', 'walk', 'run', 'punch', 'death'],
-    simplify: 0.09,
-    recolor: { Skin: 0x8fa060, Clothes: 0x6a3a4a, Pants: 0x5a5a4a, DarkClothes: 0x2a2a2a, Guts: 0x7a2a1a, Bones: 0xc8b890, Hair: 0x3a2a1a },
+    url: 'models/characters/zombieF/zombie_female.fbx',
+    textureByMesh: { Body: 'models/characters/zombieF/body.png', Tops: 'models/characters/zombieF/material.png', Bottoms: 'models/characters/zombieF/bottom.png' },
+    colorByMesh: { Eyes: 0xb8b090, Eyelashes: 0x1a1410 },
+    clips: ['idle', 'walk', 'run', 'death'],
+    clipFiles: {
+      idle: 'models/characters/zombieF/idle.fbx',
+      walk: 'models/characters/zombieF/walk.fbx',
+      run: 'models/characters/zombieF/run.fbx',
+      death: 'models/characters/zombieF/death.fbx',
+    },
+    inPlace: true,
+    deathFalls: true,
+    simplify: 0.07, // ~43k-vertex source: crowd-weight it like the main zombie
+    simplifyColors: 3,
   },
 ];
 

@@ -4,7 +4,7 @@
 
 | Asset | Author | Licence | Source | Used for |
 |---|---|---|---|---|
-| Ultimate Animated Character Pack (Soldier_Male, Worker_Male, Zombie_Male, Zombie_Female) | Quaternius | CC0 1.0 (public domain) | https://opengameart.org/content/animated-characters-pack · https://quaternius.com | Female zombies (`public/models/characters/Zombie_Female.fbx`); the retired soldier/worker/male zombie are kept in `assets-src/models/quaternius/` |
+| Ultimate Animated Character Pack (Soldier_Male, Worker_Male, Zombie_Male, Zombie_Female) | Quaternius | CC0 1.0 (public domain) | https://opengameart.org/content/animated-characters-pack · https://quaternius.com | No longer in the game (v4.18); all four kept in `assets-src/models/quaternius/` |
 
 CC0 needs no attribution; it's credited here anyway because it's the decent thing to do.
 
@@ -43,7 +43,11 @@ Everything else in the city (buildings, vehicles, trees, street furniture, groun
 | [Emergency Power Station (PS1)](https://sketchfab.com/3d-models/emergency-power-station-ps1-389f5331f49744dfa82a45fabb75d740) | S1lMoon | CC-BY-4.0 |
 | [fat zombie idle (animated)](https://sketchfab.com/3d-models/fat-zombie-idle-animated-ab45b1f5bf0947fa8a3f2d349f47e0ba) | vicente betoret ferrero | CC-BY-4.0 |
 
+| [Soldier Full Tactical Gear](https://sketchfab.com/3d-models/soldier-full-tactical-gear-850593a8c7114c188395ba1849a66eb9) | DanlyVostok | CC-BY-4.0 |
+| [female zombie](https://sketchfab.com/3d-models/female-zombie-7ecd809925ba4459921cf67f4e652582) (in the game: female zombies, rigged on Mixamo) | jeferson | CC-BY-SA-4.0 (share-alike) |
+| [Mobile diesel generator set](https://sketchfab.com/3d-models/mobile-diesel-generator-set-125ad1f014da4186b2703ed733c0226c) | MrdT | CC-BY-4.0 |
+
 ## Mixamo (`assets-src/models/mixamo/`)
 
-Characters and animations from [Mixamo](https://www.mixamo.com) (Adobe), downloaded by the project owner. Mixamo's terms allow royalty-free use in games; the raw files may not be redistributed as a standalone asset pack.
+Rigs and animations from [Mixamo](https://www.mixamo.com) (Adobe), downloaded by the project owner. **In the game:** riflemen and engineers (Military RTS Character 1, rigged on Mixamo) with Rifle Idle, Walking, Firing Rifle, Dying and Working On Device; female zombies with Zombie Idle, Walking, Zombie Run and Zombie Dying. Mixamo's terms allow royalty-free use in games; the raw files may not be redistributed as a standalone asset pack.
 
