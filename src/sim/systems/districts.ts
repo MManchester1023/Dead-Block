@@ -13,6 +13,13 @@ export function updateDistricts(w: World, dt: number): void {
         100,
         Math.max(BALANCE.infestation.floorWithHive, d.infestation + (BALANCE.infestation.regrowPerMinWithHive * hives.length * dt) / 60),
       );
+    } else if (d.infestation > 0) {
+      // v4.9 (playtest #40): with no hive left, infestation can't exceed what's still walking around,
+      // so a district with nothing left to kill drains to 0 instead of sticking at a few percent
+      const r = d.def.rect;
+      let left = 0;
+      for (const z of w.zombies) if (z.alive && z.pos.x >= r.x && z.pos.y >= r.y && z.pos.x < r.x + r.w && z.pos.y < r.y + r.h) left += BALANCE.infestation.perKill[z.def.id] ?? 0.5;
+      if (d.infestation > left) d.infestation = Math.max(left, d.infestation - BALANCE.infestation.unpaidDrainPerSec * dt);
     }
 
     if (!d.cleared && d.infestation <= 0) {
@@ -31,6 +38,7 @@ export function updateDistricts(w: World, dt: number): void {
         d.secured = true;
         d.outpostId = op.id;
         d.infestation = 0;
+        w.commandCap += BALANCE.economy.commandPerSecuredDistrict;
         w.events.emit('districtSecured', { districtId: d.def.id, name: d.def.name });
         if (d.def.starter && [...w.districts.values()].every((x) => x.secured))
           w.events.emit('victory', { reason: `${d.def.name} is secured. The first block is ours.` });
@@ -44,8 +52,9 @@ export function updateDistricts(w: World, dt: number): void {
         d.cleared = false;
         d.outpostId = null;
         d.infestation = 40;
+        w.commandCap -= BALANCE.economy.commandPerSecuredDistrict;
         if (isEnabled('regionTakeover')) {
-          const hive = new Hive(pos, d.def.id, BALANCE.hive.hpByStage[0], BALANCE.horde.pulseIntervalSec);
+          const hive = new Hive(pos, d.def.id, BALANCE.hive.hpByStage[0], w.tier(d.def.id).pulseIntervalSec[0]);
           w.hives.push(hive);
           w.registerHive(hive);
         }

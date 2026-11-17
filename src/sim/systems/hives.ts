@@ -1,7 +1,7 @@
 import { dist, type Vec2 } from '../../core/math';
 import { BALANCE } from '../../config/balance';
 import { isEnabled } from '../../config/features';
-import { Squad, type Hive } from '../entities';
+import { Squad, type Hive, type Zombie } from '../entities';
 import type { World } from '../World';
 import { lure } from './zombies';
 
@@ -33,13 +33,21 @@ export function updateHives(w: World, dt: number): void {
       }
     }
 
-    // spawning within local + global caps
+    // spawning within local + global caps; rates come from the district's difficulty tier
+    const T = w.tier(h.districtId);
     for (const id of h.spawned) if (!w.get(id)) h.spawned.delete(id);
     h.spawnTimer -= dt;
     if (h.spawnTimer <= 0) {
-      h.spawnTimer = H.spawnIntervalSec[h.stage - 1];
-      const room = H.localCap[h.stage - 1] - h.spawned.size;
-      for (let i = 0; i < Math.min(room, H.spawnGroup[h.stage - 1]); i++) spawnAt(w, h);
+      const cap = T.localCap[h.stage - 1];
+      // a hive that's been bled dry rebuilds faster (v4.9, playtest #32)
+      const thin = h.spawned.size < cap * H.reinforceBelow;
+      h.spawnTimer = T.spawnIntervalSec[h.stage - 1] * (thin ? H.reinforceRate : 1);
+      const room = cap - h.spawned.size;
+      let specials = specialRoom(w, h.districtId);
+      for (let i = 0; i < Math.min(room, T.spawnGroup[h.stage - 1]); i++) {
+        const z = spawnAt(w, h, specials > 0);
+        if (z && isSpecial(z)) specials--;
+      }
     }
 
     // horde pulses (doc §11) — on a timer, or immediately when the district's noise meter fills
@@ -51,22 +59,44 @@ export function updateHives(w: World, dt: number): void {
         w.events.emit('noiseAlert', { districtId: d.def.id });
         d.noise = 0;
       }
-      h.pulseTimer = BALANCE.horde.pulseIntervalSec;
+      h.pulseTimer = T.pulseIntervalSec[h.stage - 1];
       pulse(w, h, loud ? 4 : 0);
     }
   }
 }
 
-function spawnAt(w: World, h: Hive): void {
+const isSpecial = (z: Zombie | undefined): boolean => !!z && z.def.id !== 'walker';
+
+/**
+ * How many more Runners/Bloaters the district may hold right now (v4.9, playtest #53): a share of
+ * its zombies, never more than the tier's hard ceiling.
+ */
+export function specialRoom(w: World, districtId: string): number {
+  const d = w.districts.get(districtId);
+  if (!d) return 0;
+  const T = w.tier(districtId);
+  const r = d.def.rect;
+  let total = 0;
+  let specials = 0;
+  for (const z of w.zombies) {
+    if (!z.alive || z.pos.x < r.x || z.pos.y < r.y || z.pos.x >= r.x + r.w || z.pos.y >= r.y + r.h) continue;
+    total++;
+    if (isSpecial(z)) specials++;
+  }
+  return Math.max(0, Math.min(T.specialMax, Math.floor(total * T.specialShare) + 1) - specials);
+}
+
+function spawnAt(w: World, h: Hive, allowSpecial: boolean): Zombie | null {
   const roll = w.rng.next();
-  // mostly Walkers while young; Runners and Bloaters creep in as the hive matures
+  // mostly Walkers while young; Runners and Bloaters creep in as the hive matures (capped per district)
   const bloater = 0.02 + 0.02 * (h.stage - 1);
   const runner = bloater + 0.06 + 0.07 * (h.stage - 1);
-  const kind = roll < bloater ? 'bloater' : roll < runner ? 'runner' : 'walker';
+  const kind = !allowSpecial ? 'walker' : roll < bloater ? 'bloater' : roll < runner ? 'runner' : 'walker';
   const a = w.rng.range(0, Math.PI * 2);
   const p = w.grid.nearestFree({ x: h.pos.x + Math.cos(a) * (h.radius + 2), y: h.pos.y + Math.sin(a) * (h.radius + 2) });
   const z = w.spawnZombie(kind, p, h.id);
   if (z) h.spawned.add(z.id);
+  return z;
 }
 
 /** Pulse target: nearest player outpost, else the base gate. */
@@ -86,7 +116,8 @@ export function pulseTarget(w: World, from: Vec2): Vec2 {
 }
 
 export function pulse(w: World, h: Hive, bonus = 0): void {
-  const size = BALANCE.horde.basePulseSize + BALANCE.horde.perStagePulseSize * (h.stage - 1) + bonus;
+  const size = Math.round((BALANCE.horde.basePulseSize + BALANCE.horde.perStagePulseSize * (h.stage - 1)) * w.tier(h.districtId).pulseSize) + bonus;
+  let specials = specialRoom(w, h.districtId);
   const target = pulseTarget(w, h.pos);
   let sent = 0;
   // recruit idle zombies near the hive first, then spawn the remainder
@@ -98,7 +129,9 @@ export function pulse(w: World, h: Hive, bonus = 0): void {
   }
   while (sent < size) {
     const a = w.rng.range(0, Math.PI * 2);
-    const z = w.spawnZombie(w.rng.chance(0.1 + 0.07 * (h.stage - 1)) ? 'runner' : 'walker', w.grid.nearestFree({ x: h.pos.x + Math.cos(a) * (h.radius + 3), y: h.pos.y + Math.sin(a) * (h.radius + 3) }), h.id);
+    const runner = specials > 0 && w.rng.chance(0.1 + 0.07 * (h.stage - 1));
+    if (runner) specials--;
+    const z = w.spawnZombie(runner ? 'runner' : 'walker', w.grid.nearestFree({ x: h.pos.x + Math.cos(a) * (h.radius + 3), y: h.pos.y + Math.sin(a) * (h.radius + 3) }), h.id);
     if (!z) break;
     h.spawned.add(z.id);
     lure(z, target, 'pulse');

@@ -48,7 +48,7 @@ describe('world rules', () => {
     const w = new World();
     expect(w.money).toBe(250);
     expect(w.supplies).toBe(100);
-    expect(w.commandCap).toBe(8);
+    expect(w.commandCap).toBe(16);
     expect(w.squads.map((s) => s.def.id).sort()).toEqual(['engineer', 'rifle', 'rifle']);
   });
 
@@ -224,7 +224,7 @@ describe('world rules', () => {
       const built = w.addStructure('mgNest', { x: 20, y: 44 }, true);
       const m1 = w.money;
       w.dismantle(built);
-      expect(w.money).toBe(m1 + 40);
+      expect(w.money).toBe(m1 + 70);
       expect(w.grid.isBlocked(20, 44)).toBe(false);
       expect(w.canDeconstruct(w.structures.find((s) => s.def.id === 'barracks') ?? built)).not.toBeNull();
     });

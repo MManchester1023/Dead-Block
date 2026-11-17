@@ -1,7 +1,7 @@
 import { EventBus } from '../core/events';
 import { Rng } from '../core/rng';
 import { dist, inRect, norm, sub, type Vec2 } from '../core/math';
-import { BALANCE } from '../config/balance';
+import { BALANCE, DIFFICULTY, type DifficultyTier } from '../config/balance';
 import { isEnabled } from '../config/features';
 import { STRUCTURES, UNITS, ZOMBIES } from '../config/units';
 import { buildStarterMap, type CityMap, type DistrictDef } from './map';
@@ -22,6 +22,8 @@ import { updateSupport, type PendingImpact, type SupplyCrate } from './systems/s
 export interface DistrictState {
   def: DistrictDef;
   infestation: number;
+  /** Seconds the noise meter holds before it starts draining (v4.9). */
+  noiseHold: number;
   noise: number;
   secured: boolean;
   outpostId: number | null;
@@ -83,7 +85,7 @@ export class World {
     }
     for (const p of this.map.props) this.grid.setRect(p.cells.x, p.cells.y, p.cells.w, p.cells.h, true, p.id);
     for (const d of this.map.districts)
-      this.districts.set(d.id, { def: d, infestation: d.initialInfestation, noise: 0, secured: d.id === 'base', outpostId: null, cleared: d.initialInfestation === 0 });
+      this.districts.set(d.id, { def: d, infestation: d.initialInfestation, noise: 0, noiseHold: 0, secured: d.id === 'base', outpostId: null, cleared: d.initialInfestation === 0 });
 
     if (opts.populate !== false) this.populate();
   }
@@ -115,14 +117,14 @@ export class World {
 
     for (const d of m.districts)
       for (const site of d.hiveSites) {
-        const hive = new Hive({ ...site }, d.id, BALANCE.hive.hpByStage[0], BALANCE.horde.firstPulseDelaySec);
+        const hive = new Hive({ ...site }, d.id, BALANCE.hive.hpByStage[0], DIFFICULTY[d.difficulty].firstPulseDelaySec);
         this.hives.push(hive);
         this.registerHive(hive);
       }
 
     // initial infestation: each district seeds its own population mix
     for (const d of this.districts.values()) {
-      const count = Math.round(d.infestation * d.def.density);
+      const count = Math.round(d.infestation * d.def.density * this.tier(d.def.id).density);
       const kinds = Object.entries(d.def.mix);
       for (let i = 0; i < count; i++) {
         const r = d.def.rect;
@@ -152,6 +154,9 @@ export class World {
   spawnZombie(defId: string, pos: Vec2, hiveId: number | null = null): Zombie | null {
     if (this.zombies.length >= BALANCE.hive.globalZombieCap) return null;
     const z = new Zombie(ZOMBIES[defId], { ...this.grid.nearestFree(pos) });
+    // easier districts field weaker dead (v4.9, playtest #59)
+    const d = this.districtAt(z.pos);
+    if (d) z.hp = z.maxHp = z.maxHp * this.tier(d.def.id).zombieHp;
     z.homeHiveId = hiveId;
     this.zombies.push(z);
     this.byId.set(z.id, z);
@@ -176,6 +181,12 @@ export class World {
 
   get(id: number | null): Targetable | undefined {
     return id == null ? undefined : this.byId.get(id);
+  }
+
+  /** Difficulty tier of a district (config/balance.ts DIFFICULTY). */
+  tier(districtId: string | null | undefined): DifficultyTier {
+    const d = districtId ? this.districts.get(districtId) : undefined;
+    return DIFFICULTY[Math.min(DIFFICULTY.length - 1, d?.def.difficulty ?? 2)];
   }
 
   districtAt(p: Vec2): DistrictState | undefined {
@@ -317,7 +328,10 @@ export class World {
     if (same) same.loudness = Math.max(same.loudness, loudness) + Math.min(loudness, same.loudness) * 0.1;
     else this.noiseEvents.push({ pos: { ...pos }, loudness, age: 0 });
     const d = this.districtAt(pos);
-    if (d && d.def.id !== 'base') d.noise = Math.min(BALANCE.noise.pulseThreshold, d.noise + loudness * 0.12);
+    if (d && d.def.id !== 'base') {
+      d.noise = Math.min(BALANCE.noise.pulseThreshold, d.noise + loudness * 0.12);
+      d.noiseHold = BALANCE.noise.holdSec;
+    }
   }
 
   damage(target: Targetable, amount: number, type: DamageType, source?: Vec2, attacker?: Targetable): void {

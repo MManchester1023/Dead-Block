@@ -121,7 +121,7 @@ export const STRUCTURES: Record<string, StructureDef> = {
   outpost: { id: 'outpost', name: 'Outpost', hp: 600, cost: { money: 100, supplies: 30 }, buildTime: 30, size: { w: 3, h: 3 }, blocksMovement: true, requiresSecured: true, hotkey: 'O' },
   sandbags: { id: 'sandbags', name: 'Sandbag Wall', hp: 260, cost: { money: 15, supplies: 10 }, buildTime: 6, size: { w: 3, h: 1 }, blocksMovement: true, cover: 0.55, climbable: true, hotkey: 'Q' },
   wire: { id: 'wire', name: 'Barbed Wire', hp: 120, cost: { money: 10, supplies: 5 }, buildTime: 4, size: { w: 3, h: 1 }, blocksMovement: false, slow: 0.35, hotkey: 'W' },
-  mgNest: { id: 'mgNest', name: 'MG Emplacement', hp: 380, cost: { money: 80, supplies: 25 }, buildTime: 12, size: { w: 2, h: 2 }, blocksMovement: true, cover: 0.5, hotkey: 'E', weapon: { name: 'Mounted HMG', range: 22, damage: 8, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 } },
+  mgNest: { id: 'mgNest', name: 'MG Emplacement', hp: 380, cost: { money: 140, supplies: 45 }, buildTime: 12, size: { w: 2, h: 2 }, blocksMovement: true, cover: 0.5, hotkey: 'E', weapon: { name: 'Mounted HMG', range: 22, damage: 8, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 } },
   tallWall: { id: 'tallWall', name: 'Tall Concrete Wall (40 ft)', hp: 4000, cost: { money: 400, supplies: 120 }, buildTime: 60, size: { w: 4, h: 1 }, blocksMovement: true, climbable: false, requires: 'tallWalls' },
   loudspeaker: { id: 'loudspeaker', name: 'Loudspeaker', hp: 80, cost: { money: 40, supplies: 10 }, buildTime: 8, size: { w: 1, h: 1 }, blocksMovement: false, lure: 6, requires: 'tallWalls' },
 };

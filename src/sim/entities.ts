@@ -127,8 +127,10 @@ export class Zombie implements Targetable {
   losTimer = 0;
   stuckFor = 0;
 
+  maxHp: number;
+
   constructor(public def: ZombieDef, public pos: Vec2) {
-    this.hp = def.hp;
+    this.hp = this.maxHp = def.hp;
     // deterministic per-id jitter so zombies don't all think on the same tick
     const j = ((this.id * 2654435761) >>> 0) / 4294967296;
     this.thinkTimer = j;
