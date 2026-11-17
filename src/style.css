@@ -147,3 +147,21 @@ button.big.ghost { background: transparent; }
   .hud-objectives { display: none; }
   .dialog .cols { grid-template-columns: 1fr; }
 }
+
+/* tutorial (doc §18) */
+.tutorial { position: absolute; left: 0; right: 0; top: 52px; display: none; pointer-events: none; z-index: 8; }
+.tutorial .tut-card, .tutorial .tut-banner, .tutorial button { pointer-events: auto; }
+.tut-card { width: min(560px, 92vw); margin: 40px auto 0; background: #1d1f1bf2; border: 1px solid var(--warn); box-shadow: 0 0 0 4px #0009, 0 10px 40px #000a; padding: 16px 20px 18px; }
+.tut-card h2 { margin: 6px 0 8px; font: 700 26px var(--display); letter-spacing: 1px; color: var(--tan); }
+.tut-card p { margin: 0 0 10px; font-size: 13px; line-height: 1.5; }
+.tut-card .tut-obj { color: var(--warn); font-weight: 600; }
+.tut-card button.big { margin: 6px 0 0; }
+.tut-head { display: flex; justify-content: space-between; align-items: center; font: 600 12px var(--display); letter-spacing: 2px; color: var(--warn); }
+.tut-head button, .tut-banner button { font-size: 10px; padding: 2px 8px; }
+.tut-paused { margin-top: 10px; font-size: 10px; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; }
+.tut-banner { width: fit-content; max-width: 92vw; margin: 6px auto 0; display: flex; align-items: center; gap: 12px; padding: 7px 12px; background: #2a2414ee; border: 1px solid var(--warn); }
+.tut-banner b { font: 700 15px var(--display); letter-spacing: 1px; color: #ffe9a0; }
+.tut-n { font: 600 11px var(--display); letter-spacing: 2px; color: var(--warn); }
+.tut-highlight { outline: 2px solid var(--warn) !important; outline-offset: 2px; animation: tutpulse 1.2s ease-in-out infinite; }
+@keyframes tutpulse { 0%, 100% { outline-color: #e0b24a; } 50% { outline-color: #e0b24a33; } }
+

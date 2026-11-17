@@ -4,6 +4,7 @@ import { ABILITIES, STRUCTURES, UNITS } from '../config/units';
 import { isEnabled } from '../config/features';
 import type { Game } from '../Game';
 import { Radio } from './Radio';
+import { ROADSIDE_MOTEL_TUTORIAL, Tutorial } from '../tutorial/Tutorial';
 import { squadStatus } from './status';
 import { incomeRates } from '../sim/systems/economy';
 import { SUPPORT } from '../config/support';
@@ -26,6 +27,8 @@ export class Hud {
   private toastEl!: HTMLElement;
   private modal!: HTMLElement;
   private radio: Radio;
+  tutorial: Tutorial | null = null;
+  private root: HTMLElement;
   private dirty = true;
   private last = 0;
   private toastTimer = 0;
@@ -53,6 +56,7 @@ export class Hud {
     this.toastEl = q('.toast');
     this.modal = q('.modal');
 
+    this.root = root;
     this.radio = new Radio(game.world, () => (this.dirty = true));
     game.onChange(() => (this.dirty = true));
     game.toast = (m) => this.toast(m);
@@ -110,6 +114,10 @@ export class Hud {
       case 'start':
         this.modal.classList.remove('open');
         g.paused = false;
+        if (arg === 'training') {
+          this.tutorial = new Tutorial(g, ROADSIDE_MOTEL_TUTORIAL, this.root);
+          this.tutorial.start();
+        }
         this.radio.say('Command', 'All units, this is Command. Roadside Motel is crawling. Push out, find that hive, and bring me a clean block.', 'info');
         this.radio.say('Sapper Charlie', 'Give me thirty seconds and a lot of sandbags.', 'info');
         g.changed();
@@ -126,6 +134,7 @@ export class Hud {
   }
 
   update(dt: number): void {
+    this.tutorial?.update();
     if (this.toastTimer > 0) {
       this.toastTimer -= dt;
       if (this.toastTimer <= 0) this.toastEl.classList.remove('show');
@@ -316,7 +325,8 @@ export class Hud {
           </ul></div>
       </div>
       <details class="roadmap"><summary>Build roadmap: what's in this MVP vs. coming next</summary>${tiers}</details>
-      <button class="big" data-act="start">DEPLOY</button>
+      <button class="big" data-act="start:training">DEPLOY WITH TRAINING</button>
+      <button class="big ghost" data-act="start">DEPLOY (skip training)</button>
     </div>`;
     this.modal.classList.add('open');
   }

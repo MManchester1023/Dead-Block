@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.6** | See-through buildings (any building hiding a squad, hive or build site fades out). Crowd navigation via shared flow fields (zombie sim ~30% cheaper; profiling says the sim isn't the bottleneck yet, so the Web Worker move is deferred until real-hardware tests say otherwise). Tutorial system + mission 1 script. |
 | **v4.5** | Playtest round 3 (§22): continuous supply income (fixes outposts becoming unaffordable), Quonset barracks and roofed MG nest, tough base walls, full-length avenues, status badges, blood. Model-dependent notes parked. |
 | **v4.4** | Playtest round 2 (§22): fixed hand-authored world layout confirmed (§2), engine/porting notes (§23), repair and resume building, Command Post support powers, shooter aggro, kill salvage, wider gunfire hearing, calmer hives, crowds of hundreds to thousands. Animated CC0 characters (Quaternius) with flipbook crowd rendering. |
 | **v4.3** | Art direction: isometric first, pixel art dropped (only a loose influence). First procedural city pass: houses, apartments, motel, shops, warehouse, trees, streetlights, vehicles, painted roads. Optional glTF model overrides. |
@@ -662,6 +663,8 @@ The starter sequence is a guided tutorial. During instruction, **the game pauses
 
 **Progressive instruction.** Prompts introduce controls and systems in a set order, each shown in the relevant starter area. Prompts are short, actionable and tied to the current objective.
 
+**Implementation status [v4.6].** The tutorial system is built and mission 1 (Roadside Motel) is scripted: 12 steps covering camera, selection, movement, cover, noise and targeting, fortifying, recruiting, Command Post support, the hive and securing the district. Each step pauses with a prompt; after "Got it" it becomes an objective banner while you play, the relevant HUD panel pulses, and steps you've already completed advance on their own. Missions 2–7 need their maps first.
+
 **Final test.** The last one or two larger starter regions are a practical final test: they combine earlier mechanics with less step-by-step instruction. They're still part of the tutorial and must be completed before the open world unlocks.
 
 ## 19. Region loss, hive takeover, and progression regression
@@ -733,7 +736,7 @@ Every feature, ranked by importance to the game being fun and shippable. The MVP
 
 ### Visual production track (runs alongside the tiers) [v4.1]
 - V1. ~~Lock world scale~~ ✔; ~~camera rotation~~ ✔; ~~glTF model loading~~ ✔ (`public/models/manifest.json`)
-- V2. Instanced, animated zombie crowds + flow-field pathing in a Web Worker
+- V2. ~~Instanced, animated zombie crowds~~ ✔ + ~~flow-field pathing~~ ✔; Web Worker deferred: at 1,500 zombies the whole sim costs ~3.7 ms/tick, so move it only if real-hardware testing shows the sim (not the GPU) is the limit
 - V3. First real asset set: ~~procedural suburban houses (pitched roofs, porches, balconies), roads/crosswalks/streetlights, palm trees, cars~~ ✔ first pass; CC0 soldiers and zombies still to do
 - V4. Lighting pass: sun shadows, dusk grade, night lights/flares, smoke columns, fire
 - V5. UI restyle toward the §14 direction (unit-card strip, support panel, minimap, day clock)
