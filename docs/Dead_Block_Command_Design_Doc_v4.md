@@ -720,7 +720,7 @@ Leaving a region unattended can therefore cost territory, income and forward pre
 
 ## 21. Feature priority roadmap [v4, re-ranked v4.10]
 
-Every feature, ranked by importance to the game being fun and shippable. **Work goes top to bottom**: within a tier, items are in priority order, and the next thing to build is the first open item. ✔ = done. Playtest note numbers (#) point to §22. The code has **extension hooks** for many later items (see `README.md` → *Architecture*).
+Every feature, ranked by importance to the game being fun and shippable. **Work goes top to bottom**: within a tier, items are in priority order, and the next thing to build is the first open item. ✔ = done. Playtest note numbers (#) point to §22. The code has **extension hooks** for many later items (see `README_old.md` → *Architecture*).
 
 ### Tier 0: MVP core ✔
 1. ✔ Isometric 3D world, camera pan/zoom/rotate (WASD, MMB), fixed-step persistent simulation, pause and 4× speed
