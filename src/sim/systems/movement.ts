@@ -6,15 +6,13 @@ export function moveWithCollision(grid: NavGrid, pos: Vec2, dx: number, dy: numb
   let blocked = false;
   const free = (x: number, y: number) => {
     for (const [ox, oy] of [[-r, -r], [r, -r], [-r, r], [r, r]]) {
-      const tx = Math.floor(x + ox);
-      const ty = Math.floor(y + oy);
-      if (grid.isBlocked(tx, ty) && !(ignoreId && grid.occupant[grid.idx(tx, ty)] === ignoreId)) return false;
+      if (grid.isBlockedXY(x + ox, y + oy) && !(ignoreId && grid.occupantXY(x + ox, y + oy) === ignoreId)) return false;
     }
     return true;
   };
   // already overlapping something (spawned or knocked into it)? let it slide out instead of freezing
   if (!free(pos.x, pos.y)) {
-    if (!grid.isBlocked(Math.floor(pos.x + dx), Math.floor(pos.y + dy))) {
+    if (!grid.isBlockedXY(pos.x + dx, pos.y + dy)) {
       pos.x += dx;
       pos.y += dy;
     }
@@ -34,7 +32,6 @@ export function moveWithCollision(grid: NavGrid, pos: Vec2, dx: number, dy: numb
 /** Which tile would we enter moving by (dx, dy)? Used to find the structure a zombie is scratching at. */
 export function blockingTile(grid: NavGrid, pos: Vec2, dx: number, dy: number, r: number): number {
   const l = Math.hypot(dx, dy) || 1;
-  const x = Math.floor(pos.x + (dx / l) * (r + 0.3));
-  const y = Math.floor(pos.y + (dy / l) * (r + 0.3));
-  return grid.inBounds(x, y) ? grid.occupant[grid.idx(x, y)] : 0;
+  const reach = r + 0.3 * grid.cell;
+  return grid.occupantXY(pos.x + (dx / l) * reach, pos.y + (dy / l) * reach);
 }

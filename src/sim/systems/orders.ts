@@ -6,7 +6,8 @@ import { findPath } from '../pathfinding';
 import type { World } from '../World';
 import { moveWithCollision } from './movement';
 
-const ARRIVE = 0.35;
+const ARRIVE = 1; // metres
+const BODY = 0.9; // squad-centre collision radius, metres
 
 export function updateOrders(w: World, dt: number): void {
   for (const s of w.squads) {
@@ -56,7 +57,7 @@ export function updateOrders(w: World, dt: number): void {
 
 function applyKnock(w: World, s: Squad, dt: number): void {
   if (Math.abs(s.knock.x) + Math.abs(s.knock.y) < 0.01) return;
-  moveWithCollision(w.grid, s.pos, s.knock.x * dt, s.knock.y * dt, 0.3);
+  moveWithCollision(w.grid, s.pos, s.knock.x * dt, s.knock.y * dt, BODY);
   const decay = Math.exp(-6 * dt);
   s.knock.x *= decay;
   s.knock.y *= decay;
@@ -73,19 +74,17 @@ export function moveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: n
   }
   const wp = s.path[0];
   const d = dist(s.pos, wp);
-  const tile = w.grid.idx(Math.floor(s.pos.x), Math.floor(s.pos.y));
-  const step = s.def.speed * dt * (w.grid.slow[tile] < 1 ? 0.75 : 1);
-  if (d <= step) {
-    s.pos.x = wp.x;
-    s.pos.y = wp.y;
-    s.path.shift();
-  } else {
-    const dir = norm(sub(wp, s.pos));
-    moveWithCollision(w.grid, s.pos, dir.x * step, dir.y * step, 0.3);
-    s.facing = Math.atan2(dir.y, dir.x);
-  }
+  const step = Math.min(d, s.def.speed * dt * (w.grid.slowAt(s.pos) < 1 ? 0.75 : 1));
+  const dir = norm(sub(wp, s.pos));
+  // always move through collision (no snapping onto a waypoint that hugs an obstacle)
+  const blocked = moveWithCollision(w.grid, s.pos, dir.x * step, dir.y * step, BODY);
+  if (d > 0.01) s.facing = Math.atan2(dir.y, dir.x);
+  if (dist(s.pos, wp) < 0.15) s.path.shift();
   s.moving = true;
-  return !s.path.length && dist(s.pos, dest) <= arrive + 0.6;
+  const left = dist(s.pos, dest);
+  // a destination right against a car or wall can be unreachable for a body this wide: close enough is arrived
+  if (blocked && left <= arrive + BODY * 2) return true;
+  return !s.path.length && left <= arrive + 1.8;
 }
 
 function doBuild(w: World, s: Squad, dt: number): void {
@@ -96,7 +95,7 @@ function doBuild(w: World, s: Squad, dt: number): void {
     s.buildProgress = 0;
     return;
   }
-  const st = approach(w, s, site.pos, site.radius, site.radius + 1.6, dt);
+  const st = approach(w, s, site.pos, site.radius, site.radius + 4, dt);
   if (st === 'moving') return;
   if (st === 'blocked') {
     w.events.emit('radio', { speaker: s.name, text: "Can't reach that build site, Command.", tone: 'warn' });
@@ -125,7 +124,7 @@ function doCharge(w: World, s: Squad, dt: number): void {
     s.orders.shift();
     return;
   }
-  const st = approach(w, s, hive.pos, hive.radius, hive.radius + 1.2, dt);
+  const st = approach(w, s, hive.pos, hive.radius, hive.radius + 3, dt);
   if (st === 'moving') return;
   if (st === 'blocked') {
     w.events.emit('radio', { speaker: s.name, text: "Can't get close enough to that hive.", tone: 'warn' });
@@ -144,7 +143,7 @@ function doCharge(w: World, s: Squad, dt: number): void {
   // auto-retreat away from the blast unless the player queued something else
   if (!s.orders.length) {
     const away = norm(sub(s.pos, hive.pos));
-    s.orders.unshift({ type: 'move', pos: w.grid.nearestFree({ x: s.pos.x + away.x * 7, y: s.pos.y + away.y * 7 }) });
+    s.orders.unshift({ type: 'move', pos: w.grid.nearestFree({ x: s.pos.x + away.x * 16, y: s.pos.y + away.y * 16 }) });
   }
   s.path = [];
 }
@@ -155,26 +154,26 @@ function doCharge(w: World, s: Squad, dt: number): void {
  */
 function approach(w: World, s: Squad, target: Vec2, radius: number, reach: number, dt: number): 'moving' | 'inReach' | 'blocked' {
   if (dist(s.pos, target) <= reach) return 'inReach';
-  const arrived = moveToward(w, s, approachPoint(w, s, target, radius), dt, 0.3);
+  const arrived = moveToward(w, s, approachPoint(w, s, target, radius), dt, ARRIVE);
   if (!arrived) return 'moving';
   s.path = [];
-  return dist(s.pos, target) <= reach + 1.6 ? 'inReach' : 'blocked';
+  return dist(s.pos, target) <= reach + 3.5 ? 'inReach' : 'blocked';
 }
 
 /** Closest walkable spot just outside a target, on the side the squad is coming from. */
 function approachPoint(w: World, s: Squad, target: Vec2, radius: number): Vec2 {
   const d = norm(sub(s.pos, target));
-  return w.grid.nearestFree({ x: target.x + d.x * (radius + 0.7), y: target.y + d.y * (radius + 0.7) });
+  return w.grid.nearestFree({ x: target.x + d.x * (radius + 1.8), y: target.y + d.y * (radius + 1.8) });
 }
 
 function separate(w: World, s: Squad, dt: number): void {
-  for (const o of w.squadHash.query(s.pos, 1.8)) {
+  for (const o of w.squadHash.query(s.pos, 4.5)) {
     if (o === s) continue;
     const d = dist(s.pos, o.pos);
-    if (d < 1.6 && d > 0.001) {
-      const push = ((1.6 - d) / 1.6) * 2 * dt;
+    if (d < 4 && d > 0.001) {
+      const push = ((4 - d) / 4) * 5 * dt;
       const dir = norm(sub(s.pos, o.pos));
-      moveWithCollision(w.grid, s.pos, dir.x * push, dir.y * push, 0.3);
+      moveWithCollision(w.grid, s.pos, dir.x * push, dir.y * push, BODY);
     }
   }
 }
@@ -184,15 +183,15 @@ function updateCover(w: World, s: Squad): void {
   s.coverPropId = null;
   if (s.moving) return;
   for (const p of w.map.props) {
-    if (Math.abs(p.pos.x - s.pos.x) > 2.5 || Math.abs(p.pos.y - s.pos.y) > 2.5) continue;
-    if (dist(p.pos, s.pos) < 1.9 && p.cover > s.inCover) {
+    if (Math.abs(p.pos.x - s.pos.x) > 6 || Math.abs(p.pos.y - s.pos.y) > 6) continue;
+    if (dist(p.pos, s.pos) < 4.5 && p.cover > s.inCover) {
       s.inCover = p.cover;
       s.coverPropId = p.id;
     }
   }
   for (const st of w.structures) {
     if (!st.built || !st.def.cover) continue;
-    if (dist(st.pos, s.pos) < st.radius + 1.3 && st.def.cover > s.inCover) {
+    if (dist(st.pos, s.pos) < st.radius + 3 && st.def.cover > s.inCover) {
       s.inCover = st.def.cover;
       s.coverPropId = st.id;
     }

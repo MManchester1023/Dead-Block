@@ -4,6 +4,10 @@ import { ThreatClass, type Targetable } from '../src/sim/types';
 import { World } from '../src/sim/World';
 import { BALANCE } from '../src/config/balance';
 import { findPath } from '../src/sim/pathfinding';
+import { CELL } from '../src/config/world';
+
+/** Positions below are written in nav cells (as on the map sketch) and converted to metres. */
+const M = (x: number, y: number) => ({ x: x * CELL, y: y * CELL });
 
 const T = (id: number, x: number, y: number, threat = ThreatClass.Normal, alive = true): Targetable => ({
   id, faction: 'zombie', pos: { x, y }, alive, threat, radius: 0,
@@ -50,7 +54,7 @@ describe('world rules', () => {
 
   it('loses members individually and wipes permanently', () => {
     const w = new World({ populate: false });
-    const sq = w.spawnSquad('rifle', { x: 10, y: 36 });
+    const sq = w.spawnSquad('rifle', M(10, 36));
     w.damageSquad(sq, 1000, 'melee');
     expect(sq.aliveCount).toBe(3);
     for (let i = 0; i < 3; i++) w.damageSquad(sq, 1000, 'melee');
@@ -75,7 +79,7 @@ describe('world rules', () => {
     const hive = w.hives[0];
     hive.spawnTimer = 1e9;
     const eng = w.squads.find((s) => s.def.id === 'engineer')!;
-    eng.pos = { x: 92, y: 55 }; // approach from the side where cars block the closest tiles
+    eng.pos = M(92, 55); // approach from the side where cars block the closest tiles
     expect(w.orderCharge([eng], hive)).toBeNull();
     for (let i = 0; i < 30 * 15 && hive.alive; i++) w.step(1 / 30);
     expect(hive.alive).toBe(false);
@@ -86,27 +90,27 @@ describe('world rules', () => {
     // squad on the main road, zombie tucked behind the building at x42–49, y20–29 (19 tiles away, no line of sight)
     const setup = (shoot: boolean) => {
       const w = new World({ populate: false, seed: 5 });
-      const sq = w.spawnSquad('rifle', { x: 45.5, y: 36.5 });
+      const sq = w.spawnSquad('rifle', M(45.5, 36.5));
       w.issueOrder([sq], { type: 'hold', pos: sq.pos });
-      const hidden = w.spawnZombie('runner', { x: 45.5, y: 17.5 })!;
-      if (shoot) w.spawnZombie('walker', { x: 52, y: 36.5 }); // something to shoot at
+      const hidden = w.spawnZombie('runner', M(45.5, 17.5))!;
+      if (shoot) w.spawnZombie('walker', M(52, 36.5)); // something to shoot at
       let closest = Infinity;
       for (let i = 0; i < 30 * 15; i++) {
         w.step(1 / 30);
         if (hidden.alive) closest = Math.min(closest, Math.hypot(hidden.pos.x - sq.pos.x, hidden.pos.y - sq.pos.y));
         else closest = 0; // it came close enough to be shot
       }
-      return { closest, sees: w.grid.lineClear(sq.pos, { x: 45.5, y: 17.5 }) };
+      return { closest, sees: w.grid.lineClear(sq.pos, M(45.5, 17.5)) };
     };
 
     it('the hidden zombie really is out of sight', () => {
       expect(setup(false).sees).toBe(false);
     });
     it('stays put when nobody shoots', () => {
-      expect(setup(false).closest).toBeGreaterThan(12);
+      expect(setup(false).closest).toBeGreaterThan(12 * CELL);
     });
     it('comes around the building toward the shots', () => {
-      expect(setup(true).closest).toBeLessThan(9);
+      expect(setup(true).closest).toBeLessThan(9 * CELL);
     });
   });
 
@@ -151,10 +155,10 @@ describe('world rules', () => {
 
   it('finds a path from the base out to the motel', () => {
     const w = new World();
-    const p = findPath(w.grid, { x: 20, y: 36 }, { x: 70, y: 22 });
+    const p = findPath(w.grid, M(20, 36), M(70, 22));
     expect(p).not.toBeNull();
     const end = p![p!.length - 1];
-    expect(Math.hypot(end.x - 70, end.y - 22)).toBeLessThan(1.5);
+    expect(Math.hypot(end.x - 70 * CELL, end.y - 22 * CELL)).toBeLessThan(1.5 * CELL);
   });
 
   it('a held street with rifle squads kills an approaching walker horde (the doc §15 fun check)', () => {
@@ -162,11 +166,11 @@ describe('world rules', () => {
     // dig in: sandbags across the road, squads behind them
     w.addStructure('sandbags', { x: 42, y: 34 }, true, true);
     w.addStructure('sandbags', { x: 42, y: 37 }, true, true);
-    const squads = [w.spawnSquad('rifle', { x: 40.5, y: 35 }), w.spawnSquad('rifle', { x: 40.5, y: 37.5 })];
-    w.issueOrder(squads, { type: 'hold', pos: { x: 40, y: 36 } });
+    const squads = [w.spawnSquad('rifle', M(40.5, 35)), w.spawnSquad('rifle', M(40.5, 37.5))];
+    w.issueOrder(squads, { type: 'hold', pos: M(40, 36) });
     for (let i = 0; i < 16; i++) {
-      const z = w.spawnZombie('walker', { x: 50 + (i % 4), y: 34.5 + Math.floor(i / 4) })!;
-      z.goal = { x: 40, y: 36 };
+      const z = w.spawnZombie('walker', M(50 + (i % 4), 34.5 + Math.floor(i / 4)))!;
+      z.goal = M(40, 36);
       z.state = 'pulse';
     }
     for (let t = 0; t < 30 * 40; t++) w.step(1 / 30);

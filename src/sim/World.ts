@@ -58,21 +58,21 @@ export class World {
   noiseEvents: NoiseEvent[] = [];
   districts = new Map<string, DistrictState>();
 
-  readonly zombieHash = new SpatialHash<Zombie>(4);
-  readonly squadHash = new SpatialHash<Squad>(6);
+  readonly zombieHash = new SpatialHash<Zombie>(8);
+  readonly squadHash = new SpatialHash<Squad>(12);
   private byId = new Map<number, Targetable>();
   private nameCounter = 0;
 
   constructor(opts: { seed?: number; map?: CityMap; populate?: boolean } = {}) {
     this.rng = new Rng(opts.seed ?? 1337);
     this.map = opts.map ?? buildStarterMap();
-    this.grid = new NavGrid(this.map.width, this.map.height);
+    this.grid = new NavGrid(this.map.cols, this.map.rows, this.map.cell);
     for (const b of this.map.buildings) {
-      this.grid.setRect(b.rect.x, b.rect.y, b.rect.w, b.rect.h, true);
-      for (let y = b.rect.y; y < b.rect.y + b.rect.h; y++)
-        for (let x = b.rect.x; x < b.rect.x + b.rect.w; x++) this.grid.opaque[this.grid.idx(x, y)] = 1;
+      const c = b.cells;
+      this.grid.setRect(c.x, c.y, c.w, c.h, true);
+      for (let y = c.y; y < c.y + c.h; y++) for (let x = c.x; x < c.x + c.w; x++) this.grid.opaque[this.grid.idx(x, y)] = 1;
     }
-    for (const p of this.map.props) this.grid.setRect(Math.floor(p.pos.x - p.w / 2), Math.floor(p.pos.y - p.h / 2), p.w, p.h, true, p.id);
+    for (const p of this.map.props) this.grid.setRect(p.cells.x, p.cells.y, p.cells.w, p.cells.h, true, p.id);
     for (const d of this.map.districts)
       this.districts.set(d.id, { def: d, infestation: d.initialInfestation, noise: 0, secured: d.id === 'base', outpostId: null, cleared: d.initialInfestation === 0 });
 
@@ -83,13 +83,14 @@ export class World {
 
   private populate(): void {
     const m = this.map;
-    const b = m.baseRect;
+    const b = m.baseCells; // structures snap to nav cells
     this.addStructure('commandPost', { x: b.x + 3, y: b.y + 4 }, true);
     this.addStructure('barracks', { x: b.x + 3, y: b.y + 26 }, true);
     this.addStructure('supplyDepot', { x: b.x + 12, y: b.y + 4 }, true);
     // perimeter wall with a gate on the east side
     for (let y = b.y - 1; y <= b.y + b.h; y++) {
-      if (y >= m.baseGate.y && y < m.baseGate.y + m.baseGate.h) continue;
+      const gy = m.baseGate.y / m.cell; // gate is in metres; walls are placed in cells
+      if (y >= gy && y < gy + m.baseGate.h / m.cell) continue;
       this.addStructure('baseWall', { x: b.x + b.w, y }, true);
     }
     for (let x = b.x - 1; x < b.x + b.w; x++) {
@@ -99,9 +100,9 @@ export class World {
     for (let y = b.y; y < b.y + b.h; y++) this.addStructure('baseWall', { x: b.x - 1, y }, true);
 
     // doc §11 starting force: two Rifle Squads + one Engineer Team
-    this.spawnSquad('rifle', { x: 22, y: 34 });
-    this.spawnSquad('rifle', { x: 22, y: 38 });
-    this.spawnSquad('engineer', { x: 18, y: 36 });
+    this.spawnSquad('rifle', { x: 66, y: 102 });
+    this.spawnSquad('rifle', { x: 66, y: 114 });
+    this.spawnSquad('engineer', { x: 54, y: 108 });
 
     for (const d of m.districts)
       for (const site of d.hiveSites) {
@@ -116,7 +117,7 @@ export class World {
       const kinds = Object.entries(d.def.mix);
       for (let i = 0; i < count; i++) {
         const r = d.def.rect;
-        const p = this.grid.nearestFree({ x: this.rng.range(r.x + 4, r.x + r.w - 2), y: this.rng.range(r.y + 2, r.y + r.h - 2) });
+        const p = this.grid.nearestFree({ x: this.rng.range(r.x + 12, r.x + r.w - 6), y: this.rng.range(r.y + 6, r.y + r.h - 6) });
         let roll = this.rng.next();
         const kind = kinds.find(([, wgt]) => (roll -= wgt) < 0)?.[0] ?? 'walker';
         this.spawnZombie(kind, p);
@@ -161,7 +162,7 @@ export class World {
 
   registerHive(h: Hive): void {
     this.byId.set(h.id, h);
-    this.grid.setRect(Math.floor(h.pos.x) - 1, Math.floor(h.pos.y) - 1, 2, 2, true, h.id);
+    this.grid.setRect(this.grid.c(h.pos.x) - 1, this.grid.c(h.pos.y) - 1, 2, 2, true, h.id);
   }
 
   get(id: number | null): Targetable | undefined {
@@ -203,7 +204,7 @@ export class World {
     const center = squads.reduce((a, s) => ({ x: a.x + s.pos.x / n, y: a.y + s.pos.y / n }), { x: 0, y: 0 });
     const dir = norm(sub(order.pos, center));
     const perp = { x: -dir.y, y: dir.x };
-    const spacing = 2.4;
+    const spacing = 6; // metres between squads in a line
     const isSupport = (s: Squad) => !!s.def.canBuild?.length;
     const front = squads.filter((s) => !isSupport(s));
     const back = squads.filter(isSupport);
@@ -214,7 +215,7 @@ export class World {
       const o: Order = { ...order, pos: { ...order.pos } };
       if (n > 1 && (order.type === 'move' || order.type === 'attackMove')) {
         const { k, rank } = slot.get(s)!;
-        const back = rank * 3;
+        const back = rank * 7;
         o.pos = this.grid.nearestFree({ x: order.pos.x + perp.x * k - dir.x * back, y: order.pos.y + perp.y * k - dir.y * back });
       }
       if (!queue) {
@@ -267,12 +268,13 @@ export class World {
     const fp = this.footprint(defId, rotated);
     if (!this.grid.rectFree(tile.x, tile.y, fp.w, fp.h)) return 'Blocked';
     if (def.requiresSecured) {
-      const d = this.districtAt({ x: tile.x + fp.w / 2, y: tile.y + fp.h / 2 });
+      const d = this.districtAt({ x: (tile.x + fp.w / 2) * this.grid.cell, y: (tile.y + fp.h / 2) * this.grid.cell });
       if (!d || d.def.id === 'base') return 'Outposts go in a district';
       if (d.outpostId) return 'District already has an outpost';
       if (d.infestation > 0) return `Infestation must be 0% (now ${Math.ceil(d.infestation)}%)`;
     }
-    for (const z of this.zombieHash.query({ x: tile.x + fp.w / 2, y: tile.y + fp.h / 2 }, 2)) if (z.alive) return 'Zombies in the way';
+    const c = { x: (tile.x + fp.w / 2) * this.grid.cell, y: (tile.y + fp.h / 2) * this.grid.cell };
+    for (const z of this.zombieHash.query(c, Math.max(fp.w, fp.h) * this.grid.cell * 0.5 + 1.5)) if (z.alive) return 'Zombies in the way';
     if (!this.canAfford(def.cost)) return 'Not enough money or supplies';
     return null;
   }
@@ -348,10 +350,10 @@ export class World {
       this.events.emit('zombieKilled', { id: z.id, defId: z.def.id, pos: { ...z.pos }, districtId: d?.def.id ?? null });
       if (d) d.infestation = Math.max(0, d.infestation - (BALANCE.infestation.perKill[z.def.id] ?? 0.5));
       if (z.def.onDeath === 'toxicCloud') {
-        const cloud: ToxicCloud = { id: newId(), pos: { ...z.pos }, radius: 2.6, remaining: 8, dps: 7 };
+        const cloud: ToxicCloud = { id: newId(), pos: { ...z.pos }, radius: 5.5, remaining: 8, dps: 7 };
         this.clouds.push(cloud);
         this.events.emit('toxicCloud', { pos: cloud.pos, radius: cloud.radius, duration: cloud.remaining });
-        this.explode(z.pos, 2.2, 6, 'toxic', 0.8);
+        this.explode(z.pos, 4.5, 6, 'toxic', 0.8);
       }
     }
   }
@@ -363,7 +365,7 @@ export class World {
     if (h.hp <= 0 && h.alive) {
       h.alive = false;
       this.byId.delete(h.id);
-      this.grid.setRect(Math.floor(h.pos.x) - 1, Math.floor(h.pos.y) - 1, 2, 2, false);
+      this.grid.setRect(this.grid.c(h.pos.x) - 1, this.grid.c(h.pos.y) - 1, 2, 2, false);
       const d = this.districts.get(h.districtId);
       if (d) d.infestation = Math.max(0, d.infestation - BALANCE.infestation.hiveDestroyed);
       this.money += BALANCE.economy.hiveBounty;
@@ -387,7 +389,7 @@ export class World {
   explode(pos: Vec2, radius: number, damage: number, type: DamageType, knockback = 1.5): void {
     this.events.emit('explosion', { pos: { ...pos }, radius, type });
     const kb = isEnabled('knockback') ? knockback : 0;
-    for (const z of this.zombieHash.query(pos, radius + 1)) {
+    for (const z of this.zombieHash.query(pos, radius + 2)) {
       if (!z.alive) continue;
       const d = dist(pos, z.pos);
       if (d > radius + z.radius) continue;
@@ -395,8 +397,8 @@ export class World {
       this.damageZombie(z, damage * falloff, type);
       if (kb) {
         const dir = norm(sub(z.pos, pos));
-        z.knock.x += dir.x * kb * 6 * falloff;
-        z.knock.y += dir.y * kb * 6 * falloff;
+        z.knock.x += dir.x * kb * 12 * falloff; // m/s
+        z.knock.y += dir.y * kb * 12 * falloff;
       }
     }
     for (const s of this.squads) {
@@ -407,15 +409,15 @@ export class World {
       if (type !== 'toxic') this.damageSquad(s, damage * 0.6 * falloff, type, pos);
       if (kb && d < radius * 0.7) {
         const dir = norm(sub(s.pos, pos));
-        s.knock.x += dir.x * kb * 3 * falloff;
-        s.knock.y += dir.y * kb * 3 * falloff;
+        s.knock.x += dir.x * kb * 6 * falloff;
+        s.knock.y += dir.y * kb * 6 * falloff;
         s.stunned = Math.max(s.stunned, 0.6 * falloff);
       }
     }
     for (const h of this.hives) if (h.alive && dist(pos, h.pos) <= radius + h.radius) this.damageHive(h, damage, type);
     for (const st of this.structures)
       if (st.alive && st.def.id !== 'baseWall' && dist(pos, st.pos) <= radius + st.radius) this.damageStructure(st, damage * 0.3);
-    this.makeNoise(pos, type === 'toxic' ? 4 : radius * 6);
+    this.makeNoise(pos, type === 'toxic' ? 4 : radius * 3);
   }
 
   // ---------- main loop ----------

@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { Vec2 } from '../core/math';
 import { isEnabled } from '../config/features';
 import { BALANCE } from '../config/balance';
+import { CELL } from '../config/world';
 import type { World } from '../sim/World';
 import type { Squad, Structure, Hive } from '../sim/entities';
 import { CameraRig } from './CameraRig';
@@ -24,6 +25,8 @@ interface Fx {
 }
 
 const ZOMBIE_TYPES = ['walker', 'runner', 'bloater'] as const;
+/** Soldier meshes are authored ~1.14 tall; scale to a 1.8 m person. */
+const SOLDIER_SCALE = 1.6;
 const MAX_ZOMBIES = 320;
 
 /** World (x, y) → scene (x, h, y). The renderer only reads the simulation; it never mutates it. */
@@ -64,18 +67,18 @@ export class Renderer {
     this.hemi = new THREE.HemisphereLight(0xc8ccd0, 0x3a3428, 1.2);
     this.scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(0xfff1dc, 2.2);
-    this.sun.position.set(world.map.width / 2 - 22, 70, world.map.height / 2 + 38);
+    this.sun.position.set(world.map.width / 2 - 66, 210, world.map.height / 2 + 114);
     this.sun.target.position.set(world.map.width / 2, 0, world.map.height / 2);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
+    this.sun.shadow.mapSize.set(4096, 4096);
     const sc = this.sun.shadow.camera;
-    sc.left = -75;
-    sc.right = 75;
-    sc.top = 60;
-    sc.bottom = -60;
-    sc.far = 200;
+    sc.left = -225;
+    sc.right = 225;
+    sc.top = 180;
+    sc.bottom = -180;
+    sc.far = 600;
     this.sun.shadow.bias = -0.0005;
-    this.sun.shadow.normalBias = 0.06;
+    this.sun.shadow.normalBias = 0.2;
     this.scene.add(this.sun, this.sun.target);
 
     this.buildStatic();
@@ -86,7 +89,7 @@ export class Renderer {
     tracerLines.frustumCulled = false;
     this.scene.add(tracerLines);
 
-    this.ghost = new THREE.Mesh(new THREE.BoxGeometry(1, 0.6, 1), new THREE.MeshBasicMaterial({ color: 0x77dd77, transparent: true, opacity: 0.45, depthWrite: false }));
+    this.ghost = new THREE.Mesh(new THREE.BoxGeometry(1, 1.5, 1), new THREE.MeshBasicMaterial({ color: 0x77dd77, transparent: true, opacity: 0.45, depthWrite: false }));
     this.ghost.visible = false;
     this.scene.add(this.ghost);
 
@@ -108,7 +111,7 @@ export class Renderer {
     this.scene.add(ground);
 
     // apron of wasteland so the map edge isn't a cliff into the void
-    const apron = new THREE.Mesh(new THREE.PlaneGeometry(m.width + 80, m.height + 80), new THREE.MeshLambertMaterial({ color: 0x2f2c26 }));
+    const apron = new THREE.Mesh(new THREE.PlaneGeometry(m.width + 240, m.height + 240), new THREE.MeshLambertMaterial({ color: 0x2f2c26 }));
     apron.rotation.x = -Math.PI / 2;
     apron.position.set(m.width / 2, -0.02, m.height / 2);
     this.scene.add(apron);
@@ -116,7 +119,8 @@ export class Renderer {
     for (const b of m.buildings) {
       const g = new THREE.Group();
       const tex = facadeTexture(b.id * 31);
-      tex.repeat.set(Math.max(1, Math.round(Math.max(b.rect.w, b.rect.h) / 2.5)), Math.max(1, Math.round(b.height)));
+      // each facade tile is 2 bays × 2 floors ≈ 7 m × 6 m
+      tex.repeat.set(Math.max(1, Math.round(Math.max(b.rect.w, b.rect.h) / 7)), Math.max(1, Math.round(b.height / 6)));
       const wallMat = new THREE.MeshLambertMaterial({ color: b.color, map: tex });
       const roofMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(b.color).offsetHSL(0, -0.04, -0.04) });
       const mats = [wallMat, wallMat, roofMat, roofMat, wallMat, wallMat];
@@ -128,19 +132,19 @@ export class Renderer {
       // parapet + rooftop clutter (future: rooftop positions, doc §5)
       const parMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(b.color).offsetHSL(0, 0, 0.06) });
       for (const [w, d, x, z] of [
-        [b.rect.w, 0.2, 0, -b.rect.h / 2 + 0.1],
-        [b.rect.w, 0.2, 0, b.rect.h / 2 - 0.1],
-        [0.2, b.rect.h, -b.rect.w / 2 + 0.1, 0],
-        [0.2, b.rect.h, b.rect.w / 2 - 0.1, 0],
+        [b.rect.w, 0.4, 0, -b.rect.h / 2 + 0.2],
+        [b.rect.w, 0.4, 0, b.rect.h / 2 - 0.2],
+        [0.4, b.rect.h, -b.rect.w / 2 + 0.2, 0],
+        [0.4, b.rect.h, b.rect.w / 2 - 0.2, 0],
       ]) {
-        const p = new THREE.Mesh(new THREE.BoxGeometry(w, 0.3, d), parMat);
-        p.position.set(x, b.height + 0.15, z);
+        const p = new THREE.Mesh(new THREE.BoxGeometry(w, 0.8, d), parMat);
+        p.position.set(x, b.height + 0.4, z);
         p.castShadow = true;
         g.add(p);
       }
-      if (b.rect.w * b.rect.h > 30) {
-        const ac = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 0.9), new THREE.MeshLambertMaterial({ color: 0x8c8f8a }));
-        ac.position.set(b.rect.w * 0.2, b.height + 0.3, -b.rect.h * 0.15);
+      if (b.rect.w * b.rect.h > 270) {
+        const ac = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.4, 2), new THREE.MeshLambertMaterial({ color: 0x8c8f8a }));
+        ac.position.set(b.rect.w * 0.2, b.height + 0.7, -b.rect.h * 0.15);
         ac.castShadow = true;
         g.add(ac);
       }
@@ -151,12 +155,13 @@ export class Renderer {
     for (const p of m.props) {
       const g = new THREE.Group();
       const col = new THREE.Color(p.color);
-      const body = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.45, 0.85), new THREE.MeshLambertMaterial({ color: col }));
-      body.position.y = 0.38;
-      const cab = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.35, 0.75), new THREE.MeshLambertMaterial({ color: col.clone().offsetHSL(0, -0.1, -0.08) }));
-      cab.position.set(-0.1, 0.78, 0);
-      const glass = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.2, 0.77), new THREE.MeshLambertMaterial({ color: 0x2b3438 }));
-      glass.position.set(-0.1, 0.8, 0);
+      // real sedan: 4.6 × 1.85 m, 1.45 m tall
+      const body = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.75, 1.85), new THREE.MeshLambertMaterial({ color: col }));
+      body.position.y = 0.6;
+      const cab = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.5, 1.65), new THREE.MeshLambertMaterial({ color: col.clone().offsetHSL(0, -0.1, -0.08) }));
+      cab.position.set(-0.25, 1.2, 0);
+      const glass = new THREE.Mesh(new THREE.BoxGeometry(2.42, 0.32, 1.67), new THREE.MeshLambertMaterial({ color: 0x2b3438 }));
+      glass.position.set(-0.25, 1.22, 0);
       for (const o of [body, cab, glass]) {
         o.castShadow = true;
         g.add(o);
@@ -174,7 +179,7 @@ export class Renderer {
         new THREE.MeshBasicMaterial({ color: PAL.infest, transparent: true, opacity: 0.2, depthWrite: false }),
       );
       ov.rotation.x = -Math.PI / 2;
-      ov.position.set(d.rect.x + d.rect.w / 2, 0.03, d.rect.y + d.rect.h / 2);
+      ov.position.set(d.rect.x + d.rect.w / 2, 0.06, d.rect.y + d.rect.h / 2);
       this.scene.add(ov);
       this.districtOverlays.set(d.id, ov);
       const lab = document.createElement('div');
@@ -196,7 +201,8 @@ export class Renderer {
       ])!;
     const colors: Record<string, number> = { walker: PAL.walker, runner: PAL.runner, bloater: PAL.bloater };
     for (const t of ZOMBIE_TYPES) {
-      const geo = humanoid(t === 'bloater' ? 1.9 : t === 'runner' ? 0.85 : 1);
+      // authored ~1.2 tall; scale to a 1.8 m person
+      const geo = humanoid(t === 'bloater' ? 1.9 : t === 'runner' ? 0.85 : 1).scale(1.5, 1.5, 1.5);
       const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: 0xffffff }), MAX_ZOMBIES);
       mesh.castShadow = true;
       mesh.count = 0;
@@ -228,6 +234,7 @@ export class Renderer {
       o.castShadow = true;
       g.add(o);
     }
+    g.scale.setScalar(SOLDIER_SCALE);
     return g;
   }
 
@@ -235,9 +242,9 @@ export class Renderer {
     let v = this.squadViews.get(s.id);
     if (v) return v;
     const group = new THREE.Group();
-    const ring = new THREE.Mesh(new THREE.RingGeometry(1.15, 1.35, 24), new THREE.MeshBasicMaterial({ color: PAL.select, transparent: true, opacity: 0.85, depthWrite: false }));
+    const ring = new THREE.Mesh(new THREE.RingGeometry(2.7, 3.1, 32), new THREE.MeshBasicMaterial({ color: PAL.select, transparent: true, opacity: 0.85, depthWrite: false }));
     ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.05;
+    ring.position.y = 0.08;
     group.add(ring);
     const color = s.def.id === 'engineer' ? PAL.engineer : PAL.olive;
     const members = s.members.map(() => {
@@ -258,7 +265,8 @@ export class Renderer {
     let o = this.structViews.get(s.id);
     if (o) return o;
     const g = new THREE.Group();
-    const { w, h } = s.size;
+    const w = s.size.w * CELL; // metres
+    const h = s.size.h * CELL;
     const add = (geo: THREE.BufferGeometry, color: number, y: number, x = 0, z = 0) => {
       const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color, transparent: true }));
       m.position.set(x, y, z);
@@ -268,55 +276,57 @@ export class Renderer {
     };
     switch (s.def.id) {
       case 'baseWall':
-        add(new THREE.BoxGeometry(1, 1.6, 1), PAL.concrete, 0.8);
+        add(new THREE.BoxGeometry(w, 4, h), PAL.concrete, 2);
         break;
       case 'sandbags':
         for (let i = 0; i < Math.max(w, h); i++) {
           const along = i - (Math.max(w, h) - 1) / 2;
-          const geo = new THREE.BoxGeometry(w > h ? 0.95 : 0.8, 0.35, w > h ? 0.8 : 0.95);
-          add(geo, PAL.sandbag, 0.18, w > h ? along : 0, w > h ? 0 : along);
-          add(geo.clone().scale(0.9, 1, 0.9), new THREE.Color(PAL.sandbag).offsetHSL(0, 0, -0.06).getHex(), 0.52, w > h ? along + 0.25 : 0, w > h ? 0 : along + 0.25);
+          const geo = new THREE.BoxGeometry(w > h ? 0.95 : 0.8, 0.42, w > h ? 0.8 : 0.95);
+          add(geo, PAL.sandbag, 0.21, w > h ? along : 0, w > h ? 0 : along);
+          add(geo.clone().scale(0.9, 1, 0.9), new THREE.Color(PAL.sandbag).offsetHSL(0, 0, -0.06).getHex(), 0.62, w > h ? along + 0.25 : 0, w > h ? 0 : along + 0.25);
         }
         break;
       case 'wire':
-        for (let i = 0; i < Math.max(w, h) * 3; i++) {
-          const along = i / 3 - (Math.max(w, h) - 1) / 2 - 0.33;
-          const m = add(new THREE.TorusGeometry(0.28, 0.025, 4, 8), PAL.wire, 0.3, w > h ? along : 0, w > h ? 0 : along);
+        for (let i = 0; i < Math.max(w, h); i++) {
+          const along = i - (Math.max(w, h) - 1) / 2;
+          const m = add(new THREE.TorusGeometry(0.5, 0.04, 4, 8), PAL.wire, 0.5, w > h ? along : 0, w > h ? 0 : along);
           m.rotation.y = w > h ? 0 : Math.PI / 2;
         }
         break;
       case 'mgNest': {
-        add(new THREE.CylinderGeometry(1, 1.05, 0.6, 8), PAL.sandbag, 0.3);
+        add(new THREE.CylinderGeometry(2.4, 2.6, 1.0, 10, 1, true), PAL.sandbag, 0.5);
         const gun = new THREE.Group();
-        const barrel = new THREE.Mesh(new THREE.BoxGeometry(1, 0.1, 0.1), new THREE.MeshLambertMaterial({ color: 0x1b1b1b }));
-        barrel.position.x = 0.5;
-        gun.add(barrel);
-        gun.position.y = 0.8;
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.3, 0.3), new THREE.MeshLambertMaterial({ color: 0x2a2a2a }));
+        const barrel = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.1, 0.1), new THREE.MeshLambertMaterial({ color: 0x1b1b1b }));
+        barrel.position.x = 0.9;
+        gun.add(body, barrel);
+        gun.position.y = 1.3;
         gun.name = 'turret';
         g.add(gun);
         break;
       }
       case 'outpost': {
-        add(new THREE.BoxGeometry(w - 0.4, 1, h - 0.6), 0x5d6b3a, 0.5);
-        add(new THREE.BoxGeometry(0.08, 3.2, 0.08), 0x333333, 1.6, w / 2 - 0.4, -h / 2 + 0.4);
-        add(new THREE.BoxGeometry(0.7, 0.4, 0.04), 0x4a6a8a, 2.9, w / 2 - 0.05, -h / 2 + 0.4);
+        add(new THREE.BoxGeometry(w - 3, 2.6, h - 4), 0x5d6b3a, 1.3); // command tent
+        add(new THREE.BoxGeometry(0.12, 7, 0.12), 0x333333, 3.5, w / 2 - 1, -h / 2 + 1); // radio mast
+        add(new THREE.BoxGeometry(1.4, 0.8, 0.05), 0x4a6a8a, 6.4, w / 2 - 0.3, -h / 2 + 1); // flag
+        for (const [x, z] of [[-w / 2 + 1, h / 2 - 1], [w / 2 - 1, h / 2 - 1]]) add(new THREE.BoxGeometry(2.2, 0.9, 0.9), PAL.sandbag, 0.45, x, z);
         break;
       }
       case 'commandPost':
-        add(new THREE.BoxGeometry(w, 2.2, h), 0x5f6553, 1.1);
-        add(new THREE.BoxGeometry(0.1, 4, 0.1), 0x2a2a2a, 3, w / 3, 0);
-        add(new THREE.BoxGeometry(1.2, 0.08, 1.2), 0xb0b0a0, 4.9, w / 3, 0);
+        add(new THREE.BoxGeometry(w - 1, 5, h - 1), 0x5f6553, 2.5);
+        add(new THREE.BoxGeometry(0.2, 10, 0.2), 0x2a2a2a, 10, w / 3, 0);
+        add(new THREE.BoxGeometry(2.4, 0.12, 2.4), 0xb0b0a0, 14.5, w / 3, 0);
         break;
       case 'barracks':
         add(new THREE.CylinderGeometry(h / 2, h / 2, w, 10, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateX(Math.PI / 2), 0x5d6b3a, 0);
-        add(new THREE.BoxGeometry(0.1, 1.4, 1), 0x3a3a2a, 0.7, w / 2, 0);
+        add(new THREE.BoxGeometry(0.2, 2.6, 2.2), 0x3a3a2a, 1.3, w / 2, 0);
         break;
       case 'supplyDepot':
-        for (let i = 0; i < 6; i++) add(new THREE.BoxGeometry(0.9, 0.7, 0.9), i % 2 ? 0x7a6a4a : 0x5a6a3a, 0.35 + (i > 3 ? 0.7 : 0), -w / 2 + 0.8 + (i % 4) * 0.95, (i % 2) * 0.9 - 0.4);
-        add(new THREE.BoxGeometry(w, 0.1, h), 0x6a6050, 0.05);
+        for (let i = 0; i < 14; i++) add(new THREE.BoxGeometry(1.8, 1.4, 1.8), i % 3 ? 0x7a6a4a : 0x5a6a3a, 0.7 + (i > 9 ? 1.4 : 0), -w / 2 + 1.5 + (i % 5) * 2.1, Math.floor((i % 10) / 5) * 2.2 - 1.5);
+        add(new THREE.BoxGeometry(w, 0.15, h), 0x6a6050, 0.08);
         break;
       default:
-        add(new THREE.BoxGeometry(w, 1, h), 0x777777, 0.5);
+        add(new THREE.BoxGeometry(w, 2, h), 0x777777, 1);
     }
     g.position.set(s.pos.x, 0, s.pos.y);
     this.scene.add(g);
@@ -328,20 +338,20 @@ export class Renderer {
     let v = this.hiveViews.get(h.id);
     if (v) return v;
     const group = new THREE.Group();
-    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.2, 1), new THREE.MeshLambertMaterial({ color: PAL.hive, emissive: PAL.hiveGlow, emissiveIntensity: 0.25, flatShading: true }));
-    core.position.y = 0.8;
+    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(3, 1), new THREE.MeshLambertMaterial({ color: PAL.hive, emissive: PAL.hiveGlow, emissiveIntensity: 0.25, flatShading: true }));
+    core.position.y = 2;
     core.castShadow = true;
     group.add(core);
     for (let i = 0; i < 7; i++) {
       const a = (i / 7) * Math.PI * 2;
-      const t = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.18, 0.3), new THREE.MeshLambertMaterial({ color: 0x4a1a28 }));
-      t.position.set(Math.cos(a) * 1.4, 0.1, Math.sin(a) * 1.4);
+      const t = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.45, 0.75), new THREE.MeshLambertMaterial({ color: 0x4a1a28 }));
+      t.position.set(Math.cos(a) * 3.5, 0.25, Math.sin(a) * 3.5);
       t.rotation.y = -a;
       group.add(t);
     }
-    const goo = new THREE.Mesh(new THREE.CircleGeometry(3.2, 16), new THREE.MeshBasicMaterial({ color: 0x3a1420, transparent: true, opacity: 0.6, depthWrite: false }));
+    const goo = new THREE.Mesh(new THREE.CircleGeometry(8, 20), new THREE.MeshBasicMaterial({ color: 0x3a1420, transparent: true, opacity: 0.6, depthWrite: false }));
     goo.rotation.x = -Math.PI / 2;
-    goo.position.y = 0.04;
+    goo.position.y = 0.07;
     group.add(goo);
     group.position.set(h.pos.x, 0, h.pos.y);
     this.scene.add(group);
@@ -372,7 +382,7 @@ export class Renderer {
 
   private spawnExplosion(p: Vec2, r: number, color: number): void {
     const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false }));
-    m.position.set(p.x, 0.6, p.y);
+    m.position.set(p.x, 1.2, p.y);
     this.addFx(m, 0.45, (t, fx) => {
       const k = 1 - fx.life / fx.max;
       m.scale.setScalar(0.3 + k * r);
@@ -381,22 +391,22 @@ export class Renderer {
     });
     const scorch = new THREE.Mesh(new THREE.CircleGeometry(r * 0.6, 10), new THREE.MeshBasicMaterial({ color: 0x1a1814, transparent: true, opacity: 0.55, depthWrite: false }));
     scorch.rotation.x = -Math.PI / 2;
-    scorch.position.set(p.x, 0.035, p.y);
+    scorch.position.set(p.x, 0.05, p.y);
     this.addFx(scorch, 60, (_t, fx) => ((scorch.material as THREE.MeshBasicMaterial).opacity = 0.55 * Math.min(1, fx.life / 10)));
   }
 
   private spawnSplat(p: Vec2): void {
     if (this.fx.length > 600) return;
-    const s = new THREE.Mesh(new THREE.CircleGeometry(0.35 + Math.random() * 0.25, 6), new THREE.MeshBasicMaterial({ color: PAL.blood, transparent: true, opacity: 0.7, depthWrite: false }));
+    const s = new THREE.Mesh(new THREE.CircleGeometry(0.6 + Math.random() * 0.5, 6), new THREE.MeshBasicMaterial({ color: PAL.blood, transparent: true, opacity: 0.7, depthWrite: false }));
     s.rotation.x = -Math.PI / 2;
-    s.position.set(p.x, 0.03, p.y);
+    s.position.set(p.x, 0.04, p.y);
     this.addFx(s, 40, (_t, fx) => ((s.material as THREE.MeshBasicMaterial).opacity = 0.7 * Math.min(1, fx.life / 8)));
   }
 
   private spawnCloud(p: Vec2, r: number, dur: number): void {
     const c = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 6), new THREE.MeshBasicMaterial({ color: 0x9fbf3a, transparent: true, opacity: 0.3, depthWrite: false }));
     c.scale.y = 0.4;
-    c.position.set(p.x, 0.4, p.y);
+    c.position.set(p.x, 1, p.y);
     this.addFx(c, dur, (t, fx) => {
       (c.material as THREE.MeshBasicMaterial).opacity = 0.3 * Math.min(1, fx.life / 2);
       c.rotation.y = t * 0.3;
@@ -404,9 +414,9 @@ export class Renderer {
   }
 
   marker(p: Vec2, color: number): void {
-    const m = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.5, 16), new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false }));
+    const m = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.4, 20), new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false }));
     m.rotation.x = -Math.PI / 2;
-    m.position.set(p.x, 0.06, p.y);
+    m.position.set(p.x, 0.09, p.y);
     this.addFx(m, 0.6, (_t, fx) => {
       const k = 1 - fx.life / fx.max;
       m.scale.setScalar(1 + k * 1.5);
@@ -417,8 +427,8 @@ export class Renderer {
   setGhost(tile: { x: number; y: number } | null, size = { w: 1, h: 1 }, ok = true): void {
     this.ghost.visible = !!tile;
     if (!tile) return;
-    this.ghost.scale.set(size.w, 1, size.h);
-    this.ghost.position.set(tile.x + size.w / 2, 0.3, tile.y + size.h / 2);
+    this.ghost.scale.set(size.w * CELL, 1, size.h * CELL);
+    this.ghost.position.set((tile.x + size.w / 2) * CELL, 0.75, (tile.y + size.h / 2) * CELL);
     (this.ghost.material as THREE.MeshBasicMaterial).color.set(ok ? 0x77dd77 : PAL.danger);
   }
 
@@ -427,7 +437,7 @@ export class Renderer {
   render(realDt: number, simDt: number, selected: Set<number>): void {
     this.time += realDt;
     const w = this.world;
-    this.rig.apply();
+    this.rig.apply(realDt);
 
     // squads
     const seen = new Set<number>();
@@ -441,12 +451,12 @@ export class Renderer {
         const g = v.members[i];
         g.visible = m.alive;
         if (!m.alive) return;
-        const bob = s.moving ? Math.abs(Math.sin(this.time * 10 + i)) * 0.06 : 0;
+        const bob = s.moving ? Math.abs(Math.sin(this.time * 10 + i)) * 0.1 : 0;
         g.position.set(m.pos.x, bob, m.pos.y);
         g.rotation.y = -s.facing;
-        g.scale.y = s.inCover && !s.moving ? 0.82 : 1; // crouch behind cover
+        g.scale.y = SOLDIER_SCALE * (s.inCover && !s.moving ? 0.82 : 1); // crouch behind cover
       });
-      this.placeLabel(v.label, s.pos, 1.9, () => this.squadLabelHtml(s, selected.has(s.id)));
+      this.placeLabel(v.label, s.pos, 3.4, () => this.squadLabelHtml(s, selected.has(s.id)));
     }
     for (const [id, v] of this.squadViews)
       if (!seen.has(id)) {
@@ -513,7 +523,7 @@ export class Renderer {
       const pulse = 1 + Math.sin(this.time * (1.5 + h.stage)) * 0.06;
       v.core.scale.setScalar((0.8 + h.stage * 0.18) * pulse);
       (v.core.material as THREE.MeshLambertMaterial).emissiveIntensity = 0.15 + h.stage * 0.12 + (pulse - 1) * 2;
-      this.placeLabel(v.label, h.pos, 3, () => {
+      this.placeLabel(v.label, h.pos, 7, () => {
         const pct = Math.max(0, h.hp / BALANCE.hive.hpByStage[h.stage - 1]) * 100;
         return `<b>HIVE</b> · stage ${h.stage}/4<div class="bar"><i style="width:${pct}%"></i></div>`;
       });
@@ -539,7 +549,7 @@ export class Renderer {
       t.life -= realDt;
       if (t.life <= 0 || n >= 1024) continue;
       const o = n * 6;
-      this.tracerPos.set([t.a.x, 0.7, t.a.y, t.b.x, 0.6, t.b.y], o);
+      this.tracerPos.set([t.a.x, 1.3, t.a.y, t.b.x, 1.1, t.b.y], o);
       n++;
     }
     this.tracers = this.tracers.filter((t) => t.life > 0);
@@ -598,7 +608,7 @@ export class Renderer {
   // ---------------------------------------------------------------- picking
 
   worldToScreen(p: Vec2): { x: number; y: number } {
-    const v = new THREE.Vector3(p.x, 0.5, p.y).project(this.rig.camera);
+    const v = new THREE.Vector3(p.x, 1, p.y).project(this.rig.camera);
     return { x: (v.x * 0.5 + 0.5) * window.innerWidth, y: (-v.y * 0.5 + 0.5) * window.innerHeight };
   }
 

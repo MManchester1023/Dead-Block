@@ -177,6 +177,14 @@ export class Input {
       case 'm':
         g.renderer.rig.toggleStrategic();
         break;
+      case 'q':
+        g.renderer.rig.rotate(-1);
+        g.changed();
+        break;
+      case 'e':
+        g.renderer.rig.rotate(1);
+        g.changed();
+        break;
       case 'p':
         g.renderer.togglePixelation();
         break;

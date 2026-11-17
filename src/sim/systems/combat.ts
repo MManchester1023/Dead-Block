@@ -16,7 +16,7 @@ export function canHurt(weapon: WeaponDef, t: Targetable): boolean {
 function candidatesFor(w: World, faction: Faction, pos: Vec2, range: number): Targetable[] {
   const out: Targetable[] = [];
   if (areHostile(faction, 'zombie')) {
-    w.zombieHash.query(pos, range + 1, out as Zombie[]);
+    w.zombieHash.query(pos, range + 2, out as Zombie[]);
     for (const h of w.hives) if (h.alive && dist(h.pos, pos) <= range + h.radius) out.push(h);
   }
   // 'hostile' human faction candidates get appended here when that faction exists (doc §9a)
@@ -44,7 +44,7 @@ function fire(w: World, from: Vec2, t: Targetable, weapon: WeaponDef, dmgMult: n
   const d = dist(from, t.pos);
   const acc = weapon.accuracy * (1 - 0.35 * Math.min(1, d / weapon.range)) * accMult;
   const hit = w.rng.chance(acc);
-  const miss = hit ? { x: 0, y: 0 } : { x: w.rng.range(-0.8, 0.8), y: w.rng.range(-0.8, 0.8) };
+  const miss = hit ? { x: 0, y: 0 } : { x: w.rng.range(-1.6, 1.6), y: w.rng.range(-1.6, 1.6) };
   w.events.emit('shot', { from: { ...from }, to: { x: t.pos.x + miss.x, y: t.pos.y + miss.y }, faction: 'player', heavy: weapon.damage >= 30 });
   w.makeNoise(from, weapon.loudness);
   if (!hit) return false;
@@ -62,7 +62,7 @@ export function updateCombat(w: World, dt: number): void {
     if (!t) continue;
     if (!s.moving) s.facing = Math.atan2(t.pos.y - s.pos.y, t.pos.x - s.pos.x);
     // builders only defend themselves against danger-close threats
-    if (busy && dist(t.pos, s.pos) > BALANCE.combat.dangerCloseRadius + 1) continue;
+    if (busy && dist(t.pos, s.pos) > BALANCE.combat.dangerCloseRadius + 2) continue;
     const accMult = s.moving ? 0.6 : 1;
     for (const m of s.members) {
       if (!m.alive) continue;

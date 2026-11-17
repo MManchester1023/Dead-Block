@@ -42,7 +42,8 @@ kbd { display: inline-block; min-width: 16px; padding: 0 3px; margin-right: 4px;
 .res b { color: var(--tan); margin-right: 4px; }
 .res.day { font-size: 12px; min-width: 130px; }
 .res.day .bar { margin: 2px 0 0; }
-.speed { margin-left: auto; display: flex; gap: 4px; }
+.speed { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+.compass { font-size: 11px; color: var(--tan); min-width: 92px; text-align: center; }
 button { font: 11px var(--mono); color: var(--ink); background: #2b2d27; border: 1px solid #555a48; padding: 4px 8px; cursor: pointer; }
 button:hover { background: #3a3d33; }
 button.on { background: #4a5a30; border-color: var(--olive); }

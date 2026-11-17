@@ -4,11 +4,11 @@ import type { NavGrid } from './grid';
 /** Binary-heap A* over the nav grid, 8-connected with no corner cutting, plus line-of-sight smoothing. */
 export function findPath(grid: NavGrid, from: Vec2, to: Vec2, maxNodes = 6000): Vec2[] | null {
   const W = grid.width;
-  const sx = Math.floor(from.x);
-  const sy = Math.floor(from.y);
+  const sx = grid.c(from.x);
+  const sy = grid.c(from.y);
   const goal = grid.nearestFree(to);
-  const gx = Math.floor(goal.x);
-  const gy = Math.floor(goal.y);
+  const gx = grid.c(goal.x);
+  const gy = grid.c(goal.y);
   if (sx === gx && sy === gy) return [goal];
 
   const start = sy * W + sx;
@@ -100,21 +100,21 @@ export function findPath(grid: NavGrid, from: Vec2, to: Vec2, maxNodes = 6000): 
   }
   if (!tilePath.length) return null;
   tilePath.reverse();
-  const pts = tilePath.map((i) => ({ x: (i % W) + 0.5, y: ((i / W) | 0) + 0.5 }));
+  const pts = tilePath.map((i) => ({ x: grid.center(i % W), y: grid.center((i / W) | 0) }));
   if (best === target) pts[pts.length - 1] = goal;
   return smooth(grid, from, pts);
 }
 
 function walkable(grid: NavGrid, a: Vec2, b: Vec2): boolean {
   const d = Math.hypot(b.x - a.x, b.y - a.y);
-  const steps = Math.ceil(d / 0.25);
+  const steps = Math.ceil(d / (0.25 * grid.cell));
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
     const x = a.x + (b.x - a.x) * t;
     const y = a.y + (b.y - a.y) * t;
     // sample a small footprint so smoothed paths don't clip corners
-    for (const [ox, oy] of [[0.3, 0.3], [-0.3, 0.3], [0.3, -0.3], [-0.3, -0.3]])
-      if (grid.isBlocked(Math.floor(x + ox), Math.floor(y + oy))) return false;
+    const f = 0.3 * grid.cell;
+    for (const [ox, oy] of [[f, f], [-f, f], [f, -f], [-f, -f]]) if (grid.isBlockedXY(x + ox, y + oy)) return false;
   }
   return true;
 }

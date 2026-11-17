@@ -1,5 +1,6 @@
 import type { Rect, Vec2 } from '../core/math';
 import { Rng } from '../core/rng';
+import { CELL } from '../config/world';
 
 export enum Tile {
   Dirt = 0,
@@ -13,7 +14,11 @@ export enum Tile {
 
 export interface BuildingDef {
   id: number;
+  /** metres */
   rect: Rect;
+  /** nav cells covered */
+  cells: Rect;
+  /** metres */
   height: number;
   color: number;
   /** Future: hp for collapse (doc §6a), rooftop slots (doc §5). */
@@ -24,9 +29,10 @@ export interface BuildingDef {
 export interface PropDef {
   id: number;
   kind: 'car';
-  pos: Vec2; // center
-  w: number;
+  pos: Vec2; // centre, metres
+  w: number; // metres (real car footprint, ~4.6 × 1.9)
   h: number;
+  cells: Rect; // nav cells blocked
   color: number;
   cover: number;
   /** Tanks crush these (doc §6a, Tier 2). */
@@ -46,10 +52,15 @@ export interface DistrictDef {
   mix: Record<string, number>;
 }
 
+/** Everything in metres except `tiles` / `cols` / `rows` / `*Cells`, which are nav-grid cells. */
 export interface CityMap {
   width: number;
   height: number;
+  cols: number;
+  rows: number;
+  cell: number;
   tiles: Uint8Array;
+  baseCells: Rect;
   buildings: BuildingDef[];
   props: PropDef[];
   districts: DistrictDef[];
@@ -59,7 +70,8 @@ export interface CityMap {
 }
 
 /**
- * MVP slice of the city: the main base plus one 64 × 64 starter zone (Roadside Motel), doc §15.
+ * MVP slice of the city: the main base plus one starter zone (Roadside Motel), doc §15.
+ * Authored on the nav grid (64 × 64 cells = 192 × 192 m at 3 m cells), then converted to metres.
  * The map is one continuous grid; later districts get appended to the east/north as the city grows.
  */
 export function buildStarterMap(seed = 7): CityMap {
@@ -110,7 +122,7 @@ export function buildStarterMap(seed = 7): CityMap {
   const buildings: BuildingDef[] = [];
   const palette = [0x6f6a60, 0x7a7266, 0x5f6466, 0x8a7f6c, 0x6a5e55, 0x73786f];
   const addB = (rect: Rect, height: number) => {
-    buildings.push({ id: buildings.length + 1, rect, height, color: rng.pick(palette), hp: 800 * height, roofCapacity: Math.max(1, Math.floor((rect.w * rect.h) / 12)) });
+    buildings.push({ id: buildings.length + 1, rect, cells: { ...rect }, height, color: rng.pick(palette), hp: 800 * height, roofCapacity: Math.max(1, Math.floor((rect.w * rect.h) / 12)) });
     fill(rect, Tile.Building);
   };
   // Roadside Motel: north wing + east wing around the parking lot
@@ -143,7 +155,7 @@ export function buildStarterMap(seed = 7): CityMap {
         if (tiles[y * width + x] === Tile.Building || blockedByProp.has(y * width + x)) return;
       }
     for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) blockedByProp.add(y * width + x);
-    props.push({ id: 10000 + props.length, kind: 'car', pos: { x: x0 + w / 2, y: y0 + h / 2 }, w, h, color: rng.pick(carColors), cover: 0.4, crushable: true });
+    props.push({ id: 10000 + props.length, kind: 'car', pos: { x: x0 + w / 2, y: y0 + h / 2 }, w, h, cells: { x: x0, y: y0, w, h }, color: rng.pick(carColors), cover: 0.4, crushable: true });
   };
   for (let x = 64; x < 77; x += 3) {
     if (rng.chance(0.75)) addCar(x + 1, 16, false);
@@ -163,15 +175,37 @@ export function buildStarterMap(seed = 7): CityMap {
       density: 0.7, mix: { walker: 0.88, runner: 0.09, bloater: 0.03 } },
   ];
 
+  // ---- cells → metres ----
+  const m = (r: Rect): Rect => ({ x: r.x * CELL, y: r.y * CELL, w: r.w * CELL, h: r.h * CELL });
+  const mv = (p: Vec2): Vec2 => ({ x: p.x * CELL, y: p.y * CELL });
+  for (const b of buildings) {
+    b.rect = m(b.cells);
+    b.height *= CELL;
+  }
+  for (const p of props) {
+    const horizontal = p.w > p.h;
+    p.pos = mv(p.pos);
+    p.w = horizontal ? 4.6 : 1.9;
+    p.h = horizontal ? 1.9 : 4.6;
+  }
+  for (const d of districts) {
+    d.rect = m(d.rect);
+    d.hiveSites = d.hiveSites.map(mv);
+  }
+
   return {
-    width,
-    height,
+    width: width * CELL,
+    height: height * CELL,
+    cols: width,
+    rows: height,
+    cell: CELL,
     tiles,
     buildings,
     props,
     districts,
-    baseRect,
-    baseGate: { x: 29, y: 33, w: 1, h: 6 },
-    rally: { x: 25, y: 36 },
+    baseCells: baseRect,
+    baseRect: m(baseRect),
+    baseGate: m({ x: 29, y: 33, w: 1, h: 6 }),
+    rally: mv({ x: 25, y: 36 }),
   };
 }

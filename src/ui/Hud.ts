@@ -84,6 +84,7 @@ export class Hud {
         break;
       }
       case 'ops': g.renderer.rig.toggleStrategic(); break;
+      case 'rot': g.renderer.rig.rotate(Number(arg)); break;
       case 'start':
         this.modal.classList.remove('open');
         g.paused = false;
@@ -135,6 +136,7 @@ export class Hud {
       </div>
       <div class="speed">
         <button class="${g.paused ? 'on warn' : ''}" data-act="pause">${g.paused ? '▶ PAUSED' : '❚❚'}</button>${speeds}
+        <button data-act="rot:-1" title="Rotate camera (Q)">⟲</button><span class="compass" title="Camera heading">VIEW ${Math.round(g.renderer.rig.headingDeg)}° ${g.renderer.rig.headingLabel}</span><button data-act="rot:1" title="Rotate camera (E)">⟳</button>
         <button data-act="ops" title="Operations map (M)">${g.renderer.rig.strategic ? 'STREET' : 'OPS MAP'}</button>
       </div>`;
   }
@@ -252,7 +254,7 @@ export class Hud {
             <li><kbd>A</kbd> attack-move · <kbd>H</kbd> hold · <kbd>S</kbd> stop</li>
             <li><kbd>Shift</kbd>+<kbd>RMB</kbd> queue waypoints · <kbd>Ctrl</kbd>+<kbd>1-9</kbd> groups</li>
             <li>Engineers: <kbd>F</kbd> sandbags · <kbd>G</kbd> wire · <kbd>T</kbd> MG nest · <kbd>O</kbd> outpost · <kbd>C</kbd> demo charge · <kbd>R</kbd> rotate</li>
-            <li><kbd>Arrows</kbd>/edge/<kbd>MMB</kbd> pan · wheel zoom · <kbd>M</kbd> ops map</li>
+            <li><kbd>Arrows</kbd>/edge/<kbd>MMB</kbd> pan · wheel zoom · <kbd>Q</kbd>/<kbd>E</kbd> rotate · <kbd>M</kbd> ops map</li>
             <li><kbd>Space</kbd> pause · <kbd>+</kbd>/<kbd>-</kbd> speed · <kbd>P</kbd> pixel filter</li>
           </ul></div>
         <div><h3>Field notes</h3>

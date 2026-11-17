@@ -514,9 +514,9 @@ The current MVP visuals (code-built boxes) are placeholders for testing. The fin
 **What this means for production** (decisions needed; see §16):
 
 1. **Art assets.** Code-generated boxes won't get there. The look needs modelled and textured 3D assets: buildings, vehicles, aircraft, props, soldiers and zombies with animation. Options: model in-house (e.g. Blender), license asset packs that match the style, or commission an artist. Whichever we choose, the renderer will load glTF models in place of the placeholder meshes; sim code doesn't change.
-2. **World scale.** Fix **1 world unit = 1 metre** before building more content. The 64 × 64 starter zones then need to grow (a suburban block in the reference is ~100 m+), or "64 × 64" is re-read as tiles of several metres each.
+2. **World scale — DECIDED.** **1 world unit = 1 metre.** Navigation uses a 3 m grid, so a "64 × 64" starter zone is 64 × 64 grid cells = **192 × 192 m**. Soldiers are 1.8 m, cars 4.6 m, buildings 6–15 m. Speeds and weapon ranges were doubled together (so fights close at the same pace) while the map grew 3×, and hearing scales with the map.
 3. **Crowd tech.** Thousands of zombies needs GPU-instanced, vertex-animated zombie meshes plus flow-field pathing, with the simulation in a Web Worker. This is the single biggest performance item and is the most likely trigger for the "move to desktop" decision in §15.
-4. **Camera rotation** affects input (screen→world), labels and building see-through/cutaway; add it before the UI hardens.
+4. **Camera rotation — DONE.** Q / E rotate in 90° steps with a compass readout. Building see-through/cutaway when a building hides units is still to do.
 
 ### Day/night cycle [v4]
 
@@ -609,8 +609,7 @@ These are left open on purpose so they don't block the core design or the protot
 - **[v4]** Artillery vehicles: whether the howitzer and/or HIMARS-style unit make the cut, and their unlocks.
 - **[v4]** Building destruction thresholds (HP per building class, fire spread rate).
 - **[v4]** Tall wall cost, build time and what can destroy them.
-- **[v4.1]** Art pipeline: in-house models vs. licensed packs vs. commissioned art (§14 target look).
-- **[v4.1]** World scale (1 unit = 1 m) and how large starter zones become at that scale.
+- **[v4.1]** Art pipeline — DECIDED: no purchases. Procedurally generated buildings, roads, props, trees and fortifications (in code), plus free CC0 models (e.g. Quaternius, Kenney, Poly Pizza; check each model's licence) for animated soldiers/zombies and aircraft/armour.
 - **[v4.1]** Crowd target (hundreds routine, thousands at a Last Stand) and whether that forces the desktop build.
 
 ---
@@ -699,9 +698,9 @@ Every feature, ranked by importance to the game being fun and shippable. The MVP
 28. Howitzer / HIMARS-style artillery vehicles (if kept)
 
 ### Visual production track (runs alongside the tiers) [v4.1]
-- V1. Lock world scale; camera rotation; glTF model loading behind the current placeholder meshes
+- V1. ~~Lock world scale~~ ✔; ~~camera rotation~~ ✔; glTF model loading behind the current placeholder meshes
 - V2. Instanced, animated zombie crowds + flow-field pathing in a Web Worker
-- V3. First real asset set: suburban houses, roads/props, soldiers, zombies
+- V3. First real asset set: procedural suburban houses (pitched roofs, porches, balconies), roads/crosswalks/streetlights, palm trees, cars; CC0 soldiers and zombies
 - V4. Lighting pass: sun shadows, dusk grade, night lights/flares, smoke columns, fire
 - V5. UI restyle toward the §14 direction (unit-card strip, support panel, minimap, day clock)
 

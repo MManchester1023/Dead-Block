@@ -1,25 +1,37 @@
 import type { Vec2 } from '../core/math';
+import { CELL } from '../config/world';
 
 /**
  * Walkability grid shared by pathfinding and collision.
+ * Internally indexed by **cell** (x, y integers); every method named `…At` / taking a Vec2 takes **metres**.
  * Static layer (buildings, cars) + dynamic layer (player structures, rubble later).
- * `slow` holds per-tile speed multipliers for area denial (barbed wire).
+ * `slow` holds per-cell speed multipliers for area denial (barbed wire).
  */
 export class NavGrid {
   readonly blocked: Uint8Array;
   readonly slow: Float32Array;
-  /** structure id occupying a tile (0 = none). Lets zombies attack what blocks them. */
+  /** structure id occupying a cell (0 = none). Lets zombies attack what blocks them. */
   readonly occupant: Int32Array;
   /** Sight blockers (buildings, later rubble). Cars and sandbags are low — you shoot over them. */
   readonly opaque: Uint8Array;
   /** Bumped whenever walkability changes so cached paths can be invalidated. */
   version = 0;
 
-  constructor(readonly width: number, readonly height: number) {
+  constructor(readonly width: number, readonly height: number, readonly cell = CELL) {
     this.blocked = new Uint8Array(width * height);
     this.slow = new Float32Array(width * height).fill(1);
     this.occupant = new Int32Array(width * height);
     this.opaque = new Uint8Array(width * height);
+  }
+
+  // ---- coordinate helpers ----
+  /** metres → cell index along one axis */
+  c(v: number): number {
+    return Math.floor(v / this.cell);
+  }
+  /** cell → metres at the cell centre */
+  center(c: number): number {
+    return (c + 0.5) * this.cell;
   }
 
   idx(x: number, y: number): number {
@@ -36,7 +48,23 @@ export class NavGrid {
   }
 
   isBlockedAt(p: Vec2): boolean {
-    return this.isBlocked(Math.floor(p.x), Math.floor(p.y));
+    return this.isBlocked(this.c(p.x), this.c(p.y));
+  }
+
+  isBlockedXY(x: number, y: number): boolean {
+    return this.isBlocked(this.c(x), this.c(y));
+  }
+
+  slowAt(p: Vec2): number {
+    const x = this.c(p.x);
+    const y = this.c(p.y);
+    return this.inBounds(x, y) ? this.slow[this.idx(x, y)] : 1;
+  }
+
+  occupantXY(x: number, y: number): number {
+    const cx = this.c(x);
+    const cy = this.c(y);
+    return this.inBounds(cx, cy) ? this.occupant[this.idx(cx, cy)] : 0;
   }
 
   setRect(x0: number, y0: number, w: number, h: number, blocked: boolean, occupant = 0): void {
@@ -65,10 +93,10 @@ export class NavGrid {
     return true;
   }
 
-  /** Nearest walkable tile center to p (spiral search). */
+  /** Nearest walkable cell centre to p (metres in, metres out). */
   nearestFree(p: Vec2, maxR = 8): Vec2 {
-    const cx = Math.floor(p.x);
-    const cy = Math.floor(p.y);
+    const cx = this.c(p.x);
+    const cy = this.c(p.y);
     if (!this.isBlocked(cx, cy)) return p;
     for (let r = 1; r <= maxR; r++) {
       let best: Vec2 | null = null;
@@ -79,10 +107,11 @@ export class NavGrid {
           const x = cx + dx;
           const y = cy + dy;
           if (this.isBlocked(x, y)) continue;
-          const d = (x + 0.5 - p.x) ** 2 + (y + 0.5 - p.y) ** 2;
+          const q = { x: this.center(x), y: this.center(y) };
+          const d = (q.x - p.x) ** 2 + (q.y - p.y) ** 2;
           if (d < bestD) {
             bestD = d;
-            best = { x: x + 0.5, y: y + 0.5 };
+            best = q;
           }
         }
       if (best) return best;
@@ -90,12 +119,14 @@ export class NavGrid {
     return p;
   }
 
-  /** Bresenham line-of-sight across tiles. */
+  /** Bresenham line-of-sight across cells (metres in). Only `opaque` cells block sight. */
   lineClear(a: Vec2, b: Vec2): boolean {
-    let x0 = Math.floor(a.x);
-    let y0 = Math.floor(a.y);
-    const x1 = Math.floor(b.x);
-    const y1 = Math.floor(b.y);
+    const ax = this.c(a.x);
+    const ay = this.c(a.y);
+    let x0 = ax;
+    let y0 = ay;
+    const x1 = this.c(b.x);
+    const y1 = this.c(b.y);
     const dx = Math.abs(x1 - x0);
     const dy = -Math.abs(y1 - y0);
     const sx = x0 < x1 ? 1 : -1;
@@ -104,7 +135,7 @@ export class NavGrid {
     for (;;) {
       if (x0 === x1 && y0 === y1) return true;
       if (!this.inBounds(x0, y0)) return false;
-      if (this.opaque[this.idx(x0, y0)] && !(x0 === Math.floor(a.x) && y0 === Math.floor(a.y))) return false;
+      if (this.opaque[this.idx(x0, y0)] && !(x0 === ax && y0 === ay)) return false;
       const e2 = 2 * err;
       if (e2 >= dy) {
         err += dy;

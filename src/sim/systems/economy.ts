@@ -32,9 +32,9 @@ export function updateEconomy(w: World, dt: number): void {
     job.remaining -= dt;
     if (job.remaining <= 0) {
       b.queue.shift();
-      const door = w.grid.nearestFree({ x: b.tile.x + b.def.size.w + 1, y: b.tile.y + b.def.size.h / 2 });
+      const door = w.grid.nearestFree({ x: b.pos.x + b.radius + 3, y: b.pos.y });
       const sq = w.spawnSquad(job.defId, door);
-      const rally = w.grid.nearestFree({ x: w.map.rally.x + w.rng.range(-2, 2), y: w.map.rally.y + w.rng.range(-3, 3) });
+      const rally = w.grid.nearestFree({ x: w.map.rally.x + w.rng.range(-6, 6), y: w.map.rally.y + w.rng.range(-8, 8) });
       w.issueOrder([sq], { type: 'move', pos: rally });
       w.events.emit('unitProduced', { id: sq.id, defId: job.defId, name: `${sq.name} (${UNITS[job.defId].name})` });
     }

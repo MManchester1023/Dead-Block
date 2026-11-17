@@ -31,7 +31,7 @@ export class Game {
   constructor(container: HTMLElement, overlay: HTMLElement) {
     this.world = new World({ seed: 1337 });
     this.renderer = new Renderer(container, overlay, this.world);
-    this.renderer.rig.focus({ x: 34, y: 36 });
+    this.renderer.rig.focus({ x: 102, y: 108 });
     this.world.events.on('squadWiped', (e) => this.selected.delete(e.squadId));
   }
 
@@ -80,7 +80,7 @@ export class Game {
     if (!sq.length) return;
     const w = this.world;
 
-    const hive = w.hives.find((h) => h.alive && dist(h.pos, p) < h.radius + 1);
+    const hive = w.hives.find((h) => h.alive && dist(h.pos, p) < h.radius + 2);
     if (hive) {
       const eng = sq.filter((s) => s.def.abilities?.includes('demoCharge'));
       const others = sq.filter((s) => !eng.includes(s));
@@ -94,26 +94,26 @@ export class Game {
       return;
     }
 
-    const prop = w.map.props.find((c) => dist(c.pos, p) < 1.3);
+    const prop = w.map.props.find((c) => dist(c.pos, p) < 3);
     if (prop) {
       // take cover on the side of the car facing the squads (i.e. car between us and the click direction)
       sq.forEach((s, i) => {
         const dx = s.pos.x - prop.pos.x;
         const dy = s.pos.y - prop.pos.y;
         const horiz = prop.w > prop.h;
-        const side = horiz ? { x: prop.pos.x + (i - (sq.length - 1) / 2) * 1.2, y: prop.pos.y + Math.sign(dy || 1) * 1.3 } : { x: prop.pos.x + Math.sign(dx || 1) * 1.3, y: prop.pos.y + (i - (sq.length - 1) / 2) * 1.2 };
+        const side = horiz ? { x: prop.pos.x + (i - (sq.length - 1) / 2) * 4, y: prop.pos.y + Math.sign(dy || 1) * 3.5 } : { x: prop.pos.x + Math.sign(dx || 1) * 3.5, y: prop.pos.y + (i - (sq.length - 1) / 2) * 4 };
         w.issueOrder([s], { type: 'cover', pos: w.grid.nearestFree(side), targetId: prop.id }, queue);
       });
       this.renderer.marker(prop.pos, 0x7ab0e0);
       return;
     }
 
-    const cover = w.structures.find((s) => s.built && s.def.cover && dist(s.pos, p) < s.radius + 0.6);
+    const cover = w.structures.find((s) => s.built && s.def.cover && dist(s.pos, p) < s.radius + 1.5);
     if (cover && cover.def.id !== 'mgNest') {
       sq.forEach((s) => {
         const away = { x: s.pos.x - cover.pos.x, y: s.pos.y - cover.pos.y };
         const horiz = cover.size.w > cover.size.h;
-        const spot = horiz ? { x: p.x, y: cover.pos.y + Math.sign(away.y || 1) * 1.1 } : { x: cover.pos.x + Math.sign(away.x || 1) * 1.1, y: p.y };
+        const spot = horiz ? { x: p.x, y: cover.pos.y + Math.sign(away.y || 1) * 3.5 } : { x: cover.pos.x + Math.sign(away.x || 1) * 3.5, y: p.y };
         w.issueOrder([s], { type: 'cover', pos: w.grid.nearestFree(spot), targetId: cover.id }, queue);
       });
       this.renderer.marker(cover.pos, 0x7ab0e0);
@@ -144,7 +144,8 @@ export class Game {
 
   buildTile(p: Vec2, defId: string, rotated: boolean): { x: number; y: number } {
     const fp = this.world.footprint(defId, rotated);
-    return { x: Math.round(p.x - fp.w / 2), y: Math.round(p.y - fp.h / 2) };
+    const cell = this.world.grid.cell;
+    return { x: Math.round(p.x / cell - fp.w / 2), y: Math.round(p.y / cell - fp.h / 2) };
   }
 
   placeBuild(p: Vec2, queue: boolean): void {

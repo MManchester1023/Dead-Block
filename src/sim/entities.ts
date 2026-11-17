@@ -1,6 +1,7 @@
 import type { Vec2 } from '../core/math';
 import type { UnitDef, ZombieDef, StructureDef } from '../config/units';
 import { BALANCE } from '../config/balance';
+import { CELL } from '../config/world';
 import { type Faction, type Order, ThreatClass, type Targetable } from './types';
 
 export interface Member {
@@ -17,11 +18,12 @@ export interface Member {
   loadout?: { weapon?: string; attachments?: string[]; cosmetics?: Record<string, string> };
 }
 
+/** Member slots around the squad centre, metres. */
 const FORMATION_SLOTS: Vec2[] = [
-  { x: -0.45, y: -0.45 },
-  { x: 0.45, y: -0.45 },
-  { x: -0.45, y: 0.45 },
-  { x: 0.45, y: 0.45 },
+  { x: -1.2, y: -1.2 },
+  { x: 1.2, y: -1.2 },
+  { x: -1.2, y: 1.2 },
+  { x: 1.2, y: 1.2 },
 ];
 
 let nextId = 1;
@@ -34,7 +36,7 @@ export class Squad implements Targetable {
   readonly id = newId();
   faction: Faction = 'player';
   threat = ThreatClass.Normal;
-  radius = 0.9;
+  radius = 2; // metres — the squad's spread, used for melee reach and blasts
   members: Member[];
   orders: Order[] = [];
   path: Vec2[] = [];
@@ -131,7 +133,7 @@ export class Hive implements Targetable {
   readonly id = newId();
   faction: Faction = 'zombie';
   threat = ThreatClass.Special;
-  radius = 1.6;
+  radius = 4; // metres
   hp: number;
   alive = true;
   stage = 1; // 1 Dormant … 4 Overrun (doc §9) — never regresses
@@ -165,16 +167,17 @@ export class Structure implements Targetable {
   /** Footprint; sandbags and wire can be rotated 90°. */
   size: { w: number; h: number };
 
+  /** `tile` is the top-left nav cell; `size` is in cells. `pos`/`radius` are metres. */
   constructor(public def: StructureDef, public tile: { x: number; y: number }, built: boolean, rotated = false) {
     this.hp = built ? def.hp : def.hp * 0.1;
     this.built = built;
     this.size = rotated ? { w: def.size.h, h: def.size.w } : { ...def.size };
   }
   get pos(): Vec2 {
-    return { x: this.tile.x + this.size.w / 2, y: this.tile.y + this.size.h / 2 };
+    return { x: (this.tile.x + this.size.w / 2) * CELL, y: (this.tile.y + this.size.h / 2) * CELL };
   }
   get radius(): number {
-    return Math.max(this.size.w, this.size.h) / 2;
+    return (Math.max(this.size.w, this.size.h) / 2) * CELL;
   }
 }
 

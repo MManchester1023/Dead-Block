@@ -31,7 +31,7 @@ export function updateZombies(w: World, dt: number): void {
     const target = w.get(z.targetId);
     let dest: Vec2 | null = null;
     if (target && target.alive) {
-      const reach = z.radius + target.radius + 0.35;
+      const reach = z.radius + target.radius + 0.6; // metres
       if (dist(z.pos, target.pos) <= reach) {
         z.state = 'attack';
         z.facing = Math.atan2(target.pos.y - z.pos.y, target.pos.x - z.pos.x);
@@ -48,7 +48,7 @@ export function updateZombies(w: World, dt: number): void {
       if (z.goal) dest = z.goal;
     }
     if (!dest) continue;
-    if (dist(z.pos, dest) < 0.6) {
+    if (dist(z.pos, dest) < 1.2) {
       z.goal = null;
       z.path = [];
       if (z.state !== 'chase') z.state = 'idle';
@@ -56,7 +56,7 @@ export function updateZombies(w: World, dt: number): void {
     }
 
     // heard something behind a building? get a real path instead of face-planting into the wall
-    if (!z.path.length && z.goal && dest === z.goal && pathBudget > 0 && dist(z.pos, dest) > 4 && !w.grid.lineClear(z.pos, dest)) {
+    if (!z.path.length && z.goal && dest === z.goal && pathBudget > 0 && dist(z.pos, dest) > 8 && !w.grid.lineClear(z.pos, dest)) {
       pathBudget--;
       z.path = findPath(w.grid, z.pos, dest, 3000) ?? [];
     }
@@ -65,13 +65,12 @@ export function updateZombies(w: World, dt: number): void {
     let wp = dest;
     if (z.path.length) {
       wp = z.path[0];
-      if (dist(z.pos, wp) < 0.5) {
+      if (dist(z.pos, wp) < 1.2) {
         z.path.shift();
         wp = z.path[0] ?? dest;
       }
     }
-    const tile = w.grid.idx(Math.floor(z.pos.x), Math.floor(z.pos.y));
-    const slow = w.grid.inBounds(Math.floor(z.pos.x), Math.floor(z.pos.y)) ? w.grid.slow[tile] : 1;
+    const slow = w.grid.slowAt(z.pos);
     const speed = z.def.speed * (z.state === 'idle' || z.state === 'wander' ? 0.5 : 1) * slow;
     const dir = norm(sub(wp, z.pos));
     z.facing = Math.atan2(dir.y, dir.x);
@@ -94,7 +93,7 @@ export function updateZombies(w: World, dt: number): void {
       const moved = dist(z.pos, z.lastPos);
       z.lastPos = { ...z.pos };
       z.stuckTimer = 0;
-      if (moved < 0.4 && pathBudget > 0) {
+      if (moved < 1 && pathBudget > 0) {
         pathBudget--;
         z.path = findPath(w.grid, z.pos, dest, 2500) ?? [];
       }
@@ -106,7 +105,7 @@ export function updateZombies(w: World, dt: number): void {
   for (const z of w.zombies) {
     if (!z.alive) continue;
     tmp.length = 0;
-    w.zombieHash.query(z.pos, 0.9, tmp);
+    w.zombieHash.query(z.pos, 1.6, tmp);
     for (const o of tmp) {
       if (o === z) continue;
       const d = dist(z.pos, o.pos);
@@ -128,12 +127,12 @@ function think(w: World, z: Zombie): void {
   for (const s of w.squadHash.query(z.pos, z.def.sight)) {
     if (!s.alive) continue;
     const d = dist(z.pos, s.pos);
-    if (d < bestD && (d < 2.5 || w.grid.lineClear(z.pos, s.pos))) {
+    if (d < bestD && (d < 5 || w.grid.lineClear(z.pos, s.pos))) {
       best = s;
       bestD = d;
     }
   }
-  if (!best && cur instanceof Structure && cur.alive && dist(z.pos, cur.pos) < cur.radius + 3) return;
+  if (!best && cur instanceof Structure && cur.alive && dist(z.pos, cur.pos) < cur.radius + 6) return;
   if (!best) {
     for (const st of w.structures) {
       if (!st.alive || st.def.id === 'baseWall') continue;
@@ -154,7 +153,7 @@ function think(w: World, z: Zombie): void {
   if (z.state === 'chase' || z.state === 'attack') z.state = 'idle';
   if (!z.goal && z.state === 'idle' && w.rng.chance(0.15)) {
     const home = (z.homeHiveId && (w.get(z.homeHiveId) as Hive | undefined)?.pos) || z.pos;
-    z.goal = w.grid.nearestFree({ x: home.x + w.rng.range(-6, 6), y: home.y + w.rng.range(-6, 6) });
+    z.goal = w.grid.nearestFree({ x: home.x + w.rng.range(-14, 14), y: home.y + w.rng.range(-14, 14) });
     z.state = 'wander';
     z.path = [];
   }
@@ -164,11 +163,11 @@ function think(w: World, z: Zombie): void {
 export function lure(z: Zombie, pos: Vec2, state: 'investigate' | 'pulse'): void {
   if (z.state === 'chase' || z.state === 'attack') return;
   if (z.state === 'pulse' && state === 'investigate') return;
-  const j = (((z.id * 2654435761) >>> 0) / 4294967296 - 0.5) * 3;
-  const k = (((z.id * 40503) % 997) / 997 - 0.5) * 3;
+  const j = (((z.id * 2654435761) >>> 0) / 4294967296 - 0.5) * 6;
+  const k = (((z.id * 40503) % 997) / 997 - 0.5) * 6;
   const goal = { x: pos.x + j, y: pos.y + k };
   // sustained fire from the same spot shouldn't wipe the path every tick
-  const moved = !z.goal || (z.goal.x - goal.x) ** 2 + (z.goal.y - goal.y) ** 2 > 16;
+  const moved = !z.goal || (z.goal.x - goal.x) ** 2 + (z.goal.y - goal.y) ** 2 > 64;
   z.goal = goal;
   z.state = state;
   if (moved) z.path = [];
