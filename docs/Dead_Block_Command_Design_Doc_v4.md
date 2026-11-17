@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.10** | Playtest rounds 4–5 implemented except #54, #58, #64. §21 roadmap re-ranked: every open item (including parked playtest notes) is now in one ordered list, with done items marked. Uploaded models catalogued (§21 visual track). |
 | **v4.9** | Round 5 design decisions recorded: one shared squad health pool (§5), three tutorial regions instead of seven (§17), medics keep their place in the roadmap, "Shriekers" in #59 meant Bloaters. |
 | **v4.8** | Playtest round 5 logged (§22): 20 notes from a two-person playtest, with likely causes, proposed fixes and the design conflicts they raise. No code changes in this revision. |
 | **v4.7** | Playtest round 4 logged (§22): 13 notes with likely causes and proposed fixes. No code changes in this revision. |
@@ -701,59 +702,70 @@ Leaving a region unattended can therefore cost territory, income and forward pre
 
 ---
 
-## 21. Feature priority roadmap [v4]
+## 21. Feature priority roadmap [v4, re-ranked v4.10]
 
-Every feature, ranked by importance to the game being fun and shippable. The MVP covers Tier 0. Later tiers are built in this order, and the MVP code includes **extension hooks** for them (see `README.md` → *Architecture*).
+Every feature, ranked by importance to the game being fun and shippable. **Work goes top to bottom**: within a tier, items are in priority order, and the next thing to build is the first open item. ✔ = done. Playtest note numbers (#) point to §22. The code has **extension hooks** for many later items (see `README.md` → *Architecture*).
 
-### Tier 0: MVP core (build now)
-1. Isometric 3D world, camera pan/zoom, fixed-step persistent simulation, pause and 4× speed
-2. Selection, move, attack-move, hold, stop, Shift-waypoints, cover
-3. Squads with individual members, member losses, permanent wipes
-4. **Threat-priority focus fire**
-5. Walker, Runner, Bloater; hive with stages; noise and horde pulses
-6. Money, supplies, daily upkeep, command cap, Barracks production
-7. District infestation, engineer outposts, field fortifications (sandbags, barbed wire, MG emplacement)
-8. Static cars as cover
+### Tier 0: MVP core ✔
+1. ✔ Isometric 3D world, camera pan/zoom/rotate (WASD, MMB), fixed-step persistent simulation, pause and 4× speed
+2. ✔ Selection, move, attack-move, hold, stop, Shift-waypoints, cover, disband
+3. ✔ Squads with one shared health pool, soldiers dropping at thresholds, permanent wipes
+4. ✔ **Threat-priority focus fire**, forced targets
+5. ✔ Walker, Runner, Bloater; hive with stages; noise (with hold) and horde pulses
+6. ✔ Money, supplies, daily upkeep, command cap, Barracks production and rally point
+7. ✔ District infestation, engineer outposts, field fortifications (sandbags, barbed wire, MG emplacement)
+8. ✔ Static cars as cover; house searching and zombies holed up in buildings
+9. ✔ Per-district difficulty tiers (tutorial → easy → standard)
 
-### Tier 1: Make the core deep
-9. XP and leveling (Recruit → Elite), Grenadier/Cinder paths
-10. Fog of war and recon
-11. Outpost resupply via Supply Truck
-12. Explosion knockback
-13. Power stations and base building unlocks
-14. Region takeover → hive (§19)
-15. Three-region tutorial flow
+### Tier 1: The campaign loop (next)
+10. **Tutorial region 2** (small, harder): a fixed, hand-authored map that attaches to the city when Roadside Motel is cleared, reachable from HQ (#58, §17). *This is the next thing to build: it proves "clear a region → the next one opens".*
+11. **Tutorial region 3** (big): the final tutorial map, attached after region 2; then the open-world unlock (#58, §17)
+12. **Healing: Medic Team and Med Bay.** No passive healing (#48), so a long campaign needs a way to recover. Kept at its §6 unlock point, but needed by region 3 at the latest
+13. **Guard towers**: engineer-built, one squad garrisons it for extra range and sight over cars and walls; zombies have to tear it down (#54). Uses the existing `garrisonedIn` hook
+14. ✔ Region takeover → hive (§19)
+15. Save / load (a persistent city needs it before the open world)
+16. Fog of war and recon
+17. Power stations and base building unlocks
+18. Outpost resupply via Supply Truck
+19. ✔ XP and leveling (Recruit → Elite); Elite paths (Grenadier/Cinder) still open
+20. ✔ Explosion knockback
 
 ### Tier 2: Escalation and spectacle
-16. Day/night cycle and flares
-17. Building destruction, permanent rubble, tank crushing of cars
-18. Vehicles: Gun Jeep, Supply Truck, LAV, Battle Tank; sheet-metal armor
-19. Artillery: Mortar Team, base artillery strike, strike patterns
-20. Elite rooftop access and pile-ups onto roofs
-21. Tall concrete walls, loudspeaker
+21. Vehicles: Gun Jeep, Supply Truck, LAV, Battle Tank; sheet-metal armour. **Includes overrun and re-crewing** (#64): zombie pile-ups kill the crew, the empty hull stays, any infantry squad can board it, it starts at 50% HP and engineers repair it
 22. Special zombies: Screamer, Brute, Dragger, Puker; reanimation
-23. Last Stand defeat mode
+23. Day/night cycle and flares
+24. Building destruction, permanent rubble, tank crushing of cars
+25. Artillery: Mortar Team, strike patterns (base barrage ✔)
+26. Elite rooftop access and pile-ups onto roofs
+27. Tall concrete walls, loudspeaker
+28. Last Stand defeat mode
 
 ### Tier 3: Air power and late game
-24. Airfield: Hawk (with rappelling), Sparrow, Hauler, Hornet, Anvil
-25. Air-support call-ins with colored smoke: gun run, bombing run, AC-130, drone
-26. Bosses
-27. Human enemy faction (Airport, Downtown Core)
-28. Howitzer / HIMARS-style artillery vehicles (if kept)
+29. Air-support call-ins with coloured smoke: gun run, bombing run, AC-130, drone (supply-drop flyover ✔ is the template)
+30. Airfield: Hawk (with rappelling), Sparrow, Hauler, Hornet, Anvil
+31. Bosses (the uploaded "muscular zombie" is the first candidate model)
+32. Human enemy faction (Airport, Downtown Core)
+33. Howitzer / HIMARS-style artillery vehicles (if kept)
 
-### Visual production track (runs alongside the tiers) [v4.1]
-- V1. ~~Lock world scale~~ ✔; ~~camera rotation~~ ✔; ~~glTF model loading~~ ✔ (`public/models/manifest.json`)
-- V2. ~~Instanced, animated zombie crowds~~ ✔ + ~~flow-field pathing~~ ✔; Web Worker deferred: at 1,500 zombies the whole sim costs ~3.7 ms/tick, so move it only if real-hardware testing shows the sim (not the GPU) is the limit
-- V3. First real asset set: ~~procedural suburban houses (pitched roofs, porches, balconies), roads/crosswalks/streetlights, palm trees, cars~~ ✔ first pass; CC0 soldiers and zombies still to do
-- V4. Lighting pass: sun shadows, dusk grade, night lights/flares, smoke columns, fire
-- V5. UI restyle toward the §14 direction (unit-card strip, support panel, minimap, day clock)
+### Visual production track (runs alongside the tiers) [v4.1, updated v4.10]
+- V1. ✔ World scale; ✔ camera rotation; ✔ glTF model loading
+- V2. ✔ Instanced, animated crowds + flow-field pathing; ✔ smoother flipbooks (more poses, stable simplification), ✔ corpses fall. Web Worker deferred until real-hardware testing shows the sim is the limit
+- V3. Real assets, in this order:
+  1. ✔ Main zombie: "Zombie" by pxltiger (Idle/Walk/Run/Attack/FallingBack)
+  2. A second zombie body to replace the cartoon Quaternius female, so the crowd has one consistent style (candidates in `assets-src/models/`; most need animations from another rig)
+  3. Soldiers: try the uploaded RTS soldier/mercenary models. They have **no animations**, so this only works if Mixamo-style clips can be retargeted onto them; otherwise keep Quaternius
+  4. Aircraft for call-ins and flyovers (A-10, Huey, Chinook, Tiger, Reaper drone, fighter jet), compressed when wired in
+  5. Ground vehicles for Tier 2 (Bradley, tank, Ural truck)
+- V4. Lighting pass: dusk grade, night lights/flares, smoke columns, fire
+- V5. UI restyle toward the §14 direction (unit-card strip, minimap, day clock). ✔ UI scale and collapsible panels
+- **Parked until better-animated soldier models:** idle realism (#22), engineer build animation (#23), leaning against cover (#25)
 
 ### Tier 4: Polish and attachment
-29. Armory weapon customization and Elite cosmetics
-30. Civilians, evacuation and Guerrillas
-31. Vehicle leveling paths
-32. Airdrop upgrades
-33. Reward items catalogue, full campaign balancing
+34. Armory weapon customization and Elite cosmetics
+35. Civilians, evacuation and Guerrillas
+36. Vehicle leveling paths
+37. Airdrop upgrades
+38. Reward items catalogue, full campaign balancing
 
 *Design status: v3 decisions remain confirmed. v4 additions are confirmed direction except where marked "candidate", "proposed" or "open question". All numbers are subject to playtesting.*
 
@@ -876,4 +888,12 @@ First hands-on playtest of the browser MVP (November 2026). Every note, and what
 - **#59 — CLARIFIED:** "Shriekers" meant **Bloaters**. The note is about Walkers, Runners and Bloaters being easier and fewer on the easy maps.
 
 **Grouping for when coding starts:** (a) difficulty pass: #51, #53, #56, #57, #59, #63 plus round 4 #32/#43; (b) zombie targeting: #52, #60; (c) UI: #45, #47, #61, #62 plus round 4 UI items; (d) rules: #48, #49, #50, #55; (e) new content: #46, #54, #58, #64, #65.
+
+### Status after v4.10 (rounds 4 and 5)
+
+**Done:** #32 hive output and gate lure · #33 smoother animation · #34 corpses fall · #35 hover-only health bars · #36 Barracks rally point · #37 cargo-plane flyover · #38 UI scale · #39 clickable names · #40 infestation stuck · #41 road under the base · #42 ghost arrows (structures have no front, so it's a wall-direction arrow plus the MG's range ring) · #43 noise hold · #44 WASD (attack-move/stop → Ctrl+A/Ctrl+S) · #45 skip step / skip tutorial · #46 house searching · #47 Barracks menu · #48 no heal on promotion · #49 wire slows soldiers · #50 shared squad health · #51 pulse timing · #52 units before structures · #53 Runner/Bloater cap · #55 disband · #56 command cap 16 (+4 per secured district) · #57 calmer late hives on easy maps · #59 weaker/fewer zombies on easy maps · #60 HQ before walls · #61 engineers-only building · #62 radio hidden (lines kept for audio) · #63 MG cost · #65 zombies holed up in buildings
+
+**Open, on the roadmap (§21):** #58 tutorial regions 2 and 3 → Tier 1 #10–11 · #54 guard towers → Tier 1 #13 · #64 vehicle overrun → Tier 2 #21 · parked #22, #23, #25 → visual track
+
+**Balance after v4.10** (scripted bots, 6 seeds, tutorial tier): careful advancing wins 5–6/6 with no losses; charging straight in wins 1–2/6 with heavy losses.
 

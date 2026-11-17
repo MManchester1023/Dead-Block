@@ -66,7 +66,7 @@ Rules that keep later features cheap to add:
 
 ## Characters
 
-Riflemen, engineers and zombies are animated CC0 models from Quaternius (see `CREDITS.md`) in `public/models/characters/`. At load, every animation is sampled into a few frozen poses and drawn with GPU instancing, so crowds of thousands cost a handful of draw calls. Zombie meshes are simplified at load; zombie shadows switch off above 300 on screen. If the models fail to load, the game falls back to simple box figures.
+Riflemen, engineers and the female zombies are animated CC0 models from Quaternius in `public/models/characters/`; the main zombie is pxltiger's "Zombie" (CC-BY 4.0) in `public/models/zombieidle.glb` (see `CREDITS.md`). Uploaded models that aren't used yet wait in `assets-src/models/`, outside `public/`, so they don't bloat the build. At load, every animation is sampled into a few frozen poses and drawn with GPU instancing, so crowds of thousands cost a handful of draw calls. Zombie meshes are simplified at load; zombie shadows switch off above 300 on screen. If the models fail to load, the game falls back to simple box figures.
 
 ## Swapping in real 3D models
 

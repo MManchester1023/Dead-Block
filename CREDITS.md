@@ -11,7 +11,7 @@ CC0 needs no attribution; it's credited here anyway because it's the decent thin
 Everything else in the city (buildings, vehicles, trees, street furniture, ground) is generated in code in `src/render/procgen/`.
 
 
-## Sketchfab models (`public/models/*.glb`)
+## Sketchfab models (`public/models/zombieidle.glb` in the game; the rest waiting in `assets-src/models/`)
 
 | Model | Author | Licence |
 |---|---|---|
