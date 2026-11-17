@@ -180,3 +180,6 @@ button.big.ghost { background: transparent; }
 @keyframes tutpulse { 0%, 100% { outline-color: #e0b24a; } 50% { outline-color: #e0b24a33; } }
 
 .sname.hover { color: #fff; text-decoration: underline; }
+
+h3.collapsible { cursor: pointer; user-select: none; }
+h3.collapsible:hover { color: #fff; }

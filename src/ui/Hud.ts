@@ -11,6 +11,25 @@ import { SUPPORT } from '../config/support';
 import { supportBlocked } from '../sim/systems/support';
 
 const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!);
+const UI_SCALES = [0.75, 0.85, 1, 1.15, 1.3];
+/** Per-viewer conveniences (UI scale, collapsed panels). Storage can be unavailable; never required. */
+const pref = {
+  get(k: string): string | null {
+    try {
+      return localStorage.getItem(`dbc.${k}`);
+    } catch {
+      return null;
+    }
+  },
+  set(k: string, v: string): void {
+    try {
+      localStorage.setItem(`dbc.${k}`, v);
+    } catch {
+      /* private mode etc. */
+    }
+  },
+};
+
 const ALERT_SPEAKERS = new Set(['Command', 'Overwatch', 'Intel', 'Quartermaster', 'Engineers']);
 const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
@@ -31,6 +50,12 @@ export class Hud {
   private dirty = true;
   private last = 0;
   private toastTimer = 0;
+  private uiScale = 1;
+  private collapsed = new Set<string>();
+
+  private applyScale(): void {
+    (this.root.style as CSSStyleDeclaration & { zoom: string }).zoom = String(this.uiScale);
+  }
 
   constructor(private game: Game, root: HTMLElement) {
     root.innerHTML = `
@@ -52,6 +77,10 @@ export class Hud {
     this.modal = q('.modal');
 
     this.root = root;
+    // v4.9 (round 4 #38): UI scale setting, remembered per browser
+    this.uiScale = Number(pref.get('uiScale')) || 1;
+    this.applyScale();
+    for (const k of ['objectives', 'districts']) if (pref.get(`collapsed.${k}`) === '1') this.collapsed.add(k);
     // v4.9 (#62): the radio log is hidden until voice audio lands. Every line is still generated
     // (Radio keeps them), and the important ones surface as a brief alert.
     this.radio = new Radio(game.world, (line) => {
@@ -118,6 +147,18 @@ export class Hud {
         break;
       }
       case 'ops': g.renderer.rig.toggleStrategic(); break;
+      case 'uiscale': {
+        const i = UI_SCALES.indexOf(this.uiScale);
+        this.uiScale = UI_SCALES[(i + 1) % UI_SCALES.length];
+        pref.set('uiScale', String(this.uiScale));
+        this.applyScale();
+        break;
+      }
+      case 'collapse':
+        if (this.collapsed.has(arg)) this.collapsed.delete(arg);
+        else this.collapsed.add(arg);
+        pref.set(`collapsed.${arg}`, this.collapsed.has(arg) ? '1' : '0');
+        break;
       case 'rot': g.renderer.rig.rotate(Number(arg)); break;
       case 'start':
         this.modal.classList.remove('open');
@@ -176,12 +217,14 @@ export class Hud {
     this.set(this.topCtl, `
         <button class="${g.paused ? 'on warn' : ''}" data-act="pause">${g.paused ? '▶ PAUSED' : '❚❚'}</button>${speeds}
         <button data-act="rot:-1" title="Rotate camera (Q)">⟲</button><span class="compass" title="Camera heading">VIEW ${Math.round(g.renderer.rig.headingDeg)}° ${g.renderer.rig.headingLabel}</span><button data-act="rot:1" title="Rotate camera (E)">⟳</button>
-        <button data-act="ops" title="Operations map (M)">${g.renderer.rig.strategic ? 'STREET' : 'OPS MAP'}</button>`);
+        <button data-act="ops" title="Operations map (M)">${g.renderer.rig.strategic ? 'STREET' : 'OPS MAP'}</button>
+        <button data-act="uiscale" title="Interface size (click to cycle)">UI ${Math.round(this.uiScale * 100)}%</button>`);
   }
 
   private renderDistricts(): void {
     const w = this.game.world;
-    let html = '<h3>Districts</h3>';
+    let html = `<h3 class="collapsible" data-act="collapse:districts">${this.collapsed.has('districts') ? '▸' : '▾'} Districts</h3>`;
+    if (this.collapsed.has('districts')) return this.set(this.districts, html);
     for (const d of w.districts.values()) {
       if (d.def.id === 'base') continue;
       const hive = w.hives.filter((h) => h.alive && h.districtId === d.def.id);
@@ -205,7 +248,9 @@ export class Hud {
       [motel.cleared || motel.secured, `Clear Roadside Motel to 0% <small>(${Math.ceil(motel.infestation)}%)</small>`],
       [motel.secured, 'Build an outpost there with engineers'],
     ] as const;
-    this.set(this.objectives, `<h3>Objectives</h3>${items.map(([done, t]) => `<div class="obj ${done ? 'done' : ''}">${done ? '☑' : '☐'} ${t}</div>`).join('')}`);
+    const head = `<h3 class="collapsible" data-act="collapse:objectives">${this.collapsed.has('objectives') ? '▸' : '▾'} Objectives</h3>`;
+    if (this.collapsed.has('objectives')) return this.set(this.objectives, head);
+    this.set(this.objectives, `${head}${items.map(([done, t]) => `<div class="obj ${done ? 'done' : ''}">${done ? '☑' : '☐'} ${t}</div>`).join('')}`);
   }
 
   private renderSelection(): void {
