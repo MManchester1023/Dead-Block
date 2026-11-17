@@ -5,7 +5,7 @@
 
 A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Build and maintain a force, push out from a safe base, establish outposts and field fortifications wherever engineers can reach, and reclaim the city through continuous battles.
 
-**Current direction:** Single-player strategy and tactical action • Continuous city battlefield • Isometric 3D with pixel-inspired art direction • Browser-first development with desktop migration if needed.
+**Current direction:** Single-player strategy and tactical action • Continuous city battlefield • Isometric 3D (clean, stylised; only loosely pixel-art influenced) • Browser-first development with desktop migration if needed.
 
 **Document history**
 
@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.3** | Art direction: isometric first, pixel art dropped (only a loose influence). First procedural city pass: houses, apartments, motel, shops, warehouse, trees, streetlights, vehicles, painted roads. Optional glTF model overrides. |
 | **v4.2** | Playtest feedback round 1 (§22): force-attack, middle-mouse camera rotation, rifle range, time-then-distance zombie aggro, HUD click fix, looser squads, weaker basic zombies, engineer deconstruction, car wheels, 12-minute days. Plus hive alarm and 3 s charge planting. |
 | **v4.1** | §14 "Target look for the finished game" (art direction from reference images, scale, crowd tech, camera rotation). §16 adds the open production questions. MVP: gunfire is now heard well beyond sight. |
 
@@ -499,11 +500,11 @@ Open questions: can a Last Stand happen more than once? Does each one get harder
 
 ## 14. Visual and audio direction
 
-The art direction is a 3D isometric world with pixel-inspired styling: more realistic and detailed than plain pixel art, but stylized, chunky and readable. It should feel like a detailed miniature battlefield, not flat sprites or a voxel game.
+**[v4.3] The game is isometric first, not pixel art.** It is a clean, full-resolution, anti-aliased 3D isometric world with stylised low-poly detail. Pixel art is at most a loose influence (chunky shapes, bold readable silhouettes, a little crunch in textures); there is **no pixel filter or low-res rendering**. It should feel like a detailed miniature battlefield, not flat sprites or a voxel game.
 
 - **Camera:** isometric, with smooth zoom between strategic overview and close battlefield view.
 - **World:** detailed ruined streets, buildings, interiors, vehicles, vegetation, debris, fortifications, **permanent rubble [v4]**.
-- **Materials:** pixel-inspired or low-res textures, chunky geometry, stylized edges, controlled detail.
+- **Materials:** stylised flat-shaded colours and simple textures, chunky geometry, crisp edges, controlled detail.
 - **Lighting:** directional light, shadows, muzzle flashes, fire, smoke and atmosphere communicate time, danger and activity.
 - **Readability:** friendlies, zombies, cover, attack ranges and formations must stay easy to tell apart at both zoom levels, **day and night [v4]**.
 - **Animations:** infantry moving and firing, vehicle damage, helicopter landing/hovering, zombie swarms, climbing piles, Dragger pulls, Puker acid, **rappelling, building collapse, knockback, colored smoke [v4]**.
@@ -564,7 +565,7 @@ Start as a browser game. Move to a desktop build only if the continuous 3D battl
 ### Browser-first MVP
 
 - A compact opening area: the main base and one 64 × 64 starter zone. Later the opening grows to three 64 × 64 zones and two larger maps.
-- Isometric 3D pixel-inspired rendering prototype with zoom and pan between strategic and close views.
+- Isometric 3D rendering prototype with zoom and pan between strategic and close views.
 - Rifle Squad and Engineer Team; Walker, Runner and Bloater; an initial hive objective.
 - Selection, move, cover, hold, attack-move, stop, Shift+click waypoint queueing.
 - Autonomous squad combat **with threat-priority focus fire [v4]**, member-by-member losses, permanent squad wipes.
@@ -712,9 +713,9 @@ Every feature, ranked by importance to the game being fun and shippable. The MVP
 28. Howitzer / HIMARS-style artillery vehicles (if kept)
 
 ### Visual production track (runs alongside the tiers) [v4.1]
-- V1. ~~Lock world scale~~ ✔; ~~camera rotation~~ ✔; glTF model loading behind the current placeholder meshes
+- V1. ~~Lock world scale~~ ✔; ~~camera rotation~~ ✔; ~~glTF model loading~~ ✔ (`public/models/manifest.json`)
 - V2. Instanced, animated zombie crowds + flow-field pathing in a Web Worker
-- V3. First real asset set: procedural suburban houses (pitched roofs, porches, balconies), roads/crosswalks/streetlights, palm trees, cars; CC0 soldiers and zombies
+- V3. First real asset set: ~~procedural suburban houses (pitched roofs, porches, balconies), roads/crosswalks/streetlights, palm trees, cars~~ ✔ first pass; CC0 soldiers and zombies still to do
 - V4. Lighting pass: sun shadows, dusk grade, night lights/flares, smoke columns, fire
 - V5. UI restyle toward the §14 direction (unit-card strip, support panel, minimap, day clock)
 

@@ -48,7 +48,9 @@ src/
   sim/         World + systems. Pure TypeScript, no DOM or Three.js, deterministic, runs headless in tests
     systems/   orders, combat, zombies, hives, noise, districts, economy, movement
     targeting.ts   the focus-fire rule as a pure, unit-tested function
-  render/      Three.js renderer, iso camera rig, pixel textures, palette (reads the sim, never writes)
+  render/      Three.js renderer, iso camera rig, palette (reads the sim, never writes)
+    procgen/   procedural city: buildings, trees/streetlights/cars, painted ground, geometry batching
+    ModelLibrary.ts  optional glTF overrides from public/models/manifest.json
   input/       mouse/keyboard → Game commands
   ui/          DOM HUD + radio chatter (subscribes to sim events)
   Game.ts      fixed-step loop, pause/speed, selection, input modes
@@ -62,9 +64,13 @@ Rules that keep later features cheap to add:
 - **Damage types** (`bullet | explosive | fire | melee | toxic | crush`) drive the rules: hives ignore bullets, cover ignores explosives and toxic, and `crush` is reserved for collapsing buildings and tanks.
 - **Deterministic**: a seeded RNG everywhere in the sim (cosmetic radio lines are the only exception).
 
+## Swapping in real 3D models
+
+The city is generated in code, but any of `car`, `palm`, `tree`, `shrub`, `streetlight` or `hydrant` can be replaced by a glTF model: put the `.glb` in `public/models/` and add it to `public/models/manifest.json`, for example `"palm": { "url": "palm.glb", "scale": 1, "rotY": 0 }`. Models should be in metres, +Y up, facing +Z. Only use models whose licence allows it (CC0 is easiest). Missing or broken files quietly fall back to the procedural version.
+
 ## Honest status / known gaps
 
 - Balance is first-pass. A scripted "bounding overwatch" push (advance, let the noise draw the wave in, kill it, advance) clears the hive in 5 of 6 seeds; charging straight in mostly fails because the whole zone hears it. All numbers live in `config/balance.ts` and `config/units.ts`.
 - Not in the MVP yet (by design; see doc §21): fog of war, power stations, the seven-mission tutorial, direct control (TAB shows a "coming later" toast), save/load, audio.
 - Zombie crowds steer directly and use A* only when stuck. That's cheap (~0.1 ms per sim tick with 60+ zombies) but they can look dumb around building corners.
-- Buildings don't receive shadows (it avoided shadow acne on software GL). Units and the ground still do.
+- Building footprints are solid for movement, including house yards (they're fenced).

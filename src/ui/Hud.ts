@@ -11,6 +11,9 @@ const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60
 /** DOM HUD. Rebuilt at ~8 Hz, or immediately on selection/mode changes. */
 export class Hud {
   private top!: HTMLElement;
+  private topCtl!: HTMLElement;
+  private selCmds!: HTMLElement;
+  private selCards!: HTMLElement;
   private districts!: HTMLElement;
   private objectives!: HTMLElement;
   private selection!: HTMLElement;
@@ -25,7 +28,7 @@ export class Hud {
 
   constructor(private game: Game, root: HTMLElement) {
     root.innerHTML = `
-      <div class="hud-top"></div>
+      <div class="hud-top"><div class="top-res"></div><div class="speed"></div></div>
       <div class="hud-objectives panel"></div>
       <div class="hud-districts panel"></div>
       <div class="hud-bottom">
@@ -36,7 +39,8 @@ export class Hud {
       <div class="toast"></div>
       <div class="modal"></div>`;
     const q = (s: string) => root.querySelector(s) as HTMLElement;
-    this.top = q('.hud-top');
+    this.top = q('.hud-top .top-res');
+    this.topCtl = q('.hud-top .speed');
     this.objectives = q('.hud-objectives');
     this.districts = q('.hud-districts');
     this.selection = q('.hud-selection');
@@ -145,13 +149,13 @@ export class Hud {
       <div class="res" title="Supplies (cap)"><b>▣</b>${Math.floor(w.supplies)}<small>/${w.supplyCap}</small></div>
       <div class="res" title="Command used / cap"><b>★</b>${w.commandUsed}<small>/${w.commandCap}</small></div>
       <div class="res day" title="Upkeep is charged at the end of each day">
-        Day ${w.day}<div class="bar"><i style="width:${dayPct}%"></i></div><small>upkeep −${upkeep}</small>
-      </div>
-      <div class="speed">
+        Day ${w.day}<div class="bar"><i style="width:${dayPct.toFixed(1)}%"></i></div><small>upkeep −${upkeep}</small>
+      </div>`);
+    // controls live in their own element so they're only rebuilt when their state changes
+    this.set(this.topCtl, `
         <button class="${g.paused ? 'on warn' : ''}" data-act="pause">${g.paused ? '▶ PAUSED' : '❚❚'}</button>${speeds}
         <button data-act="rot:-1" title="Rotate camera (Q)">⟲</button><span class="compass" title="Camera heading">VIEW ${Math.round(g.renderer.rig.headingDeg)}° ${g.renderer.rig.headingLabel}</span><button data-act="rot:1" title="Rotate camera (E)">⟳</button>
-        <button data-act="ops" title="Operations map (M)">${g.renderer.rig.strategic ? 'STREET' : 'OPS MAP'}</button>
-      </div>`);
+        <button data-act="ops" title="Operations map (M)">${g.renderer.rig.strategic ? 'STREET' : 'OPS MAP'}</button>`);
   }
 
   private renderDistricts(): void {
@@ -223,7 +227,15 @@ export class Hud {
       : mode.kind === 'charge' ? 'Click a hive to plant a demo charge'
       : mode.kind === 'deconstruct' ? 'Click something your engineers built to take it down (unstarted: full refund, built: half)'
       : `${sq.length} selected · right-click a zombie to focus it · Shift+right-click queues · Ctrl+1–9 groups`;
-    this.set(this.selection, `<div class="cards">${cards}</div><div class="cmds">${cmds}</div><p class="hint">${modeHint}</p>`);
+    if (!this.selection.querySelector('.cards')) {
+      this.cache.delete(this.selection);
+      this.selection.innerHTML = '<div class="cards"></div><div class="cmds"></div><p class="hint"></p>';
+      this.selCards = this.selection.querySelector('.cards')!;
+      this.selCmds = this.selection.querySelector('.cmds')!;
+    }
+    this.set(this.selCards, cards);
+    this.set(this.selCmds, cmds);
+    this.set(this.selection.querySelector('.hint') as HTMLElement, modeHint);
   }
 
   private renderProduction(): void {
@@ -269,7 +281,7 @@ export class Hud {
             <li><kbd>Shift</kbd>+<kbd>RMB</kbd> queue waypoints · <kbd>Ctrl</kbd>+<kbd>1-9</kbd> groups</li>
             <li>Engineers: <kbd>F</kbd> sandbags · <kbd>G</kbd> wire · <kbd>T</kbd> MG nest · <kbd>O</kbd> outpost · <kbd>C</kbd> demo charge · <kbd>X</kbd> deconstruct · <kbd>R</kbd> rotate</li>
             <li><kbd>Arrows</kbd>/edge/<kbd>Shift</kbd>+<kbd>MMB</kbd> pan · wheel zoom · <kbd>MMB</kbd> drag or <kbd>Q</kbd>/<kbd>E</kbd> rotate · <kbd>M</kbd> ops map</li>
-            <li><kbd>Space</kbd> pause · <kbd>+</kbd>/<kbd>-</kbd> speed · <kbd>P</kbd> pixel filter</li>
+            <li><kbd>Space</kbd> pause · <kbd>+</kbd>/<kbd>-</kbd> speed</li>
           </ul></div>
         <div><h3>Field notes</h3>
           <ul>

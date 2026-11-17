@@ -9,7 +9,7 @@ export class Input {
   private keys = new Set<string>();
   private box: HTMLDivElement;
 
-  constructor(private game: Game, el: HTMLElement) {
+  constructor(private game: Game, private el: HTMLElement) {
     this.box = document.createElement('div');
     this.box.className = 'dragbox';
     document.body.appendChild(this.box);
@@ -78,6 +78,8 @@ export class Input {
   private move(e: MouseEvent): void {
     this.mouse.x = e.clientX;
     this.mouse.y = e.clientY;
+    // don't trust mouseenter/leave (they don't fire when a dialog closes under a still cursor)
+    this.mouse.inside = this.el.contains(e.target as Node);
     if (this.panning) {
       const rig = this.game.renderer.rig;
       if (this.panning.rotate) rig.rotateBy((e.clientX - this.panning.x) * 0.006);
@@ -196,9 +198,6 @@ export class Input {
       case 'e':
         g.renderer.rig.rotate(1);
         g.changed();
-        break;
-      case 'p':
-        g.renderer.togglePixelation();
         break;
       case 'o':
         g.startBuild('outpost');

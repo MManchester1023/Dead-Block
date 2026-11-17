@@ -8,7 +8,11 @@ import type { World } from '../sim/World';
 import type { Squad, Structure, Hive } from '../sim/entities';
 import { CameraRig } from './CameraRig';
 import { PAL } from './palette';
-import { facadeTexture, groundTexture } from './textures';
+import { buildGroundTexture } from './procgen/ground';
+import { buildCity } from './procgen/buildings';
+import { drawDecor, makeCar, scatterDecor } from './procgen/props';
+import { Batch } from './procgen/batch';
+import { models } from './ModelLibrary';
 
 interface SquadView {
   group: THREE.Group;
@@ -34,7 +38,6 @@ export class Renderer {
   readonly gl: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
   readonly rig: CameraRig;
-  pixelScale = 0.5;
 
   private squadViews = new Map<number, SquadView>();
   private structViews = new Map<number, THREE.Object3D>();
@@ -53,12 +56,12 @@ export class Renderer {
   private time = 0;
 
   constructor(container: HTMLElement, private overlay: HTMLElement, private world: World) {
-    this.gl = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
-    this.gl.setPixelRatio(this.pixelScale * Math.min(2, window.devicePixelRatio));
+    // full-resolution, anti-aliased isometric 3D (v4.3: the pixel-art filter was dropped)
+    this.gl = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    this.gl.setPixelRatio(Math.min(2, window.devicePixelRatio));
     this.gl.setSize(window.innerWidth, window.innerHeight);
     this.gl.shadowMap.enabled = true;
     this.gl.shadowMap.type = THREE.PCFShadowMap;
-    this.gl.domElement.classList.add('pixelated');
     container.appendChild(this.gl.domElement);
 
     this.rig = new CameraRig({ w: world.map.width, h: world.map.height });
@@ -101,106 +104,40 @@ export class Renderer {
 
   private buildStatic(): void {
     const m = this.world.map;
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(m.width, m.height),
-      new THREE.MeshLambertMaterial({ map: groundTexture(m) }),
-    );
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(m.width, m.height), new THREE.MeshLambertMaterial({ map: buildGroundTexture(m) }));
     ground.rotation.x = -Math.PI / 2;
     ground.position.set(m.width / 2, 0, m.height / 2);
     ground.receiveShadow = true;
     this.scene.add(ground);
 
     // apron of wasteland so the map edge isn't a cliff into the void
-    const apron = new THREE.Mesh(new THREE.PlaneGeometry(m.width + 240, m.height + 240), new THREE.MeshLambertMaterial({ color: 0x2f2c26 }));
+    const apron = new THREE.Mesh(new THREE.PlaneGeometry(m.width + 240, m.height + 240), new THREE.MeshLambertMaterial({ color: 0x4a4436 }));
     apron.rotation.x = -Math.PI / 2;
     apron.position.set(m.width / 2, -0.02, m.height / 2);
+    apron.receiveShadow = true;
     this.scene.add(apron);
 
-    for (const b of m.buildings) {
-      const g = new THREE.Group();
-      const tex = facadeTexture(b.id * 31);
-      // each facade tile is 2 bays × 2 floors ≈ 7 m × 6 m
-      tex.repeat.set(Math.max(1, Math.round(Math.max(b.rect.w, b.rect.h) / 7)), Math.max(1, Math.round(b.height / 6)));
-      const wallMat = new THREE.MeshLambertMaterial({ color: b.color, map: tex });
-      const roofMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(b.color).offsetHSL(0, -0.04, -0.04) });
-      const mats = [wallMat, wallMat, roofMat, roofMat, wallMat, wallMat];
-      const body = new THREE.Mesh(new THREE.BoxGeometry(b.rect.w, b.height, b.rect.h), mats);
-      body.position.y = b.height / 2;
-      // buildings cast but don't receive: swiftshader/low-end GPUs acne-black the large roof faces otherwise
-      body.castShadow = true;
-      g.add(body);
-      // parapet + rooftop clutter (future: rooftop positions, doc §5)
-      const parMat = new THREE.MeshLambertMaterial({ color: new THREE.Color(b.color).offsetHSL(0, 0, 0.06) });
-      for (const [w, d, x, z] of [
-        [b.rect.w, 0.4, 0, -b.rect.h / 2 + 0.2],
-        [b.rect.w, 0.4, 0, b.rect.h / 2 - 0.2],
-        [0.4, b.rect.h, -b.rect.w / 2 + 0.2, 0],
-        [0.4, b.rect.h, b.rect.w / 2 - 0.2, 0],
-      ]) {
-        const p = new THREE.Mesh(new THREE.BoxGeometry(w, 0.8, d), parMat);
-        p.position.set(x, b.height + 0.4, z);
-        p.castShadow = true;
-        g.add(p);
-      }
-      if (b.rect.w * b.rect.h > 270) {
-        const ac = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.4, 2), new THREE.MeshLambertMaterial({ color: 0x8c8f8a }));
-        ac.position.set(b.rect.w * 0.2, b.height + 0.7, -b.rect.h * 0.15);
-        ac.castShadow = true;
-        g.add(ac);
-      }
-      g.position.set(b.rect.x + b.rect.w / 2, 0, b.rect.y + b.rect.h / 2);
-      this.scene.add(g);
+    // procedural city (doc §14 v4.1): every building and street prop merged into one mesh
+    const city = new Batch();
+    buildCity(m, city);
+    for (const d of scatterDecor(m, this.world.grid)) {
+      const model = models.instance(d.kind);
+      if (model) {
+        model.position.set(d.x, 0, d.z);
+        model.rotation.y += -d.ry;
+        model.scale.multiplyScalar(d.scale);
+        this.scene.add(model);
+      } else drawDecor(city, d);
     }
+    this.scene.add(city.build());
 
     for (const p of m.props) {
-      const g = new THREE.Group();
-      const col = new THREE.Color(p.color);
-      // real sedan: 4.6 × 1.85 m, 1.45 m tall
-      const body = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.75, 1.85), new THREE.MeshLambertMaterial({ color: col }));
-      body.position.y = 0.6;
-      const cab = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.5, 1.65), new THREE.MeshLambertMaterial({ color: col.clone().offsetHSL(0, -0.1, -0.08) }));
-      cab.position.set(-0.25, 1.2, 0);
-      const glass = new THREE.Mesh(new THREE.BoxGeometry(2.42, 0.32, 1.67), new THREE.MeshLambertMaterial({ color: 0x2b3438 }));
-      glass.position.set(-0.25, 1.22, 0);
-      for (const o of [body, cab, glass]) {
-        o.castShadow = true;
-        g.add(o);
-      }
-      // wheels (v4.2 playtest note) — abandoned cars sit a bit low, some on flats
-      const tyre = new THREE.MeshLambertMaterial({ color: 0x1c1c1c });
-      const rim = new THREE.MeshLambertMaterial({ color: 0x8a8a86 });
-      const wheelGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.24, 12).rotateX(Math.PI / 2);
-      const rimGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.26, 8).rotateX(Math.PI / 2);
-      for (const [wx, wz] of [[1.45, 0.86], [1.45, -0.86], [-1.45, 0.86], [-1.45, -0.86]]) {
-        const flat = (p.id + wx * 3 + wz * 7) % 5 === 0;
-        const y = flat ? 0.24 : 0.34;
-        const wh = new THREE.Mesh(wheelGeo, tyre);
-        wh.position.set(wx, y, wz);
-        const r = new THREE.Mesh(rimGeo, rim);
-        r.position.set(wx, y, wz);
-        wh.castShadow = true;
-        g.add(wh, r);
-      }
-      body.position.y = 0.72; // lifted onto its wheels
-      cab.position.y = 1.32;
-      glass.position.y = 1.34;
-      // bumpers + lights for a bit more silhouette
-      for (const sx of [2.33, -2.33]) {
-        const bump = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.22, 1.8), new THREE.MeshLambertMaterial({ color: 0x3a3a3a }));
-        bump.position.set(sx, 0.48, 0);
-        g.add(bump);
-      }
-      for (const lz of [0.65, -0.65]) {
-        const head = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.32), new THREE.MeshBasicMaterial({ color: 0xd8d2b0 }));
-        head.position.set(2.31, 0.78, lz);
-        const tail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.32), new THREE.MeshBasicMaterial({ color: 0x8a2020 }));
-        tail.position.set(-2.31, 0.78, lz);
-        g.add(head, tail);
-      }
-      g.position.set(p.pos.x, 0, p.pos.y);
-      if (p.h > p.w) g.rotation.y = Math.PI / 2;
-      g.rotation.y += ((p.id % 7) - 3) * 0.04; // abandoned, not parked neatly
-      this.scene.add(g);
+      const model = models.instance('car');
+      if (model) {
+        model.position.set(p.pos.x, 0, p.pos.y);
+        model.rotation.y += (p.h > p.w ? Math.PI / 2 : 0) + ((p.id % 7) - 3) * 0.05;
+        this.scene.add(model);
+      } else this.scene.add(makeCar(p));
     }
 
     for (const d of m.districts) {
@@ -564,7 +501,9 @@ export class Renderer {
     for (const [id, ov] of this.districtOverlays) {
       const d = w.districts.get(id)!;
       const mat = ov.material as THREE.MeshBasicMaterial;
-      mat.opacity = d.secured ? 0.07 : 0.04 + (d.infestation / 100) * 0.26;
+      // a faint tint at street level (keep the asphalt grey), a clear read on the ops map
+      const k = this.rig.strategic ? 1 : 0.25;
+      mat.opacity = (d.secured ? 0.07 : 0.04 + (d.infestation / 100) * 0.26) * k;
       mat.color.set(d.secured ? 0x5d8a4a : PAL.infest);
       const lab = this.districtLabels.get(id)!;
       lab.style.display = this.rig.strategic ? 'block' : 'none';
@@ -652,13 +591,8 @@ export class Renderer {
     return { x: hit.x, y: hit.z };
   }
 
-  togglePixelation(): void {
-    this.pixelScale = this.pixelScale < 1 ? 1 : 0.5;
-    this.resize();
-  }
-
   resize(): void {
-    this.gl.setPixelRatio(this.pixelScale * Math.min(2, window.devicePixelRatio));
+    this.gl.setPixelRatio(Math.min(2, window.devicePixelRatio));
     this.gl.setSize(window.innerWidth, window.innerHeight);
     this.rig.resize(window.innerWidth, window.innerHeight);
   }

@@ -2,23 +2,31 @@ import './style.css';
 import { Game } from './Game';
 import { Input } from './input/Input';
 import { Hud } from './ui/Hud';
+import { models } from './render/ModelLibrary';
 
 const view = document.getElementById('view')!;
 const labels = document.getElementById('labels')!;
 const hudRoot = document.getElementById('hud')!;
 
-const game = new Game(view, labels);
-const input = new Input(game, view);
-const hud = new Hud(game, hudRoot);
+async function boot(): Promise<void> {
+  // optional glTF overrides first (public/models/manifest.json); everything else is procedural
+  await models.preload();
 
-let last = performance.now();
-game.start(() => {
-  const now = performance.now();
-  const dt = Math.min(0.1, (now - last) / 1000);
-  last = now;
-  input.update(dt);
-  hud.update(dt);
-});
+  const game = new Game(view, labels);
+  const input = new Input(game, view);
+  const hud = new Hud(game, hudRoot);
 
-// handy in the browser console while playtesting
-(window as unknown as { game: Game }).game = game;
+  let last = performance.now();
+  game.start(() => {
+    const now = performance.now();
+    const dt = Math.min(0.1, (now - last) / 1000);
+    last = now;
+    input.update(dt);
+    hud.update(dt);
+  });
+
+  // handy in the browser console while playtesting
+  (window as unknown as { game: Game }).game = game;
+}
+
+void boot();

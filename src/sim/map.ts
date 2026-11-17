@@ -12,8 +12,13 @@ export enum Tile {
   Grass = 6,
 }
 
+/** What the renderer should generate on a footprint (doc §14 target look). */
+export type BuildingKind = 'houses' | 'apartment' | 'motel' | 'shop' | 'warehouse';
+
 export interface BuildingDef {
   id: number;
+  kind: BuildingKind;
+  floors: number;
   /** metres */
   rect: Rect;
   /** nav cells covered */
@@ -39,6 +44,12 @@ export interface PropDef {
   crushable: boolean;
 }
 
+/** A road strip, metres. `axis` is the direction traffic runs. */
+export interface RoadDef {
+  rect: Rect;
+  axis: 'h' | 'v';
+}
+
 export interface DistrictDef {
   id: string;
   name: string;
@@ -61,6 +72,7 @@ export interface CityMap {
   cell: number;
   tiles: Uint8Array;
   baseCells: Rect;
+  roads: RoadDef[];
   buildings: BuildingDef[];
   props: PropDef[];
   districts: DistrictDef[];
@@ -121,25 +133,28 @@ export function buildStarterMap(seed = 7): CityMap {
 
   const buildings: BuildingDef[] = [];
   const palette = [0x6f6a60, 0x7a7266, 0x5f6466, 0x8a7f6c, 0x6a5e55, 0x73786f];
-  const addB = (rect: Rect, height: number) => {
-    buildings.push({ id: buildings.length + 1, rect, cells: { ...rect }, height, color: rng.pick(palette), hp: 800 * height, roofCapacity: Math.max(1, Math.floor((rect.w * rect.h) / 12)) });
+  const FLOOR = 3.2; // metres per storey
+  const addB = (rect: Rect, kind: BuildingKind, floors: number) => {
+    // `height` is set in cells here and converted with everything else below
+    const height = (floors * FLOOR + (kind === 'houses' ? 2.5 : 0.8)) / CELL;
+    buildings.push({ id: buildings.length + 1, kind, floors, rect, cells: { ...rect }, height, color: rng.pick(palette), hp: 800 * floors, roofCapacity: Math.max(1, Math.floor((rect.w * rect.h) / 12)) });
     fill(rect, Tile.Building);
   };
-  // Roadside Motel: north wing + east wing around the parking lot
-  addB({ x: 62, y: 9, w: 20, h: 5 }, 3);
-  addB({ x: 78, y: 14, w: 5, h: 15 }, 3);
-  addB({ x: 62, y: 30, w: 8, h: 2 }, 1.5); // motel office
-  // scattered roadside buildings
-  addB({ x: 42, y: 8, w: 9, h: 8 }, 2.5);
-  addB({ x: 42, y: 20, w: 7, h: 9 }, 2);
-  addB({ x: 42, y: 47, w: 10, h: 8 }, 3.5);
-  addB({ x: 42, y: 59, w: 7, h: 7 }, 2);
-  addB({ x: 63, y: 46, w: 9, h: 7 }, 2.5);
-  addB({ x: 74, y: 47, w: 8, h: 10 }, 4);
-  addB({ x: 64, y: 57, w: 6, h: 8 }, 2);
-  addB({ x: 92, y: 8, w: 9, h: 10 }, 5);
-  addB({ x: 92, y: 22, w: 8, h: 8 }, 3);
-  addB({ x: 92, y: 41, w: 9, h: 6 }, 2.5);
+  // Roadside Motel: north wing + east wing around the parking lot, office by the road
+  addB({ x: 62, y: 9, w: 20, h: 5 }, 'motel', 2);
+  addB({ x: 78, y: 14, w: 5, h: 15 }, 'motel', 2);
+  addB({ x: 62, y: 30, w: 8, h: 2 }, 'shop', 1); // motel office
+  // the neighbourhood: suburban lots, a couple of apartment blocks, shops and a warehouse
+  addB({ x: 42, y: 8, w: 9, h: 8 }, 'houses', 2);
+  addB({ x: 42, y: 20, w: 7, h: 9 }, 'houses', 2);
+  addB({ x: 42, y: 47, w: 10, h: 8 }, 'apartment', 4);
+  addB({ x: 42, y: 59, w: 7, h: 7 }, 'houses', 1);
+  addB({ x: 63, y: 46, w: 9, h: 7 }, 'shop', 1);
+  addB({ x: 74, y: 47, w: 8, h: 10 }, 'apartment', 5);
+  addB({ x: 64, y: 57, w: 6, h: 8 }, 'houses', 2);
+  addB({ x: 92, y: 8, w: 9, h: 10 }, 'apartment', 6);
+  addB({ x: 92, y: 22, w: 8, h: 8 }, 'houses', 2);
+  addB({ x: 92, y: 41, w: 9, h: 6 }, 'warehouse', 2);
 
   // abandoned cars: in lots and stalled on roads (cover, doc §5)
   const props: PropDef[] = [];
@@ -193,7 +208,14 @@ export function buildStarterMap(seed = 7): CityMap {
     d.hiveSites = d.hiveSites.map(mv);
   }
 
+  const roads: RoadDef[] = [
+    { rect: m({ x: 0, y: 34, w: width, h: 4 }), axis: 'h' },
+    { rect: m({ x: 56, y: 4, w: 4, h: 64 }), axis: 'v' },
+    { rect: m({ x: 86, y: 4, w: 4, h: 64 }), axis: 'v' },
+  ];
+
   return {
+    roads,
     width: width * CELL,
     height: height * CELL,
     cols: width,

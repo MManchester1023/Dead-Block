@@ -10,20 +10,19 @@
   --warn: #e0b24a;
   --bad: #e0574a;
   --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
-  --pixel: 'Silkscreen', 'IBM Plex Mono', monospace;
+  --display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink); font: 12px/1.35 var(--mono); user-select: none; }
 #view, #labels, #hud { position: fixed; inset: 0; }
 #view canvas { display: block; width: 100% !important; height: 100% !important; }
-canvas.pixelated { image-rendering: pixelated; image-rendering: crisp-edges; }
 #labels { pointer-events: none; overflow: hidden; }
 #hud { pointer-events: none; }
 #hud .panel, #hud .hud-top, #hud .modal.open, #hud button { pointer-events: auto; }
 
 .panel { background: var(--panel); border: 1px solid var(--edge); box-shadow: 0 2px 0 #000a; padding: 8px 10px; }
-h3 { margin: 0 0 6px; font: 11px var(--pixel); letter-spacing: 1px; color: var(--tan); text-transform: uppercase; }
+h3 { margin: 0 0 6px; font: 600 13px var(--display); letter-spacing: 1.5px; color: var(--tan); text-transform: uppercase; }
 small { color: var(--dim); }
 kbd { display: inline-block; min-width: 16px; padding: 0 3px; margin-right: 4px; border: 1px solid #6a6a5a; border-bottom-width: 2px; background: #2a2b26; color: var(--ink); font: 10px var(--mono); text-align: center; }
 .good { color: var(--good); } .warn { color: var(--warn); } .bad { color: var(--bad); }
@@ -36,12 +35,13 @@ kbd { display: inline-block; min-width: 16px; padding: 0 3px; margin-right: 4px;
 
 /* top bar */
 .hud-top { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 18px; padding: 6px 12px; background: linear-gradient(#0d0e0dee, #0d0e0d99); border-bottom: 1px solid var(--edge); }
-.brand { font: 14px var(--pixel); color: var(--tan); letter-spacing: 1px; }
+.brand { font: 700 18px var(--display); color: var(--tan); letter-spacing: 1px; }
 .brand span { color: var(--bad); }
 .res { font-size: 14px; font-weight: 600; white-space: nowrap; }
 .res b { color: var(--tan); margin-right: 4px; }
 .res.day { font-size: 12px; min-width: 130px; }
 .res.day .bar { margin: 2px 0 0; }
+.top-res { display: flex; gap: 18px; align-items: center; }
 .speed { margin-left: auto; display: flex; gap: 4px; align-items: center; }
 .compass { font-size: 11px; color: var(--tan); min-width: 92px; text-align: center; }
 button { font: 11px var(--mono); color: var(--ink); background: #2b2d27; border: 1px solid #555a48; padding: 4px 8px; cursor: pointer; }
@@ -97,7 +97,7 @@ details summary { cursor: pointer; color: var(--dim); font-size: 11px; margin-to
 .hive-label { font-size: 10px; color: #f0b0b0; width: 90px; text-align: center; }
 .hive-label .bar { height: 4px; }
 .hive-label .bar i { background: var(--bad); }
-.district-label { font: 13px var(--pixel); text-align: center; color: #f3e6c8; background: #000a; padding: 4px 8px; border: 1px solid var(--edge); }
+.district-label { font: 600 15px var(--display); text-align: center; color: #f3e6c8; background: #000a; padding: 4px 8px; border: 1px solid var(--edge); }
 .district-label .dname { font-size: 15px; color: var(--tan); }
 
 .dragbox { position: fixed; display: none; border: 1px solid var(--good); background: #8fcf6a22; pointer-events: none; z-index: 5; }
@@ -110,14 +110,14 @@ details summary { cursor: pointer; color: var(--dim); font-size: 11px; margin-to
 .modal.open { display: flex; }
 .dialog { width: min(860px, 94vw); max-height: 92vh; overflow: auto; background: #1d1f1b; border: 1px solid var(--edge); box-shadow: 0 0 0 4px #0008; padding: 22px 26px; }
 .dialog.small { width: min(460px, 94vw); text-align: center; }
-.dialog h1 { font: 30px var(--pixel); margin: 0; color: var(--tan); letter-spacing: 2px; }
+.dialog h1 { font: 700 40px var(--display); margin: 0; color: var(--tan); letter-spacing: 2px; }
 .dialog h1 span { color: var(--bad); }
 .dialog .tag { display: block; background: none; font-size: 14px; color: var(--dim); margin: 2px 0 12px; padding: 0; }
 .dialog .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .dialog ul { margin: 0; padding-left: 16px; }
 .dialog li { margin: 4px 0; }
 .dialog .stats { color: var(--dim); }
-button.big { font: 16px var(--pixel); padding: 10px 28px; margin: 16px 6px 0; background: #4a5a30; border: 2px solid var(--olive); }
+button.big { font: 700 18px var(--display); padding: 10px 28px; margin: 16px 6px 0; background: #4a5a30; border: 2px solid var(--olive); }
 button.big.ghost { background: transparent; }
 .roadmap { margin-top: 14px; }
 .tier { margin: 6px 0; font-size: 11px; }
