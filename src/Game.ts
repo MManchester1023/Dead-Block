@@ -307,6 +307,7 @@ export class Game {
         }
         if (n >= 16) this.acc = 0;
       }
+      this.renderer.selectedStructure = this.selectedStructure;
       this.renderer.render(realDt, simDt, this.selected);
       frame();
       requestAnimationFrame(tick);

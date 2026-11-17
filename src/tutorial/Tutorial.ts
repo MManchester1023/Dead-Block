@@ -159,7 +159,7 @@ export const ROADSIDE_MOTEL_TUTORIAL: TutorialStep[] = [
   {
     id: 'camera',
     title: 'Look around',
-    text: 'Move the camera: <b>arrow keys</b> or push the mouse to the <b>screen edge</b> to pan, <b>mouse wheel</b> to zoom, <b>hold the middle mouse button and drag</b> (or press <b>Q / E</b>) to rotate.',
+    text: 'Move the camera: <b>WASD</b>, the <b>arrow keys</b> or push the mouse to the <b>screen edge</b> to pan, <b>mouse wheel</b> to zoom, <b>hold the middle mouse button and drag</b> (or press <b>Q / E</b>) to rotate.',
     objective: 'Pan, zoom or rotate the camera.',
     done: (g, t) => {
       const c = g.renderer.rig;
@@ -177,7 +177,7 @@ export const ROADSIDE_MOTEL_TUTORIAL: TutorialStep[] = [
   {
     id: 'move',
     title: 'Move out',
-    text: '<b>Right-click</b> the ground to move there. Hold <b>Shift</b> to queue waypoints. <b>A</b> then click is an attack-move (stop and fight anything on the way).',
+    text: '<b>Right-click</b> the ground to move there. Hold <b>Shift</b> to queue waypoints. <b>Ctrl+A</b> then click is an attack-move (stop and fight anything on the way).',
     objective: 'Move a squad out through the gate onto the road.',
     done: (g) => g.world.squads.some((s) => s.pos.x > g.world.map.baseRect.x + g.world.map.baseRect.w + 6),
   },

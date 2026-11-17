@@ -113,11 +113,13 @@ export function buildStarterMap(seed = 7): CityMap {
   const baseRect: Rect = { x: 2, y: 16, w: 28, h: 40 };
   fill(baseRect, Tile.BaseConcrete);
 
-  // main east-west road + sidewalks
-  fill({ x: 0, y: 33, w: width, h: 1 }, Tile.Sidewalk);
-  fill({ x: 0, y: 34, w: width, h: 4 }, Tile.Road);
-  fill({ x: 0, y: 38, w: width, h: 1 }, Tile.Sidewalk);
-  fill({ x: 2, y: 34, w: 28, h: 4 }, Tile.BaseConcrete);
+  // main east-west road + sidewalks. v4.9 (#41): the road starts at the base gate instead of running
+  // under the base; the gate opening itself is base concrete.
+  const ROAD_X = baseRect.x + baseRect.w + 1;
+  fill({ x: ROAD_X, y: 33, w: width - ROAD_X, h: 1 }, Tile.Sidewalk);
+  fill({ x: ROAD_X, y: 34, w: width - ROAD_X, h: 4 }, Tile.Road);
+  fill({ x: ROAD_X, y: 38, w: width - ROAD_X, h: 1 }, Tile.Sidewalk);
+  fill({ x: baseRect.x + baseRect.w, y: 33, w: 1, h: 6 }, Tile.BaseConcrete);
   // north-south roads in the zone
   // north-south avenues run the full height of the map (off both edges) so the city reads as continuing
   for (const rx of [56, 86]) {
@@ -212,7 +214,7 @@ export function buildStarterMap(seed = 7): CityMap {
   }
 
   const roads: RoadDef[] = [
-    { rect: m({ x: 0, y: 34, w: width, h: 4 }), axis: 'h' },
+    { rect: m({ x: ROAD_X, y: 34, w: width - ROAD_X, h: 4 }), axis: 'h' },
     { rect: m({ x: 56, y: 0, w: 4, h: height }), axis: 'v' },
     { rect: m({ x: 86, y: 0, w: 4, h: height }), axis: 'v' },
   ];

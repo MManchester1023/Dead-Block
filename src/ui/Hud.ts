@@ -260,7 +260,7 @@ export class Hud {
       return `<button class="cmd ${afford ? '' : 'disabled'} ${active ? 'on' : ''}" data-act="${act}"><kbd>${key}</kbd>${label}${c}</button>`;
     };
     const mode = g.mode;
-    let cmds = btn('attackMove', 'Attack-move', 'A', undefined, mode.kind === 'attackMove') + btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'S') + `<button class="cmd" data-act="disband" title="Walk back to the Barracks and stand down: frees command and upkeep, refunds ${BALANCE.economy.disbandRefund * 100}% of the cost">Disband</button>`;
+    let cmds = btn('attackMove', 'Attack-move', 'Ctrl+A', undefined, mode.kind === 'attackMove') + btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'Ctrl+S') + `<button class="cmd" data-act="disband" title="Walk back to the Barracks and stand down: frees command and upkeep, refunds ${BALANCE.economy.disbandRefund * 100}% of the cost">Disband</button>`;
     if (eng) {
       const b = (id: string, key: string) => btn(`build:${id}`, STRUCTURES[id].name, key, STRUCTURES[id].cost, mode.kind === 'build' && mode.defId === id);
       cmds += '<div class="sep"></div>' + b('sandbags', 'F') + b('wire', 'G') + b('mgNest', 'T') + b('outpost', 'O') + btn('charge', 'Demo Charge', 'C', ABILITIES.demoCharge.cost, mode.kind === 'charge') + btn('deconstruct', 'Deconstruct', 'X', undefined, mode.kind === 'deconstruct');
@@ -319,10 +319,10 @@ export class Hud {
           <ul>
             <li><kbd>LMB</kbd> select · drag to box-select · <kbd>Shift</kbd> add</li>
             <li><kbd>RMB</kbd> move · on a zombie = attack it · on a car/sandbags = take cover · on hive = charge it</li>
-            <li><kbd>A</kbd> attack-move · <kbd>H</kbd> hold · <kbd>S</kbd> stop</li>
+            <li><kbd>Ctrl</kbd>+<kbd>A</kbd> attack-move · <kbd>H</kbd> hold · <kbd>Ctrl</kbd>+<kbd>S</kbd> stop</li>
             <li><kbd>Shift</kbd>+<kbd>RMB</kbd> queue waypoints · <kbd>Ctrl</kbd>+<kbd>1-9</kbd> groups</li>
             <li>Engineers: <kbd>F</kbd> sandbags · <kbd>G</kbd> wire · <kbd>T</kbd> MG nest · <kbd>O</kbd> outpost · <kbd>C</kbd> demo charge · <kbd>X</kbd> deconstruct · <kbd>R</kbd> rotate</li>
-            <li><kbd>Arrows</kbd>/edge/<kbd>Shift</kbd>+<kbd>MMB</kbd> pan · wheel zoom · <kbd>MMB</kbd> drag or <kbd>Q</kbd>/<kbd>E</kbd> rotate · <kbd>M</kbd> ops map</li>
+            <li><kbd>WASD</kbd>/arrows/edge/<kbd>Shift</kbd>+<kbd>MMB</kbd> pan · wheel zoom · <kbd>MMB</kbd> drag or <kbd>Q</kbd>/<kbd>E</kbd> rotate · <kbd>M</kbd> ops map</li>
             <li>Click the <b>Barracks</b> (<kbd>B</kbd>) to recruit and set the rally point · click the <b>Command Post</b> for support</li>
             <li><kbd>Space</kbd> pause · <kbd>+</kbd>/<kbd>-</kbd> speed</li>
           </ul></div>

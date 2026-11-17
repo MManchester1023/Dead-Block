@@ -179,3 +179,4 @@ button.big.ghost { background: transparent; }
 .tut-highlight { outline: 2px solid var(--warn) !important; outline-offset: 2px; animation: tutpulse 1.2s ease-in-out infinite; }
 @keyframes tutpulse { 0%, 100% { outline-color: #e0b24a; } 50% { outline-color: #e0b24a33; } }
 
+.sname.hover { color: #fff; text-decoration: underline; }

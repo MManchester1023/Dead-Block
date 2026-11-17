@@ -65,6 +65,12 @@ export class Renderer {
   private corpses: { key: string; x: number; z: number; facing: number; t0: number; sx: number; sy: number; tint?: number }[] = [];
   private animClock = 0;
   private rallyFlag: THREE.Group;
+  private ghostArrow: THREE.Mesh;
+  private ghostRange: THREE.Mesh;
+  /** Entity under the mouse (squad, structure or hive id): health bars only show on hover or selection (#35). */
+  hovered: number | null = null;
+  /** Selected base building, so its bar shows too. */
+  selectedStructure: number | null = null;
 
   constructor(container: HTMLElement, private overlay: HTMLElement, private world: World, cast: Record<string, Flipbook> | null = null) {
     // full-resolution, anti-aliased isometric 3D (v4.3: the pixel-art filter was dropped)
@@ -115,6 +121,30 @@ export class Renderer {
     this.ghost = new THREE.Mesh(new THREE.BoxGeometry(1, 1.5, 1), new THREE.MeshBasicMaterial({ color: 0x77dd77, transparent: true, opacity: 0.45, depthWrite: false }));
     this.ghost.visible = false;
     this.scene.add(this.ghost);
+
+    // ghost extras (round 4 #42): a double-headed arrow along the way a wall runs (flips with R),
+    // and the firing-range ring for armed structures
+    const arrow = new THREE.Shape();
+    const hl = 0.5, hw = 0.32, sw = 0.09; // unit-length arrow along +x, centred
+    arrow.moveTo(-0.5, 0);
+    arrow.lineTo(-0.5 + hl * 0.5, hw);
+    arrow.lineTo(-0.5 + hl * 0.5, sw);
+    arrow.lineTo(0.5 - hl * 0.5, sw);
+    arrow.lineTo(0.5 - hl * 0.5, hw);
+    arrow.lineTo(0.5, 0);
+    arrow.lineTo(0.5 - hl * 0.5, -hw);
+    arrow.lineTo(0.5 - hl * 0.5, -sw);
+    arrow.lineTo(-0.5 + hl * 0.5, -sw);
+    arrow.lineTo(-0.5 + hl * 0.5, -hw);
+    arrow.closePath();
+    this.ghostArrow = new THREE.Mesh(new THREE.ShapeGeometry(arrow), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthTest: false, side: THREE.DoubleSide }));
+    this.ghostArrow.rotation.x = -Math.PI / 2;
+    this.ghostArrow.renderOrder = 10;
+    this.ghostArrow.visible = false;
+    this.ghostRange = new THREE.Mesh(new THREE.RingGeometry(0.97, 1, 64), new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide }));
+    this.ghostRange.rotation.x = -Math.PI / 2;
+    this.ghostRange.visible = false;
+    this.scene.add(this.ghostArrow, this.ghostRange);
 
     // Barracks rally flag (round 4 #36): pole + blue pennant, follows world.map.rally
     this.rallyFlag = new THREE.Group();
@@ -580,12 +610,26 @@ export class Renderer {
     });
   }
 
-  setGhost(tile: { x: number; y: number } | null, size = { w: 1, h: 1 }, ok = true): void {
+  setGhost(tile: { x: number; y: number } | null, size = { w: 1, h: 1 }, ok = true, range = 0): void {
     this.ghost.visible = !!tile;
+    this.ghostArrow.visible = !!tile && size.w !== size.h;
+    this.ghostRange.visible = !!tile && range > 0;
     if (!tile) return;
+    const cx = (tile.x + size.w / 2) * CELL;
+    const cz = (tile.y + size.h / 2) * CELL;
     this.ghost.scale.set(size.w * CELL, 1, size.h * CELL);
-    this.ghost.position.set((tile.x + size.w / 2) * CELL, 0.75, (tile.y + size.h / 2) * CELL);
+    this.ghost.position.set(cx, 0.75, cz);
     (this.ghost.material as THREE.MeshBasicMaterial).color.set(ok ? 0x77dd77 : PAL.danger);
+    if (this.ghostArrow.visible) {
+      const len = Math.max(size.w, size.h) * CELL + 1.5;
+      this.ghostArrow.position.set(cx, 1.6, cz);
+      this.ghostArrow.scale.set(len, 2.2, 1);
+      this.ghostArrow.rotation.z = size.w > size.h ? 0 : Math.PI / 2;
+    }
+    if (this.ghostRange.visible) {
+      this.ghostRange.position.set(cx, 0.12, cz);
+      this.ghostRange.scale.setScalar(range);
+    }
   }
 
   // ---------------------------------------------------------------- frame
@@ -617,7 +661,7 @@ export class Renderer {
         g.rotation.y = -m.facing;
         g.scale.y = SOLDIER_SCALE * (s.inCover && !s.moving ? 0.82 : 1); // crouch behind cover
       });
-      this.placeLabel(v.label, s.pos, 3.4, () => this.squadLabelHtml(s, selected.has(s.id)));
+      this.placeLabel(v.label, s.pos, 3.4, () => this.squadLabelHtml(s, selected.has(s.id), this.hovered === s.id));
     }
     for (const [id, v] of this.squadViews)
       if (!seen.has(id)) {
@@ -662,7 +706,9 @@ export class Renderer {
       const turret = o.getObjectByName('turret');
       if (turret) turret.rotation.y = -s.facing;
       // progress bar while unfinished, health bar while damaged (v4.4: resume / repair)
-      const needsBar = !s.built || s.hp < s.def.hp - 0.5;
+      // build progress always shows; health only on hover / selection (#35)
+      const focus = this.hovered === s.id || this.selectedStructure === s.id;
+      const needsBar = !s.built || (focus && s.hp < s.def.hp - 0.5);
       let lab = this.structLabels.get(s.id);
       if (needsBar) {
         if (!lab) {
@@ -709,7 +755,7 @@ export class Renderer {
       (v.core.material as THREE.MeshLambertMaterial).emissiveIntensity = 0.15 + h.stage * 0.12 + (pulse - 1) * 2;
       this.placeLabel(v.label, h.pos, 7, () => {
         const pct = Math.max(0, h.hp / BALANCE.hive.hpByStage[h.stage - 1]) * 100;
-        return `<b>HIVE</b> · stage ${h.stage}/4<div class="bar"><i style="width:${pct}%"></i></div>`;
+        return `<b>HIVE</b> · stage ${h.stage}/4${this.hovered === h.id ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ''}`;
       });
     }
 
@@ -863,14 +909,27 @@ export class Renderer {
     this.hemi.intensity = 0.4 + 0.8 * daylight;
   }
 
-  private squadLabelHtml(s: Squad, sel: boolean): string {
+  /** Squad whose name label is under this screen point (clicking a name selects it; #39). */
+  squadAtLabel(x: number, y: number): number | null {
+    for (const [id, v] of this.squadViews) {
+      if (v.label.style.display === 'none') continue;
+      const n = v.label.querySelector('.sname');
+      if (!n) continue;
+      const r = n.getBoundingClientRect();
+      if (x >= r.left - 3 && x <= r.right + 3 && y >= r.top - 3 && y <= r.bottom + 3) return id;
+    }
+    return null;
+  }
+
+  private squadLabelHtml(s: Squad, sel: boolean, hover = false): string {
     const k = s.hp / s.maxHp;
     const bar = `<span class="hpbar"><i class="${k < 0.35 ? 'low' : k < 0.7 ? 'mid' : ''}" style="width:${(k * 100).toFixed(0)}%"></i></span>`;
     const pips = bar + s.members.map((m) => `<span class="pip ${m.alive ? '' : 'dead'}"></span>`).join('');
     const st = squadStatus(s, this.world);
     const cover = st.tone === 'idle' && st.text === 'IDLE' ? '' : `<span class="status ${st.tone}">${st.text}</span>`;
     const lvl = s.level ? `<span class="tag lvl">${s.levelName.toUpperCase()}</span>` : '';
-    return `<div class="sname ${sel ? 'sel' : ''}">${s.name}${lvl}</div>${cover ? `<div>${cover}</div>` : ''}<div class="pips">${pips}</div>`;
+    const bars = sel || hover ? `<div class="pips">${pips}</div>` : '';
+    return `<div class="sname ${sel ? 'sel' : ''} ${hover ? 'hover' : ''}">${s.name}${lvl}</div>${cover ? `<div>${cover}</div>` : ''}${bars}`;
   }
 
   private labelCache = new WeakMap<HTMLElement, string>();

@@ -1,3 +1,4 @@
+import { STRUCTURES } from '../config/units';
 import type { Game } from '../Game';
 
 /** Mouse + keyboard → Game commands. Controls follow doc §4. */
@@ -27,6 +28,7 @@ export class Input {
     }, { passive: false });
     window.addEventListener('keydown', (e) => this.key(e));
     window.addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()));
+    window.addEventListener('blur', () => this.keys.clear()); // no runaway panning after alt-tab
     window.addEventListener('blur', () => this.keys.clear());
   }
 
@@ -96,6 +98,7 @@ export class Input {
       this.game.changed();
       return;
     }
+    if (this.mouse.inside) this.game.renderer.hovered = this.pick(e.clientX, e.clientY);
     if (this.dragStart) {
       const dx = e.clientX - this.dragStart.x;
       const dy = e.clientY - this.dragStart.y;
@@ -108,6 +111,37 @@ export class Input {
     }
   }
 
+  private lastClick: { id: number | null; t: number } = { id: null, t: 0 };
+
+  /** Squad under a screen point: its name label first (#39), else the nearest body within 28 px. */
+  private squadAt(x: number, y: number): number | null {
+    const r = this.game.renderer;
+    const byName = r.squadAtLabel(x, y);
+    if (byName != null) return byName;
+    let best: number | null = null;
+    let bestD = 28;
+    for (const s of this.game.world.squads) {
+      const p = r.worldToScreen(s.pos);
+      const d = Math.hypot(p.x - x, p.y - y);
+      if (d < bestD) {
+        bestD = d;
+        best = s.id;
+      }
+    }
+    return best;
+  }
+
+  /** What the mouse is over, for hover health bars (#35): a squad, else a structure or hive. */
+  private pick(x: number, y: number): number | null {
+    const sq = this.squadAt(x, y);
+    if (sq != null) return sq;
+    const w = this.game.world;
+    const p = this.game.renderer.screenToGround(x, y);
+    for (const h of w.hives) if (h.alive && Math.hypot(h.pos.x - p.x, h.pos.y - p.y) < h.radius + 2) return h.id;
+    for (const s of w.structures) if (s.alive && Math.hypot(s.pos.x - p.x, s.pos.y - p.y) < s.radius + 1) return s.id;
+    return null;
+  }
+
   /** Placement preview — refreshed every frame so rotating (R), panning or zooming updates it immediately. */
   private updateGhost(): void {
     const g = this.game;
@@ -115,7 +149,7 @@ export class Input {
     const p = this.ground(this.mouse.x === 0 && this.mouse.y === 0 ? { clientX: innerWidth / 2, clientY: innerHeight / 2 } : { clientX: this.mouse.x, clientY: this.mouse.y });
     const tile = g.buildTile(p, g.mode.defId, g.mode.rotated);
     const ok = !g.world.canPlace(g.mode.defId, tile, g.mode.rotated);
-    g.renderer.setGhost(tile, g.world.footprint(g.mode.defId, g.mode.rotated), ok);
+    g.renderer.setGhost(tile, g.world.footprint(g.mode.defId, g.mode.rotated), ok, STRUCTURES[g.mode.defId].weapon?.range ?? 0);
   }
 
   private up(e: MouseEvent): void {
@@ -139,16 +173,13 @@ export class Input {
         .map((s) => s.id);
       g.select(ids, e.shiftKey);
     } else {
-      let best: number | null = null;
-      let bestD = 28;
-      for (const s of g.world.squads) {
-        const p = r.worldToScreen(s.pos);
-        const d = Math.hypot(p.x - e.clientX, p.y - e.clientY);
-        if (d < bestD) {
-          bestD = d;
-          best = s.id;
-        }
+      const best = this.squadAt(e.clientX, e.clientY);
+      // double-click a squad (or its name) to centre the camera on it
+      if (best != null && best === this.lastClick.id && e.timeStamp - this.lastClick.t < 350) {
+        const s = g.world.squads.find((x) => x.id === best);
+        if (s) r.rig.focus(s.pos);
       }
+      this.lastClick = { id: best, t: e.timeStamp };
       if (best != null && e.shiftKey && g.selected.has(best)) {
         g.selected.delete(best);
         g.changed();
@@ -164,7 +195,8 @@ export class Input {
   private key(e: KeyboardEvent): void {
     if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
     const k = e.key.toLowerCase();
-    this.keys.add(k);
+    const ctrl = e.ctrlKey || e.metaKey;
+    if (!ctrl) this.keys.add(k); // Ctrl+S must not also start panning down
     const g = this.game;
     const digit = /^[0-9]$/.test(k) ? Number(k) : null;
     if (digit != null) {
@@ -189,13 +221,19 @@ export class Input {
         if (g.mode.kind !== 'normal') g.setMode({ kind: 'normal' });
         else g.select([]);
         break;
+      // v4.9 (#44): WASD pans the camera, so attack-move and stop moved to Ctrl+A / Ctrl+S.
+      // (Never bind Ctrl+W: browsers close the tab and a page can't stop it.)
       case 'a':
+        if (!ctrl) break;
+        e.preventDefault(); // not "select all"
         if (g.selectedSquads.length) g.setMode({ kind: 'attackMove' });
         break;
       case 'h':
         g.hold();
         break;
       case 's':
+        if (!ctrl) break;
+        e.preventDefault(); // not "save page"
         g.stop();
         break;
       case 'm':
@@ -260,10 +298,11 @@ export class Input {
     const sp = 900 * dt;
     let dx = 0;
     let dy = 0;
-    if (this.keys.has('arrowleft')) dx -= sp;
-    if (this.keys.has('arrowright')) dx += sp;
-    if (this.keys.has('arrowup')) dy -= sp;
-    if (this.keys.has('arrowdown')) dy += sp;
+    const k = this.keys;
+    if (k.has('arrowleft') || k.has('a')) dx -= sp;
+    if (k.has('arrowright') || k.has('d')) dx += sp;
+    if (k.has('arrowup') || k.has('w')) dy -= sp;
+    if (k.has('arrowdown') || k.has('s')) dy += sp;
     const edge = 6;
     if (this.mouse.inside && !this.dragStart && !this.panning) {
       if (this.mouse.x <= edge) dx -= sp;
