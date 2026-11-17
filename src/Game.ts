@@ -4,6 +4,7 @@ import { dist, type Vec2 } from './core/math';
 import { World } from './sim/World';
 import { Squad } from './sim/entities';
 import { Renderer } from './render/Renderer';
+import { callSupport } from './sim/systems/support';
 import type { Targetable } from './sim/types';
 
 export type Mode =
@@ -11,7 +12,8 @@ export type Mode =
   | { kind: 'attackMove' }
   | { kind: 'build'; defId: string; rotated: boolean }
   | { kind: 'charge' }
-  | { kind: 'deconstruct' };
+  | { kind: 'deconstruct' }
+  | { kind: 'support'; id: string };
 
 /**
  * Owns the fixed-step loop, pause/speed (doc §2), the current selection and the
@@ -21,6 +23,8 @@ export class Game {
   readonly world: World;
   readonly renderer: Renderer;
   selected = new Set<number>();
+  /** A selected building (e.g. the Command Post for support powers). */
+  selectedStructure: number | null = null;
   groups = new Map<number, number[]>();
   mode: Mode = { kind: 'normal' };
   paused = true;
@@ -54,6 +58,7 @@ export class Game {
 
   select(ids: number[], add = false): void {
     if (!add) this.selected.clear();
+    if (ids.length || !add) this.selectedStructure = null;
     for (const id of ids) this.selected.add(id);
     if (this.mode.kind !== 'normal' && !this.selectedEngineers.length && this.mode.kind !== 'attackMove') this.mode = { kind: 'normal' };
     this.changed();
@@ -78,7 +83,7 @@ export class Game {
   // ---- commands ----
 
   commandAt(p: Vec2, queue: boolean): void {
-    const sq = this.selectedSquads;
+    let sq = this.selectedSquads;
     if (!sq.length) return;
     const w = this.world;
 
@@ -94,6 +99,18 @@ export class Game {
       if (!eng.length) this.toast('Bullets bounce off hives — bring engineers with demo charges');
       this.renderer.marker(hive.pos, 0xd2443a);
       return;
+    }
+
+    // engineers + right-click own structure: resume an unfinished site, or repair damage (v4.4)
+    const eng = sq.filter((s) => s.def.canBuild?.length);
+    const own = w.structures.find((s) => s.alive && s.def.cost.money + s.def.cost.supplies > 0 && dist(s.pos, p) < s.radius + 1);
+    if (eng.length && own && (!own.built || own.hp < own.def.hp)) {
+      const err = own.built ? w.orderRepair(eng, own, queue) : w.orderResume(eng, own, queue);
+      if (err) this.toast(err);
+      this.renderer.marker(own.pos, 0xd0c070);
+      const rest = sq.filter((s) => !eng.includes(s));
+      if (!rest.length) return;
+      sq = rest; // everyone else falls through to the normal command (e.g. take cover)
     }
 
     // right-click a zombie: everyone selected focuses it (v4.2)
@@ -140,6 +157,24 @@ export class Game {
 
     w.issueOrder(sq, { type: 'move', pos: w.grid.nearestFree(p) }, queue);
     this.renderer.marker(p, 0x9fe07a);
+  }
+
+  /** Click on the map without hitting a squad: select a building if there is one. */
+  selectStructureAt(p: Vec2): boolean {
+    const st = this.world.structures.find((s) => s.alive && s.def.id === 'commandPost' && dist(s.pos, p) < s.radius + 2);
+    if (!st) return false;
+    this.selected.clear();
+    this.selectedStructure = st.id;
+    this.changed();
+    return true;
+  }
+
+  callSupportAt(p: Vec2): void {
+    if (this.mode.kind !== 'support') return;
+    const err = callSupport(this.world, this.mode.id, p);
+    if (err) this.toast(err);
+    else this.setMode({ kind: 'normal' });
+    this.changed();
   }
 
   deconstructAt(p: Vec2, queue: boolean): void {

@@ -61,6 +61,10 @@ export class Input {
       if (!e.shiftKey) g.setMode({ kind: 'normal' });
       return;
     }
+    if (g.mode.kind === 'support') {
+      g.callSupportAt(p);
+      return;
+    }
     if (g.mode.kind === 'deconstruct') {
       g.deconstructAt(p, e.shiftKey);
       if (!e.shiftKey) g.setMode({ kind: 'normal' });
@@ -144,6 +148,8 @@ export class Input {
       if (best != null && e.shiftKey && g.selected.has(best)) {
         g.selected.delete(best);
         g.changed();
+      } else if (best == null && !e.shiftKey && g.selectStructureAt(g.renderer.screenToGround(e.clientX, e.clientY))) {
+        // selected a building
       } else g.select(best != null ? [best] : [], e.shiftKey);
     }
     this.dragStart = null;

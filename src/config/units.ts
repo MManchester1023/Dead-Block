@@ -82,14 +82,16 @@ export interface ZombieDef {
   radius: number;
   requires?: string;
   onDeath?: 'toxicCloud';
+  /** Salvage per kill (v4.4). */
+  bounty: { money: number; supplies: number };
 }
 
 export const ZOMBIES: Record<string, ZombieDef> = {
-  walker: { id: 'walker', name: 'Walker', hp: 36, speed: 2.7, damage: 7, attackCooldown: 1.2, sight: 14, hearing: 1, threat: ThreatClass.Normal, radius: 0.4 },
-  runner: { id: 'runner', name: 'Runner', hp: 22, speed: 7.6, damage: 5, attackCooldown: 0.8, sight: 18, hearing: 1.4, threat: ThreatClass.Normal, radius: 0.38 },
-  bloater: { id: 'bloater', name: 'Bloater', hp: 120, speed: 1.8, damage: 10, attackCooldown: 1.6, sight: 12, hearing: 0.8, threat: ThreatClass.Special, radius: 0.75, onDeath: 'toxicCloud' },
-  screamer: { id: 'screamer', name: 'Screamer', hp: 40, speed: 3.2, damage: 3, attackCooldown: 1.5, sight: 24, hearing: 1.2, threat: ThreatClass.Special, radius: 0.4, requires: 'specialZombies' },
-  brute: { id: 'brute', name: 'Brute', hp: 300, speed: 2.8, damage: 25, attackCooldown: 1.8, sight: 16, hearing: 1, threat: ThreatClass.Special, radius: 0.9, requires: 'specialZombies' },
+  walker: { id: 'walker', name: 'Walker', hp: 36, speed: 2.7, damage: 7, attackCooldown: 1.2, sight: 14, hearing: 1, threat: ThreatClass.Normal, radius: 0.4, bounty: { money: 1, supplies: 0.5 } },
+  runner: { id: 'runner', name: 'Runner', hp: 22, speed: 7.6, damage: 5, attackCooldown: 0.8, sight: 18, hearing: 1.4, threat: ThreatClass.Normal, radius: 0.38, bounty: { money: 1, supplies: 0.5 } },
+  bloater: { id: 'bloater', name: 'Bloater', hp: 120, speed: 1.8, damage: 10, attackCooldown: 1.6, sight: 12, hearing: 0.8, threat: ThreatClass.Special, radius: 0.75, onDeath: 'toxicCloud', bounty: { money: 4, supplies: 2 } },
+  screamer: { id: 'screamer', name: 'Screamer', hp: 40, speed: 3.2, damage: 3, attackCooldown: 1.5, sight: 24, hearing: 1.2, threat: ThreatClass.Special, radius: 0.4, requires: 'specialZombies', bounty: { money: 3, supplies: 1 } },
+  brute: { id: 'brute', name: 'Brute', hp: 300, speed: 2.8, damage: 25, attackCooldown: 1.8, sight: 16, hearing: 1, threat: ThreatClass.Special, radius: 0.9, requires: 'specialZombies', bounty: { money: 10, supplies: 4 } },
 };
 
 export interface StructureDef {

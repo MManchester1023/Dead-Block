@@ -41,6 +41,7 @@ export class Renderer {
 
   private squadViews = new Map<number, SquadView>();
   private structViews = new Map<number, THREE.Object3D>();
+  private structLabels = new Map<number, HTMLDivElement>();
   private hiveViews = new Map<number, { group: THREE.Group; core: THREE.Mesh; label: HTMLDivElement }>();
   private zombieMeshes = new Map<string, THREE.InstancedMesh>();
   private districtOverlays = new Map<string, THREE.Mesh>();
@@ -341,6 +342,7 @@ export class Renderer {
     ev.on('explosion', (e) => this.spawnExplosion(e.pos, e.radius, e.type === 'toxic' ? 0x8fbf3a : 0xffa040));
     ev.on('zombieKilled', (e) => this.spawnSplat(e.pos));
     ev.on('toxicCloud', (e) => this.spawnCloud(e.pos, e.radius, e.duration));
+    ev.on('smoke', (e) => this.spawnSmoke(e.pos, e.color, e.duration));
   }
 
   private addFx(obj: THREE.Object3D, life: number, update: Fx['update']): void {
@@ -379,6 +381,67 @@ export class Renderer {
       (c.material as THREE.MeshBasicMaterial).opacity = 0.3 * Math.min(1, fx.life / 2);
       c.rotation.y = t * 0.3;
     });
+  }
+
+  /** Coloured marker smoke (doc §8: every call-in has its own colour). A billowing, drifting column. */
+  private spawnSmoke(p: Vec2, color: number, duration: number): void {
+    const g = new THREE.Group();
+    const puffs: { m: THREE.Mesh; phase: number; drift: number }[] = [];
+    const geo = new THREE.IcosahedronGeometry(1, 1);
+    for (let i = 0; i < 14; i++) {
+      const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.6, depthWrite: false, emissive: color, emissiveIntensity: 0.15 }));
+      g.add(m);
+      puffs.push({ m, phase: i / 14, drift: (i % 3) - 1 });
+    }
+    const can = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.35, 8), new THREE.MeshLambertMaterial({ color: 0x4a5a3a }));
+    can.position.y = 0.18;
+    g.add(can);
+    g.position.set(p.x, 0, p.y);
+    this.addFx(g, duration, (t, fx) => {
+      const fade = Math.min(1, fx.life / 3);
+      for (const pf of puffs) {
+        const k = (t * 0.25 + pf.phase) % 1; // 0 at the can, 1 at the top of the column
+        pf.m.position.set(k * 3 + pf.drift * k * 1.5, 0.6 + k * 11, pf.drift * 0.6 * k + k * 1.2);
+        pf.m.scale.setScalar(0.6 + k * 2.4);
+        (pf.m.material as THREE.MeshLambertMaterial).opacity = (1 - k) * 0.65 * fade;
+      }
+    });
+  }
+
+  private crateViews = new Map<number, THREE.Group>();
+  private syncCrates(): void {
+    const w = this.world;
+    const seen = new Set<number>();
+    for (const c of w.crates) {
+      seen.add(c.id);
+      let v = this.crateViews.get(c.id);
+      if (!v) {
+        v = new THREE.Group();
+        const crate = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.1, 1.4), new THREE.MeshLambertMaterial({ color: 0x6a6a3a }));
+        crate.position.y = 0.55;
+        crate.castShadow = true;
+        const band = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.15, 1.45), new THREE.MeshLambertMaterial({ color: 0x2a2a1a }));
+        band.position.y = 0.55;
+        const chute = new THREE.Mesh(new THREE.SphereGeometry(3, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xd8d0b8, side: THREE.DoubleSide }));
+        chute.position.y = 6;
+        chute.name = 'chute';
+        const lines = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 0.5, 5, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0x8a8670, wireframe: true }));
+        lines.position.y = 3.5;
+        lines.name = 'lines';
+        v.add(crate, band, chute, lines);
+        this.scene.add(v);
+        this.crateViews.set(c.id, v);
+      }
+      const height = c.landed ? 0 : Math.min(60, (c.landsAt - w.time) * 7);
+      v.position.set(c.pos.x, height, c.pos.y);
+      v.getObjectByName('chute')!.visible = !c.landed;
+      v.getObjectByName('lines')!.visible = !c.landed;
+    }
+    for (const [id, v] of this.crateViews)
+      if (!seen.has(id)) {
+        this.scene.remove(v);
+        this.crateViews.delete(id);
+      }
   }
 
   marker(p: Vec2, color: number): void {
@@ -468,7 +531,30 @@ export class Renderer {
       });
       const turret = o.getObjectByName('turret');
       if (turret) turret.rotation.y = -s.facing;
+      // progress bar while unfinished, health bar while damaged (v4.4: resume / repair)
+      const needsBar = !s.built || s.hp < s.def.hp - 0.5;
+      let lab = this.structLabels.get(s.id);
+      if (needsBar) {
+        if (!lab) {
+          lab = document.createElement('div');
+          lab.className = 'struct-label';
+          this.overlay.appendChild(lab);
+          this.structLabels.set(s.id, lab);
+        }
+        const pct = s.built ? (s.hp / s.def.hp) * 100 : Math.min(100, (s.buildProgress / s.def.buildTime) * 100);
+        this.placeLabel(lab, s.pos, 2.5, () =>
+          `<span>${s.built ? 'Damaged' : 'Unfinished'} ${Math.floor(pct)}%</span><div class="bar ${s.built ? 'hp' : 'build'}"><i style="width:${pct.toFixed(0)}%"></i></div>`,
+        );
+      } else if (lab) {
+        lab.remove();
+        this.structLabels.delete(s.id);
+      }
     }
+    for (const [id, lab] of this.structLabels)
+      if (!sseen.has(id)) {
+        lab.remove();
+        this.structLabels.delete(id);
+      }
     for (const [id, o] of this.structViews)
       if (!sseen.has(id)) {
         this.scene.remove(o);
@@ -496,6 +582,8 @@ export class Renderer {
         return `<b>HIVE</b> · stage ${h.stage}/4<div class="bar"><i style="width:${pct}%"></i></div>`;
       });
     }
+
+    this.syncCrates();
 
     // district overlays (infestation → red tint) + ops-map labels
     for (const [id, ov] of this.districtOverlays) {

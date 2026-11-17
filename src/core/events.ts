@@ -9,9 +9,9 @@ import type { DamageType } from '../sim/types';
 export interface GameEvents {
   shot: { from: Vec2; to: Vec2; faction: string; heavy?: boolean };
   explosion: { pos: Vec2; radius: number; type: DamageType };
-  memberKilled: { squadId: number; squadName: string };
+  memberKilled: { squadId: number; squadName: string; pos: Vec2; facing: number; unitId: string };
   squadWiped: { squadId: number; squadName: string };
-  zombieKilled: { id: number; defId: string; pos: Vec2; districtId: string | null };
+  zombieKilled: { id: number; defId: string; pos: Vec2; facing: number; districtId: string | null };
   hiveStage: { hiveId: number; stage: number; districtId: string };
   hiveDestroyed: { hiveId: number; districtId: string };
   hordePulse: { districtId: string; size: number; target: Vec2 };
@@ -24,6 +24,7 @@ export interface GameEvents {
   unitProduced: { id: number; defId: string; name: string };
   newDay: { day: number; upkeep: number; paid: boolean };
   levelUp: { squadId: number; squadName: string; level: string };
+  smoke: { pos: Vec2; color: number; duration: number };
   radio: { speaker: string; text: string; tone?: 'info' | 'warn' | 'good' | 'bad' };
   toxicCloud: { pos: Vec2; radius: number; duration: number };
   victory: { reason: string };

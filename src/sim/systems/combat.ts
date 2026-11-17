@@ -40,7 +40,7 @@ function acquire(w: World, shooter: { pos: Vec2; targetId: number | null }, fact
   return t;
 }
 
-function fire(w: World, from: Vec2, t: Targetable, weapon: WeaponDef, dmgMult: number, accMult: number): boolean {
+function fire(w: World, from: Vec2, t: Targetable, weapon: WeaponDef, dmgMult: number, accMult: number, shooter?: Targetable): boolean {
   const d = dist(from, t.pos);
   const acc = weapon.accuracy * (1 - 0.35 * Math.min(1, d / weapon.range)) * accMult;
   const hit = w.rng.chance(acc);
@@ -49,7 +49,7 @@ function fire(w: World, from: Vec2, t: Targetable, weapon: WeaponDef, dmgMult: n
   w.makeNoise(from, weapon.loudness);
   if (!hit) return false;
   const wasAlive = t.alive;
-  w.damage(t, weapon.damage * dmgMult, weapon.type, from);
+  w.damage(t, weapon.damage * dmgMult, weapon.type, from, shooter);
   return wasAlive && !t.alive;
 }
 
@@ -57,7 +57,7 @@ export function updateCombat(w: World, dt: number): void {
   for (const s of w.squads) {
     if (!s.alive || s.stunned > 0) continue;
     const order = s.currentOrder;
-    const busy = order?.type === 'build' || order?.type === 'charge' || order?.type === 'deconstruct';
+    const busy = order?.type === 'build' || order?.type === 'charge' || order?.type === 'deconstruct' || order?.type === 'repair';
     // forced target (right-clicked zombie) overrides threat priority once it's in range and visible
     const forced = order?.type === 'attack' ? w.get(order.targetId ?? null) : undefined;
     const forcedOk =
@@ -75,7 +75,8 @@ export function updateCombat(w: World, dt: number): void {
       if (m.cooldown > 0) continue;
       m.cooldown = s.def.weapon.cooldown * w.rng.range(0.85, 1.15);
       if (!t.alive) break;
-      if (fire(w, m.pos, t, s.def.weapon, s.dmgMult, accMult)) {
+      m.lastShot = w.time;
+      if (fire(w, m.pos, t, s.def.weapon, s.dmgMult, accMult, s)) {
         s.kills++;
         gainXp(w, s, t instanceof Zombie && t.def.threat >= 2 ? 3 : BALANCE.combat.xpPerKill);
       }
@@ -91,7 +92,7 @@ export function updateCombat(w: World, dt: number): void {
     st.facing = Math.atan2(t.pos.y - st.pos.y, t.pos.x - st.pos.x);
     if (st.cooldown <= 0) {
       st.cooldown = wpn.cooldown;
-      fire(w, st.pos, t, wpn, 1, 1);
+      fire(w, st.pos, t, wpn, 1, 1, st);
     }
   }
 

@@ -51,6 +51,9 @@ export function updateOrders(w: World, dt: number): void {
         case 'deconstruct':
           doDeconstruct(w, s, dt);
           break;
+        case 'repair':
+          doRepair(w, s, dt);
+          break;
         default:
           s.orders.shift();
       }
@@ -141,6 +144,38 @@ function doAttack(w: World, s: Squad, dt: number): void {
     return;
   }
   moveToward(w, s, t.pos, dt, 0);
+}
+
+function doRepair(w: World, s: Squad, dt: number): void {
+  const o = s.currentOrder!;
+  const st = w.get(o.targetId ?? null);
+  if (!(st instanceof Structure) || !st.alive || st.hp >= st.def.hp) {
+    s.orders.shift();
+    return;
+  }
+  const r = approach(w, s, st.pos, st.radius, st.radius + 4, dt);
+  if (r === 'moving') return;
+  if (r === 'blocked') {
+    s.orders.shift();
+    return;
+  }
+  s.path = [];
+  s.facing = Math.atan2(st.pos.y - s.pos.y, st.pos.x - s.pos.x);
+  // a crew restores a full bar in about the structure's build time (at least 6 s)
+  const hp = Math.min(st.def.hp - st.hp, (st.def.hp / Math.max(6, st.def.buildTime)) * dt * (s.aliveCount / s.def.members));
+  const cost = w.repairCost(st, hp);
+  if (w.supplies < cost) {
+    w.events.emit('radio', { speaker: s.name, text: 'Out of supplies for repairs, Command.', tone: 'warn' });
+    s.orders.shift();
+    return;
+  }
+  w.supplies -= cost;
+  st.hp += hp;
+  w.makeNoise(s.pos, 0.6 * dt * 10);
+  if (st.hp >= st.def.hp) {
+    st.hp = st.def.hp;
+    s.orders.shift();
+  }
 }
 
 function doDeconstruct(w: World, s: Squad, dt: number): void {

@@ -16,6 +16,7 @@ import { updateHives } from './systems/hives';
 import { updateEconomy } from './systems/economy';
 import { updateDistricts } from './systems/districts';
 import { updateNoise } from './systems/noise';
+import { updateSupport, type PendingImpact, type SupplyCrate } from './systems/support';
 
 export interface DistrictState {
   def: DistrictDef;
@@ -56,6 +57,10 @@ export class World {
   charges: DemoCharge[] = [];
   clouds: ToxicCloud[] = [];
   noiseEvents: NoiseEvent[] = [];
+  /** Command Post support (v4.4): cooldowns, incoming shells, parachuted crates. */
+  supportReadyAt = new Map<string, number>();
+  impacts: PendingImpact[] = [];
+  crates: SupplyCrate[] = [];
   districts = new Map<string, DistrictState>();
 
   readonly zombieHash = new SpatialHash<Zombie>(8);
@@ -311,10 +316,10 @@ export class World {
     if (d && d.def.id !== 'base') d.noise = Math.min(BALANCE.noise.pulseThreshold, d.noise + loudness * 0.12);
   }
 
-  damage(target: Targetable, amount: number, type: DamageType, source?: Vec2): void {
+  damage(target: Targetable, amount: number, type: DamageType, source?: Vec2, attacker?: Targetable): void {
     if (!target.alive) return;
     if (target instanceof Squad) this.damageSquad(target, amount, type, source);
-    else if (target instanceof Zombie) this.damageZombie(target, amount, type);
+    else if (target instanceof Zombie) this.damageZombie(target, amount, type, attacker);
     else if (target instanceof Hive) this.damageHive(target, amount, type);
     else if (target instanceof Structure) this.damageStructure(target, amount);
   }
@@ -331,7 +336,7 @@ export class World {
     if (victim.hp <= 0) {
       victim.alive = false;
       victim.hp = 0;
-      this.events.emit('memberKilled', { squadId: sq.id, squadName: sq.name });
+      this.events.emit('memberKilled', { squadId: sq.id, squadName: sq.name, pos: { ...victim.pos }, facing: victim.facing, unitId: sq.def.id });
       if (!sq.alive) {
         this.events.emit('squadWiped', { squadId: sq.id, squadName: sq.name });
         this.byId.delete(sq.id);
@@ -341,14 +346,27 @@ export class World {
     }
   }
 
-  damageZombie(z: Zombie, amount: number, type: DamageType): void {
+  damageZombie(z: Zombie, amount: number, type: DamageType, attacker?: Targetable): void {
     z.hp -= amount;
+    // getting shot makes it angry at the shooter (v4.4: Bloaters sometimes just stood there)
+    if (attacker && attacker.alive && z.alive && z.state !== 'attack') {
+      const cur = this.get(z.targetId);
+      if (!(cur instanceof Squad) || cur === attacker || dist(z.pos, attacker.pos) < dist(z.pos, cur.pos)) {
+        if (z.targetId !== attacker.id) z.path = [];
+        z.targetId = attacker.id;
+        z.state = 'chase';
+        z.aggro = BALANCE.zombie.aggroTimeSec;
+      }
+    }
     if (type === 'fire') z.burning = Math.max(z.burning, 3);
     if (z.hp <= 0 && z.alive) {
       z.alive = false;
       this.byId.delete(z.id);
       const d = this.districtAt(z.pos);
-      this.events.emit('zombieKilled', { id: z.id, defId: z.def.id, pos: { ...z.pos }, districtId: d?.def.id ?? null });
+      this.events.emit('zombieKilled', { id: z.id, defId: z.def.id, pos: { ...z.pos }, facing: z.facing, districtId: d?.def.id ?? null });
+      // small salvage per kill (v4.4): scavenged cash and gear
+      this.money += z.def.bounty.money;
+      this.addSupplies(z.def.bounty.supplies);
       if (d) d.infestation = Math.max(0, d.infestation - (BALANCE.infestation.perKill[z.def.id] ?? 0.5));
       if (z.def.onDeath === 'toxicCloud') {
         const cloud: ToxicCloud = { id: newId(), pos: { ...z.pos }, radius: 5.5, remaining: 8, dps: 7 };
@@ -422,6 +440,30 @@ export class World {
     return null;
   }
 
+  /** Engineers pick an unfinished site back up where it was left (v4.4). */
+  orderResume(engineers: Squad[], site: Structure, queue = false): string | null {
+    const eng = engineers.filter((e) => e.def.canBuild?.length);
+    if (!eng.length) return 'Only engineers can build';
+    if (site.built) return 'Already built';
+    this.issueOrder(eng, { type: 'build', pos: site.pos, targetId: site.id, buildDef: site.def.id }, queue);
+    return null;
+  }
+
+  /** Engineers patch up damaged structures, paying supplies as they go (v4.4). */
+  orderRepair(engineers: Squad[], st: Structure, queue = false): string | null {
+    const eng = engineers.filter((e) => e.def.canBuild?.length);
+    if (!eng.length) return 'Only engineers can repair';
+    if (!st.built) return this.orderResume(eng, st, queue);
+    if (st.hp >= st.def.hp) return 'Not damaged';
+    this.issueOrder(eng, { type: 'repair', pos: st.pos, targetId: st.id }, queue);
+    return null;
+  }
+
+  /** Supplies to fully restore `hp` of a structure: half its supply cost per full bar, minimum a trickle. */
+  repairCost(st: Structure, hp: number): number {
+    return (Math.max(4, st.def.cost.supplies) * 0.5 * hp) / st.def.hp;
+  }
+
   orderAttack(squads: Squad[], target: Targetable, queue = false): void {
     this.issueOrder(squads, { type: 'attack', pos: { ...target.pos }, targetId: target.id }, queue);
   }
@@ -478,6 +520,7 @@ export class World {
     updateNoise(this, dt);
     updateDistricts(this, dt);
     updateEconomy(this, dt);
+    updateSupport(this);
 
     // compaction
     if (this.zombies.some((z) => !z.alive)) this.zombies = this.zombies.filter((z) => z.alive);

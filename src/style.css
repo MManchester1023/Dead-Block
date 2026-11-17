@@ -69,6 +69,10 @@ button.disabled { opacity: .45; cursor: not-allowed; }
 .hint { margin: 6px 0 0; color: var(--dim); font-size: 11px; }
 .chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .chip small { margin-left: 4px; }
+.support-list { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.cmd.support { align-items: flex-start; text-align: left; gap: 8px; padding: 6px 8px; }
+.cmd.support small { display: block; margin: 2px 0 0; }
+.smoke { width: 10px; height: 10px; border-radius: 50%; flex: none; margin-top: 3px; box-shadow: 0 0 6px currentColor; }
 .prod { display: block; width: 100%; text-align: left; margin-bottom: 4px; }
 .prod small { display: block; }
 .queue { margin: 4px 0; padding: 4px; background: #0006; }
@@ -87,13 +91,17 @@ details summary { cursor: pointer; color: var(--dim); font-size: 11px; margin-to
 .pip.mid { background: var(--warn); } .pip.low { background: var(--bad); } .pip.dead { background: #222; }
 
 /* world-space labels */
-.squad-label, .hive-label, .district-label { position: absolute; left: 0; top: 0; white-space: nowrap; text-shadow: 0 1px 0 #000, 0 0 3px #000; }
+.squad-label, .hive-label, .district-label, .struct-label { position: absolute; left: 0; top: 0; white-space: nowrap; text-shadow: 0 1px 0 #000, 0 0 3px #000; }
 .squad-label { font-size: 10px; text-align: center; }
 .squad-label .pips { justify-content: center; margin: 1px 0 0; }
 .squad-label .pip { width: 8px; height: 4px; }
 .sname.sel { color: #c8f0a0; }
 .tag { margin-left: 4px; padding: 0 3px; font-size: 8px; background: #2a3a5a; color: #cfe; }
 .tag.lvl { background: #5a4a1a; color: #ffd; }
+.struct-label { font-size: 10px; color: #e8dcb0; width: 90px; text-align: center; }
+.struct-label .bar { height: 4px; margin-top: 1px; }
+.struct-label .bar.build i { background: var(--warn); }
+.struct-label .bar.hp i { background: var(--bad); }
 .hive-label { font-size: 10px; color: #f0b0b0; width: 90px; text-align: center; }
 .hive-label .bar { height: 4px; }
 .hive-label .bar i { background: var(--bad); }

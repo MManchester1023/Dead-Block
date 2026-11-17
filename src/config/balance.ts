@@ -20,9 +20,9 @@ export const BALANCE = {
     decayPerSec: 4, // district noise meter decay
     pulseThreshold: 100,
     // Gunshots carry well beyond sight (zombie sight ~14 m) and scale with the map, not with weapon
-    // range: a rifle (2.2) is heard ~73 m away (over a third of a 192 m district), an MG (3.2) ~106 m.
-    hearingRadiusPerLoudness: 33, // metres per loudness point
-    maxHearingRadius: 180,
+    // range: a rifle (2.2) is heard ~110 m away (over half a 192 m district), an MG (3.2) ~160 m.
+    hearingRadiusPerLoudness: 50, // metres per loudness point (v4.4: wider again)
+    maxHearingRadius: 260,
     mergeRadius: 6, // same-tick sounds this close merge into one louder event
   },
 
@@ -39,7 +39,7 @@ export const BALANCE = {
     pulseIntervalSec: 240,
     firstPulseDelaySec: 480, // starter zones: ~10–15 min pacing (doc §3), so the first pulse waits
     basePulseSize: 12,
-    perStagePulseSize: 6,
+    perStagePulseSize: 10,
   },
 
   hive: {
@@ -47,8 +47,8 @@ export const BALANCE = {
     alarmCallRadius: 45, // …and every zombie this close to the hive comes for it
     hpByStage: [500, 750, 1000, 1250], // grows as it matures — kill it early
     stageDurationSec: [600, 420, 480], // time to advance stage 1→2, 2→3, 3→4
-    spawnIntervalSec: [9, 5, 3.5, 2],
-    spawnGroup: [1, 3, 4, 5],
+    spawnIntervalSec: [18, 11, 7, 4], // v4.4: was far too frequent; big hordes come from pulses instead
+    spawnGroup: [1, 2, 3, 4],
     localCap: [12, 28, 40, 60],
     globalZombieCap: 260,
   },

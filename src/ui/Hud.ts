@@ -4,6 +4,8 @@ import { ABILITIES, STRUCTURES, UNITS } from '../config/units';
 import { isEnabled } from '../config/features';
 import type { Game } from '../Game';
 import { Radio } from './Radio';
+import { SUPPORT } from '../config/support';
+import { supportBlocked } from '../sim/systems/support';
 
 const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!);
 const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -87,6 +89,7 @@ export class Hud {
       case 'build': g.startBuild(arg); break;
       case 'charge': g.setMode({ kind: 'charge' }); break;
       case 'deconstruct': g.setMode({ kind: 'deconstruct' }); break;
+      case 'support': g.setMode({ kind: 'support', id: arg }); break;
       case 'attackMove': g.setMode({ kind: 'attackMove' }); break;
       case 'hold': g.hold(); break;
       case 'stop': g.stop(); break;
@@ -190,16 +193,33 @@ export class Hud {
   private renderSelection(): void {
     const g = this.game;
     const sq = g.selectedSquads;
+    const st = g.selectedStructure != null ? g.world.structures.find((s) => s.id === g.selectedStructure && s.alive) : undefined;
+    if (!sq.length && st?.def.id === 'commandPost') {
+      const w = g.world;
+      const rows = SUPPORT.map((d) => {
+        const err = supportBlocked(w, d.id);
+        const locked = !!d.requires && !!err && err.startsWith('Locked');
+        const on = g.mode.kind === 'support' && g.mode.id === d.id;
+        const cost = `$${d.cost.money}${d.cost.supplies ? ` · ${d.cost.supplies}▣` : ''} · ${d.cooldown}s cooldown`;
+        const dot = `#${d.smoke.toString(16).padStart(6, '0')}`;
+        return `<button class="cmd support ${err ? 'disabled' : ''} ${on ? 'on' : ''}" data-act="support:${d.id}" title="${esc(err ?? d.desc)}">
+          <span class="smoke" style="background:${dot};color:${dot}"></span>
+          <span><b>${locked ? '🔒 ' : ''}${d.name}</b><small>${locked ? esc(d.unlock) : err ? esc(err) : cost}</small></span></button>`;
+      }).join('');
+      const hint = g.mode.kind === 'support' ? 'Click the map to drop the marker smoke · right-click to cancel' : 'Pick a support power, then click the map. Each call-in is marked with its own smoke colour.';
+      this.set(this.selection, `<h3>Command Post · Support</h3><div class="support-list">${rows}</div><p class="hint">${hint}</p>`);
+      return;
+    }
     if (!sq.length) {
       const all = g.world.squads.map((s) => `<button class="chip" data-act="focus:${s.id}">${esc(s.name)} <small>${s.aliveCount}/${s.members.length}</small></button>`).join('');
-      this.set(this.selection, `<h3>Forces</h3><div class="chips">${all || '<i>No squads left.</i>'}</div><p class="hint">Click or drag to select · right-click to move · right-click a car for cover</p>`);
+      this.set(this.selection, `<h3>Forces</h3><div class="chips">${all || '<i>No squads left.</i>'}</div><p class="hint">Click or drag to select · click the Command Post for support powers · right-click a car for cover</p>`);
       return;
     }
     const cards = sq
       .slice(0, 6)
       .map((s) => {
         const pips = s.members.map((m) => `<span class="pip ${!m.alive ? 'dead' : m.hp / m.maxHp < 0.35 ? 'low' : m.hp / m.maxHp < 0.7 ? 'mid' : ''}"></span>`).join('');
-        const order = s.holding ? 'Holding' : s.currentOrder ? { move: 'Moving', attackMove: 'Attack-moving', cover: 'To cover', build: 'Building', charge: 'Planting charge', hold: 'Holding', patrol: 'Patrol', attack: 'Attacking target', deconstruct: 'Deconstructing' }[s.currentOrder.type] : 'Idle';
+        const order = s.holding ? 'Holding' : s.currentOrder ? { move: 'Moving', attackMove: 'Attack-moving', cover: 'To cover', build: 'Building', charge: 'Planting charge', hold: 'Holding', patrol: 'Patrol', attack: 'Attacking target', deconstruct: 'Deconstructing', repair: 'Repairing' }[s.currentOrder.type] : 'Idle';
         const lv = BALANCE.combat.levels;
         const next = lv[s.level + 1];
         const xp = next ? `${s.xp}/${next.xp} xp` : 'max';

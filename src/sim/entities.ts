@@ -15,6 +15,8 @@ export interface Member {
   /** Member position, metres (drifts around its slot — see updateMembers). */
   pos: Vec2;
   facing: number;
+  /** Sim time of this member's last shot (drives the shooting animation). */
+  lastShot: number;
   /** Per-member loadout/cosmetics hook for Armory customization (doc §7, Tier 4). */
   loadout?: { weapon?: string; attachments?: string[]; cosmetics?: Record<string, string> };
 }
@@ -72,6 +74,7 @@ export class Squad implements Targetable {
       offset: FORMATION_SLOTS[i % FORMATION_SLOTS.length],
       pos: { x: pos.x + FORMATION_SLOTS[i % 4].x, y: pos.y + FORMATION_SLOTS[i % 4].y },
       facing: 0,
+      lastShot: -99,
     }));
   }
 
