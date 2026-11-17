@@ -31,3 +31,12 @@ Everything else in the city (buildings, vehicles, trees, street furniture, groun
 | [Polyart Zombies with Animations Free Pack](https://sketchfab.com/3d-models/polyart-zombies-with-animations-free-pack-d9bcfdd88f5348549bc947226af7c314) | Denys Almaral | Sketchfab Standard |
 | Puller (zombie) | Gowo.Stoyanov | CC-BY-4.0 |
 | RTS Mercenaries 1 & 2 | britdawgmasterfunk | CC-BY-4.0 |
+| Muscular zombie (`tankzombie.glb`) | the gamer wolf | CC-BY-4.0 |
+| Ural-4320 | 42manako | CC-BY-NC-4.0 (non-commercial) |
+| Zombie (`zombie (1).glb`) | David Glynch | Sketchfab Standard |
+| zombie (`zombie (2).glb`) | Gowo.Stoyanov | CC-BY-4.0 |
+| Zombie (`zombie.glb`) | πRat | CC-BY-4.0 |
+| Zombie Crawl | Beer Game Maker | CC-BY-4.0 |
+| Zombie Scream | Juangamer | CC-BY-4.0 |
+| Zombie Woman | samsikua | CC-BY-4.0 |
+| Zombie (`zombieidle.glb`) | pxltiger | CC-BY-4.0 |
