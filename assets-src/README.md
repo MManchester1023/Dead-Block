@@ -17,3 +17,16 @@ Authors and licences for every file are in `../CREDITS.md`. Planned uses are in 
 | Aircraft (call-ins, flyovers) | `a-10_thunderbolt_ii.glb`, `bell_huey_helicopter.glb`, `boeing_ch-47_chinook.glb`, `eurocopter_tiger_attack_helicopter.glb`, `helicopter.glb`, `helicopter_military.glb`, `low-poly_fighter_jet.glb`, `mq-9_reaper_drone__game_ready_military_asset.glb` |
 | Ground vehicles | `m2_bradley_ifv.glb`, `fictional_lowpoly_pbr_tank_lowpole.glb`, `ural-4320.glb` |
 | Not planned | `fps_guns_4k_-_rifle_1.glb` (CC-BY-ND: can't be modified/compressed, and a gun is a few pixels at our camera distance) |
+
+## Mixamo (`mixamo/`)
+
+Rigged on Mixamo's standard skeleton (`mixamorig`), so any of these animations can be put on any Mixamo-rigged character.
+
+| Folder | What's there | Still missing |
+|---|---|---|
+| `shooter-pack/` | Mixamo "Basic Shooter Pack": the **X Bot** mannequin plus rifle idle (aiming), walking, rifle run, firing, reloading, hit reaction, grenade toss, strafes, turns | A soldier-looking character to put them on (X Bot is a grey mannequin) |
+| `soldier/` | `Dying.fbx` (death) | |
+| `zombie/` | Zombie Idle, Zombie Run, Zombie Crawl, Zombie Dying (animation only, no mesh) | A zombie **walk** and **attack**, and a female zombie character mesh |
+
+Engineer: still needs a working loop (e.g. hammering / kneeling and working).
+
