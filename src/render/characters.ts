@@ -54,6 +54,8 @@ export interface CharacterSpec {
   texture?: string;
   /** Bone the procedural rifle is held in (default: Quaternius 'FistR'). */
   rifleBone?: string;
+  /** A real rifle model (glTF) instead of the box rifle (v4.18). */
+  rifleModel?: string;
   /** Rifle orientation fix-up in the hand bone's frame (Euler, radians). */
   rifleRot?: [number, number, number];
   /** Pin the hips' horizontal position (Mixamo clips downloaded without "In Place" walk forward). */
@@ -196,7 +198,7 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
     if (!hips && (o as THREE.Bone).isBone && /hips$/i.test(o.name)) hips = o;
   });
   const hipsRest = hips ? hips.position.clone() : null;
-  const rifle = spec.rifle ? rifleGeometry(1) : undefined; // built in metres
+  const rifle = spec.rifle ? (spec.rifleModel ? await loadRifleModel(spec.rifleModel) : rifleGeometry(1)) : undefined; // built in metres
 
   const book: Flipbook = { key: spec.key, deathFalls: !!spec.deathFalls, frames: {}, durations: {}, loops: {} };
   // round 4 #33: one simplification plan (made from the first pose) is reused for every frame, so the
@@ -254,6 +256,60 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
   }
   mixer.stopAllAction();
   return book;
+}
+
+const rifleCache = new Map<string, Promise<THREE.BufferGeometry>>();
+
+/**
+ * A rifle model (v4.18: "Low-poly M4 assault rifle" by szaw, CC-BY 4.0) in the same frame as the box rifle:
+ * metres, muzzle along +Y, magazine down (-Z), the pistol grip at the origin (that's where the hand is).
+ * The source mesh has the barrel on +X and the magazine on -Z; parts are coloured by their materials.
+ */
+function loadRifleModel(url: string): Promise<THREE.BufferGeometry> {
+  let p = rifleCache.get(url);
+  if (!p) {
+    p = (async () => {
+      const gltf = await new GLTFLoader().loadAsync(url);
+      const parts: THREE.BufferGeometry[] = [];
+      gltf.scene.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh) return;
+        const g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+        const col = (m.material as THREE.MeshStandardMaterial).color ?? new THREE.Color(0x222222);
+        const c = col.clone().lerp(new THREE.Color(0x3a3a38), 0.35); // near-black PBR colours read better lifted a little
+        const n = g.attributes.position.count;
+        const colors = new Float32Array(n * 3);
+        for (let i = 0; i < n; i++) colors.set([c.r, c.g, c.b], i * 3);
+        const out = new THREE.BufferGeometry();
+        out.setAttribute('position', g.attributes.position.clone()); // raw mesh space (all parts share one parent)
+        out.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        parts.push(out);
+      });
+      let geo = parts.reduce((a, b) => mergeSimple(a, b));
+      geo.computeBoundingBox();
+      const bb = geo.boundingBox!;
+      const len = bb.max.x - bb.min.x;
+      const s = 0.84 / len; // an M4 is ~84 cm long
+      // pistol grip: a bit behind the magazine well, below the receiver
+      const gripX = bb.min.x + len * 0.33;
+      const gripZ = bb.min.z + (bb.max.z - bb.min.z) * 0.45;
+      const pos = geo.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < pos.count; i++) {
+        const x = (pos.getX(i) - gripX) * s;
+        const y = pos.getY(i) * s;
+        const z = (pos.getZ(i) - gripZ) * s;
+        pos.setXYZ(i, -y, x, z); // barrel +X → +Y, keep -Z down (a proper rotation)
+      }
+      pos.needsUpdate = true;
+      // crowd LOD: ~6k triangles is a lot to carry in every soldier's hands
+      const plan = makeClusterPlan(geo, 0.012, 6);
+      geo = applyClusterPlan(plan, geo);
+      geo.deleteAttribute('normal');
+      return geo;
+    })();
+    rifleCache.set(url, p);
+  }
+  return p;
 }
 
 /** A simple rifle in the hand bone's local space (bone units = 1/s metres). Points along the bone's +Y. */
@@ -489,6 +545,7 @@ export const CHARACTER_SPECS: CharacterSpec[] = [
     deathFalls: true,
     rifle: true,
     rifleBone: 'mixamorigRightHand',
+    rifleModel: 'models/weapons/m4.glb',
   },
   {
     // same soldier, dustier, with Mixamo "Working On Device" while building / repairing / planting
@@ -501,6 +558,7 @@ export const CHARACTER_SPECS: CharacterSpec[] = [
     deathFalls: true,
     rifle: true,
     rifleBone: 'mixamorigRightHand',
+    rifleModel: 'models/weapons/m4.glb',
     tint: 0xe8d4a0,
   },
   {
@@ -514,14 +572,14 @@ export const CHARACTER_SPECS: CharacterSpec[] = [
   },
   {
     // v4.18: "female zombie" (jeferson, CC-BY-SA 4.0) rigged on Mixamo, with Mixamo zombie animations.
-    // No attack clip yet: attacks fall back to the idle.
     key: 'zombieF',
     url: 'models/characters/zombieF/zombie_female.fbx',
     textureByMesh: { Body: 'models/characters/zombieF/body.png', Tops: 'models/characters/zombieF/material.png', Bottoms: 'models/characters/zombieF/bottom.png' },
     colorByMesh: { Eyes: 0xb8b090, Eyelashes: 0x1a1410 },
-    clips: ['idle', 'walk', 'run', 'death'],
+    clips: ['idle', 'walk', 'run', 'punch', 'death'],
     clipFiles: {
       idle: 'models/characters/zombieF/idle.fbx',
+      punch: 'models/characters/zombieF/attack.fbx',
       walk: 'models/characters/zombieF/walk.fbx',
       run: 'models/characters/zombieF/run.fbx',
       death: 'models/characters/zombieF/death.fbx',

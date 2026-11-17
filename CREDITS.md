@@ -47,7 +47,9 @@ Everything else in the city (buildings, vehicles, trees, street furniture, groun
 | [female zombie](https://sketchfab.com/3d-models/female-zombie-7ecd809925ba4459921cf67f4e652582) (in the game: female zombies, rigged on Mixamo) | jeferson | CC-BY-SA-4.0 (share-alike) |
 | [Mobile diesel generator set](https://sketchfab.com/3d-models/mobile-diesel-generator-set-125ad1f014da4186b2703ed733c0226c) | MrdT | CC-BY-4.0 |
 
+| [Low-poly M4 assault rifle](https://sketchfab.com/3d-models/low-poly-m4-assault-rifle-fb85c455cf374675a1db7988def2d926) (in the game: every soldier's and engineer's rifle) | szaw | CC-BY-4.0 |
+
 ## Mixamo (`assets-src/models/mixamo/`)
 
-Rigs and animations from [Mixamo](https://www.mixamo.com) (Adobe), downloaded by the project owner. **In the game:** riflemen and engineers (Military RTS Character 1, rigged on Mixamo) with Rifle Idle, Walking, Firing Rifle, Dying and Working On Device; female zombies with Zombie Idle, Walking, Zombie Run and Zombie Dying. Mixamo's terms allow royalty-free use in games; the raw files may not be redistributed as a standalone asset pack.
+Rigs and animations from [Mixamo](https://www.mixamo.com) (Adobe), downloaded by the project owner. **In the game:** riflemen and engineers (Military RTS Character 1, rigged on Mixamo) with Rifle Idle, Walking, Firing Rifle, Dying and Working On Device; female zombies with Zombie Idle, Walking, Zombie Run, Zombie Attack and Zombie Dying (Zombie Punching kept in `assets-src/models/` as an alternative). Mixamo's terms allow royalty-free use in games; the raw files may not be redistributed as a standalone asset pack.
 
