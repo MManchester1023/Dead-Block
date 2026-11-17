@@ -24,3 +24,8 @@ Everything else in the city (buildings, vehicles, trees, street furniture, groun
 | [FPS Guns 4K - Rifle 1](https://sketchfab.com/3d-models/fps-guns-4k-rifle-1-9f421e63c2e241cdb5ec85fd10837853) | Heart State Games | CC-BY-ND-4.0 (no derivatives) |
 | [Helicopter](https://sketchfab.com/3d-models/helicopter-ef70283b1dea4ae8b18eec9231ce390e) | Gigantic Burger | CC-BY-4.0 |
 | [Helicopter Military](https://sketchfab.com/3d-models/helicopter-military-b6dca85fb0474f9faa017d761e97bef2) | Arion Digital | CC-BY-4.0 |
+| [Low-Poly Fighter Jet](https://sketchfab.com/3d-models/low-poly-fighter-jet-95f90eff9a6542bda178f3fca0be6950) | reizergideon | CC-BY-4.0 |
+| [M2 Bradley IFV](https://sketchfab.com/3d-models/m2-bradley-ifv-ab022158ab5f4fbfa55d4142db7595ab) | 42manako | CC-BY-4.0 |
+| [Military RTS Character 1](https://sketchfab.com/3d-models/military-rts-character-1-cc0-908065a7006443b29edca30276750a6d) | britdawgmasterfunk | CC-BY-4.0 (per the file metadata; the title says CC0) |
+| [MQ-9 Reaper Drone](https://sketchfab.com/3d-models/mq-9-reaper-drone-game-ready-military-asset-a02057e7401a4f4ea130cb75cc73d8cb) | The Aesthetic Modeler | CC-BY-4.0 |
+| [Polyart Zombies with Animations Free Pack](https://sketchfab.com/3d-models/polyart-zombies-with-animations-free-pack-d9bcfdd88f5348549bc947226af7c314) | Denys Almaral | Sketchfab Standard |
