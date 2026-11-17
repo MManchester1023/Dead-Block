@@ -13,8 +13,9 @@ describe('tutorial region 2: Gas Station Strip (doc §17, v4.10)', () => {
     expect(w.hives.some((h) => h.districtId === 'gasStrip')).toBe(false);
     // the border column is solid from top to bottom
     const c = w.grid.cell;
-    const bx = Math.round(d.def.border!.x / c);
-    for (let y = 0; y < w.map.rows; y++) expect(w.grid.isBlocked(bx, y)).toBe(true);
+    const b = d.def.borders![0];
+    const bx = Math.round(b.x / c);
+    for (let y = Math.round(b.y / c); y < Math.round((b.y + b.h) / c); y++) expect(w.grid.isBlocked(bx, y)).toBe(true);
     w.makeNoise({ x: d.def.rect.x + 30, y: d.def.rect.y + 30 }, 5);
     expect(d.noise).toBe(0);
   });

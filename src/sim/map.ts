@@ -10,10 +10,12 @@ export enum Tile {
   Parking = 4,
   Building = 5,
   Grass = 6,
+  /** Railway ballast with tracks (v4.17, Rail Siding). */
+  Rail = 7,
 }
 
 /** What the renderer should generate on a footprint (doc §14 target look). */
-export type BuildingKind = 'houses' | 'apartment' | 'motel' | 'shop' | 'warehouse';
+export type BuildingKind = 'houses' | 'apartment' | 'motel' | 'shop' | 'warehouse' | 'boxcar';
 
 export interface BuildingDef {
   id: number;
@@ -67,8 +69,8 @@ export interface DistrictDef {
   mix: Record<string, number>;
   /** Packs placed at the start (v4.13, region 2: Runner packs). */
   packs?: { kind: string; count: number; size: number }[];
-  /** Hive stage at the start (default 1). */
-  hiveStage?: number;
+  /** Hive stage at the start (default 1): one number for all hives, or one per hive site. */
+  hiveStage?: number | number[];
   /** Campaign unlocks granted when this region opens (v4.13: region 2 → guard towers). */
   unlocksOnOpen?: string[];
   /**
@@ -77,7 +79,10 @@ export interface DistrictDef {
    */
   locked?: boolean;
   unlockAfter?: string;
-  border?: Rect;
+  /** Fence segments (metres) closing the region off while locked. */
+  borders?: Rect[];
+  /** Power stations (nav cells, top-left) placed when the region opens (v4.17). */
+  powerStations?: { x: number; y: number }[];
 }
 
 /** Everything in metres except `tiles` / `cols` / `rows` / `*Cells`, which are nav-grid cells. */
@@ -110,7 +115,7 @@ export interface CityMap {
 export function buildStarterMap(seed = 7): CityMap {
   const rng = new Rng(seed);
   const width = 170; // v4.10: was 104 (motel only); region 2 occupies x 104–167
-  const height = 72;
+  const height = 152; // v4.17: was 72; region 3 (Rail Siding) occupies y 72–151
   const tiles = new Uint8Array(width * height).fill(Tile.Dirt);
   const set = (x: number, y: number, t: Tile) => {
     if (x >= 0 && y >= 0 && x < width && y < height) tiles[y * width + x] = t;
@@ -146,6 +151,13 @@ export function buildStarterMap(seed = 7): CityMap {
     fill({ x: rx, y: 0, w: 4, h: height }, Tile.Road);
     fill({ x: rx + 4, y: 0, w: 1, h: height }, Tile.Sidewalk);
   }
+  // ---- tutorial region 3: Rail Siding (doc §2: boxcars and a small depot; Walkers and Runners) ----
+  // its own main road, a rail line across the whole region, level crossings on the avenues
+  fill({ x: 38, y: 95, w: width - 38, h: 1 }, Tile.Sidewalk);
+  fill({ x: 38, y: 96, w: width - 38, h: 4 }, Tile.Road);
+  fill({ x: 38, y: 100, w: width - 38, h: 1 }, Tile.Sidewalk);
+  for (let x = 38; x < width; x++) for (const y of [120, 121]) if (tiles[y * width + x] !== Tile.Road) set(x, y, Tile.Rail);
+
   // motel parking + other lots
   const lots: Rect[] = [
     { x: 62, y: 14, w: 16, h: 16 },
@@ -157,6 +169,10 @@ export function buildStarterMap(seed = 7): CityMap {
     { x: 140, y: 39, w: 24, h: 12 },
     { x: 138, y: 19, w: 27, h: 13 },
     { x: 107, y: 47, w: 12, h: 6 },
+    // region 3: lots, the power station yard, the depot apron
+    { x: 40, y: 102, w: 14, h: 10 },
+    { x: 138, y: 102, w: 26, h: 15 },
+    { x: 92, y: 124, w: 30, h: 4 },
   ];
   lots.forEach((r) => fill(r, Tile.Parking));
 
@@ -196,6 +212,32 @@ export function buildStarterMap(seed = 7): CityMap {
   addB({ x: 107, y: 57, w: 8, h: 8 }, 'houses', 1);
   addB({ x: 119, y: 57, w: 8, h: 8 }, 'houses', 2);
   addB({ x: 140, y: 56, w: 9, h: 9 }, 'apartment', 3);
+
+  // ---- region 3: Rail Siding ----
+  // north of the road: workers' houses, a corner shop, a yard office, small warehouses
+  addB({ x: 40, y: 76, w: 8, h: 7 }, 'houses', 1);
+  addB({ x: 40, y: 86, w: 8, h: 7 }, 'houses', 2);
+  addB({ x: 62, y: 76, w: 10, h: 6 }, 'shop', 1);
+  addB({ x: 62, y: 85, w: 9, h: 8 }, 'apartment', 3);
+  addB({ x: 92, y: 76, w: 14, h: 9 }, 'warehouse', 2);
+  addB({ x: 110, y: 76, w: 8, h: 7 }, 'houses', 1);
+  addB({ x: 120, y: 76, w: 8, h: 7 }, 'houses', 2);
+  addB({ x: 138, y: 76, w: 12, h: 6 }, 'shop', 1);
+  addB({ x: 152, y: 76, w: 8, h: 8 }, 'houses', 2);
+  // between the road and the rails: sheds and the goods warehouse
+  addB({ x: 62, y: 103, w: 16, h: 10 }, 'warehouse', 2);
+  addB({ x: 92, y: 104, w: 10, h: 8 }, 'warehouse', 1);
+  addB({ x: 110, y: 104, w: 8, h: 6 }, 'shop', 1);
+  // boxcars standing on the siding (cover and choke points; gaps at the level crossings)
+  for (const x of [40, 46, 62, 68, 76, 92, 98, 112, 118, 140, 148, 156]) addB({ x, y: 120, w: 6, h: 2 }, 'boxcar', 1);
+  // south of the rails: the depot, sheds, a few houses; the two hives sit out here
+  addB({ x: 60, y: 125, w: 14, h: 8 }, 'warehouse', 2);
+  addB({ x: 100, y: 129, w: 16, h: 9 }, 'warehouse', 2);
+  addB({ x: 40, y: 132, w: 8, h: 7 }, 'houses', 1);
+  addB({ x: 40, y: 142, w: 8, h: 7 }, 'houses', 1);
+  addB({ x: 120, y: 140, w: 9, h: 8 }, 'apartment', 3);
+  addB({ x: 138, y: 126, w: 10, h: 7 }, 'warehouse', 1);
+
   const canopyCells: Rect[] = [
     { x: 116, y: 26, w: 11, h: 5 },
     { x: 150, y: 41, w: 11, h: 5 },
@@ -242,6 +284,15 @@ export function buildStarterMap(seed = 7): CityMap {
     if (rng.chance(0.45)) addCar(x + 1, 29, false);
   }
   for (let i = 0; i < 3; i++) addCar(rng.int(109, 117), rng.int(48, 51), true);
+  // region 3: stalled traffic, lots, the power station yard
+  for (const x of [44, 52, 64, 72, 80, 96, 104, 116, 126, 142, 152, 160]) addCar(x, rng.chance(0.5) ? 97 : 99, true);
+  for (const y of [80, 90, 110, 130, 145]) {
+    addCar(rng.chance(0.5) ? 57 : 59, y, false);
+    addCar(rng.chance(0.5) ? 87 : 89, y, false);
+    addCar(rng.chance(0.5) ? 133 : 135, y, false);
+  }
+  for (let i = 0; i < 4; i++) addCar(rng.int(41, 52), rng.int(103, 110), true);
+  for (const [x, y] of [[140, 104], [140, 113], [160, 104], [160, 113], [144, 114]]) addCar(x, y, true);
 
   const districts: DistrictDef[] = [
     { id: 'base', name: 'Main Base', rect: baseRect, starter: true, hiveSites: [], initialInfestation: 0, difficulty: 0, density: 0, mix: {} },
@@ -251,7 +302,12 @@ export function buildStarterMap(seed = 7): CityMap {
     // tutorial region 2 (doc §17): a little harder (Easy tier), opens when the motel is secured
     { id: 'gasStrip', name: 'Gas Station Strip', rect: { x: 104, y: 4, w: 64, h: 64 }, starter: true, hiveSites: [{ x: 159, y: 61 }], initialInfestation: 70, difficulty: 1,
       // v4.13 (#74): a real step up: bigger crowd (tier density), Runner packs, hive already at stage 2
-      density: 0.75, mix: { walker: 0.82, runner: 0.18 }, packs: [{ kind: 'runner', count: 3, size: 4 }], hiveStage: 2, unlocksOnOpen: ['guardTower'], locked: true, unlockAfter: 'motel', border: { x: 103, y: 0, w: 1, h: height } },
+      density: 0.75, mix: { walker: 0.82, runner: 0.18 }, packs: [{ kind: 'runner', count: 3, size: 4 }], hiveStage: 2, unlocksOnOpen: ['guardTower'], locked: true, unlockAfter: 'motel', borders: [{ x: 103, y: 0, w: 1, h: 71 }] },
+    // tutorial region 3 (doc §17, v4.17): the big final exam. Two hives, standard difficulty, and the
+    // region's power station: restoring it brings the power system online and unlocks the Med Bay
+    { id: 'railSiding', name: 'Rail Siding', rect: { x: 38, y: 72, w: 130, h: 80 }, starter: true, hiveSites: [{ x: 70, y: 143 }, { x: 155, y: 140 }], initialInfestation: 75, difficulty: 2,
+      density: 1.5, mix: { walker: 0.78, runner: 0.22 }, packs: [{ kind: 'runner', count: 6, size: 4 }], locked: true, unlockAfter: 'gasStrip',
+      borders: [{ x: 37, y: 71, w: 133, h: 1 }, { x: 37, y: 72, w: 1, h: 80 }], powerStations: [{ x: 147, y: 106 }] },
   ];
 
   // ---- cells → metres ----
@@ -270,7 +326,7 @@ export function buildStarterMap(seed = 7): CityMap {
   for (const d of districts) {
     d.rect = m(d.rect);
     d.hiveSites = d.hiveSites.map(mv);
-    if (d.border) d.border = m(d.border);
+    if (d.borders) d.borders = d.borders.map(m);
   }
 
   const roads: RoadDef[] = [
@@ -278,6 +334,7 @@ export function buildStarterMap(seed = 7): CityMap {
     { rect: m({ x: 56, y: 0, w: 4, h: height }), axis: 'v' },
     { rect: m({ x: 86, y: 0, w: 4, h: height }), axis: 'v' },
     { rect: m({ x: 132, y: 0, w: 4, h: height }), axis: 'v' },
+    { rect: m({ x: 38, y: 96, w: width - 38, h: 4 }), axis: 'h' },
   ];
 
   return {

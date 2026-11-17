@@ -96,8 +96,9 @@ export function updateZombies(w: World, dt: number): void {
           }
           continue;
         }
-        // v4.9 (#60): the perimeter wall isn't worth chewing on; the flow field takes them to the gate
-        if (st.def.id === 'baseWall') {
+        // v4.9 (#60): the perimeter wall isn't worth chewing on; the flow field takes them to the gate.
+        // An offline power station (v4.17) is just scenery to them until it's running.
+        if (st.def.id === 'baseWall' || (st.def.restore && !st.built)) {
           z.useField = true;
           z.stuckFor = Math.max(z.stuckFor, 2);
         } else if (z.state === 'chase' || z.state === 'pulse' || z.state === 'investigate') {
@@ -183,7 +184,7 @@ function think(w: World, z: Zombie): void {
   if (!best) {
     // v4.9 (#60): HQ buildings draw them from much further than sandbags and nests
     for (const st of w.structures) {
-      if (!st.alive || st.def.id === 'baseWall') continue;
+      if (!st.alive || st.def.id === 'baseWall' || (st.def.restore && !st.built)) continue;
       const hq = HQ.has(st.def.id);
       const d = dist(z.pos, st.pos) - st.radius - (hq ? 30 : 0);
       if (d < bestD * 0.6) {

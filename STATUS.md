@@ -4,12 +4,12 @@ Short version of the roadmap (design doc §21). Ranked by importance in my opini
 
 ## Next, in order
 
-1. **Tutorial region 3 + the power system.** The big final tutorial map. Restoring its power station introduces power and unlocks the Med Bay. Finishes the tutorial and leads into the open world.
-2. **Med Bay** (unlocked by region 3's power). Units don't heal on their own, so the campaign needs a way to recover.
+1. **Playtest region 3, the power station and the Med Bay**, and tune region 3's difficulty from that (the bots say it's beatable with losses; that needs a human check).
+2. **Open-world unlock**: what happens after region 3 is secured (the rest of the starter districts open up, §17).
 3. **Replace the cartoon models**: rifleman, engineer, big-headed female zombie. *Waiting on Mixamo downloads* (rigged characters + animations; list of clips in the design doc §21 V3).
 4. **Confirm the walking-animation fix in a playtest** (round 7 #79). Fixed in code but not visually verified at full frame rate.
 5. **Save / load.** A persistent city needs it before the open world opens.
-6. **Medic Team**: field healing, the mobile partner to the Med Bay.
+6. **Medic Team**: field healing, the mobile partner to the Med Bay (could also be unlocked by power).
 7. **Fog of war and recon**: unexplored areas show estimates; recon units reveal.
 8. **Special (medium) zombies**: Screamer, Brute, Dragger, Puker. The medium spawn pool is ready for them.
 9. **Vehicles**: Gun Jeep, Supply Truck, LAV, tank; overrun by pile-ups, re-crewable at half health (#64).
@@ -30,7 +30,9 @@ Short version of the roadmap (design doc §21). Ranked by importance in my opini
 ## Done
 
 **World and camera**
-- Fixed, hand-built city at real scale (1 unit = 1 m): main base, **Roadside Motel** (region 1), **Gas Station Strip** (region 2, fenced off until the motel is secured).
+- Fixed, hand-built city at real scale (1 unit = 1 m): main base and the three tutorial regions, each fenced off until the previous one is secured: **Roadside Motel**, **Gas Station Strip** (introduces guard towers), **Rail Siding** (big, two hives, introduces the power system).
+- **Power system**: restore Rail Siding's power station (engineers, with the yard clear); if the dead wreck it, it goes offline until restored again.
+- **Med Bay** (unlocked by power, built in the base): resting squads heal for supplies and lost soldiers rejoin.
 - Isometric camera: WASD/arrows/edge pan, zoom, rotate (MMB or Q/E), ops-map view. Pause and 1×/2×/4× speed.
 - Procedural buildings, cars, gas stations, street furniture; buildings fade when they hide units; shadows follow the camera.
 
@@ -60,4 +62,4 @@ Short version of the roadmap (design doc §21). Ranked by importance in my opini
 - Hover-only health bars, clickable squad labels, UI scale setting, collapsible panels, important radio lines as alerts (full radio kept for future audio).
 
 **Quality**
-- 46 automated tests; scripted balance bots per region; unused models kept out of the build (13 MB).
+- 50 automated tests; scripted balance bots per region; unused models kept out of the build (13 MB).

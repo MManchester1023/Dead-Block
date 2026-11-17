@@ -51,7 +51,7 @@ export const UNITS: Record<string, UnitDef> = {
     id: 'engineer', name: 'Engineer Team', category: 'infantry', members: 2, memberHp: 48, speed: 6,
     weapon: carbine, cost: { money: 50, supplies: 15 }, upkeep: 3, command: 2, buildTime: 10,
     producedAt: 'barracks', unlock: 'Starting unit', tags: ['canCover'],
-    canBuild: ['outpost', 'sandbags', 'wire', 'mgNest', 'guardTower'],
+    canBuild: ['outpost', 'sandbags', 'wire', 'mgNest', 'guardTower', 'medBay'],
     abilities: ['demoCharge'],
   },
   medic: { id: 'medic', name: 'Medic Team', category: 'infantry', members: 2, memberHp: 36, speed: 6.4, weapon: carbine, cost: { money: 70, supplies: 20 }, upkeep: 3, command: 2, buildTime: 12, producedAt: 'barracks', requires: 'powerStations', unlock: 'Suburbs power / Barracks Lv2' },
@@ -119,6 +119,18 @@ export interface StructureDef {
   garrison?: { rangeMult: number; cover: number; height: number };
   /** Campaign unlock key; buildable once `World.unlocked` has it (e.g. opened by a tutorial region). */
   unlock?: string;
+  /**
+   * A fixed map objective that starts offline and is *restored* rather than built (power station,
+   * v4.17): engineers work on it only while no zombie is within `clearRadius` metres. Wrecked, it goes
+   * offline again instead of being destroyed.
+   */
+  restore?: { clearRadius: number };
+  /** Can only be built inside the main base. */
+  baseOnly?: boolean;
+  /** Needs power from a working power station to do anything. */
+  needsPower?: boolean;
+  /** Med Bay (v4.17): squads resting within `radius` m heal `perSec` of their max health per second, paying supplies. */
+  heal?: { radius: number; perSec: number; suppliesPerHp: number; restAfterHitSec: number };
 }
 
 export const STRUCTURES: Record<string, StructureDef> = {
@@ -126,6 +138,10 @@ export const STRUCTURES: Record<string, StructureDef> = {
   barracks: { id: 'barracks', name: 'Barracks', hp: 1500, cost: { money: 0, supplies: 0 }, buildTime: 0, size: { w: 5, h: 3 }, blocksMovement: true },
   supplyDepot: { id: 'supplyDepot', name: 'Supply Depot', hp: 1200, cost: { money: 0, supplies: 0 }, buildTime: 0, size: { w: 4, h: 3 }, blocksMovement: true },
   baseWall: { id: 'baseWall', name: 'Base Wall', hp: 15000, cost: { money: 0, supplies: 0 }, buildTime: 0, size: { w: 1, h: 1 }, blocksMovement: true, climbable: false },
+  // v4.17: the power system (tutorial region 3). Restored, not built; unlocks the Med Bay.
+  powerStation: { id: 'powerStation', name: 'Power Station', hp: 2500, cost: { money: 0, supplies: 0 }, buildTime: 25, size: { w: 6, h: 4 }, blocksMovement: true, restore: { clearRadius: 30 } },
+  medBay: { id: 'medBay', name: 'Med Bay', hp: 900, cost: { money: 150, supplies: 40 }, buildTime: 20, size: { w: 4, h: 3 }, blocksMovement: true, hotkey: 'N', unlock: 'medBay', baseOnly: true, needsPower: true,
+    heal: { radius: 10, perSec: 0.025, suppliesPerHp: 0.12, restAfterHitSec: 5 } },
   // v4.13: introduced by tutorial region 2 (#54, #74)
   guardTower: { id: 'guardTower', name: 'Guard Tower', hp: 900, cost: { money: 120, supplies: 40 }, buildTime: 18, size: { w: 2, h: 2 }, blocksMovement: true, hotkey: 'V', garrison: { rangeMult: 1.4, cover: 0.5, height: 5 }, unlock: 'guardTower' },
   outpost: { id: 'outpost', name: 'Outpost', hp: 600, cost: { money: 100, supplies: 30 }, buildTime: 30, size: { w: 3, h: 3 }, blocksMovement: true, requiresSecured: true, hotkey: 'O' },

@@ -14,6 +14,7 @@ const TILE_COLORS: Record<number, [number, number, number]> = {
   [Tile.Parking]: [66, 68, 70],
   [Tile.Building]: [96, 96, 92],
   [Tile.Grass]: [92, 106, 60],
+  [Tile.Rail]: [104, 98, 90], // ballast
 };
 
 const LAWN: [number, number, number] = [86, 112, 54];
@@ -159,6 +160,19 @@ export function buildGroundTexture(map: CityMap): THREE.CanvasTexture {
     fill('#dcdad2', box.x - 5.2, box.y + box.h / 2, 0.4, box.h / 2);
     fill('#dcdad2', box.x + box.w + 4.8, box.y, 0.4, box.h / 2);
   }
+
+  // 4b) railway: sleepers and two rails along every run of rail tiles (v4.17, Rail Siding)
+  for (let cy = 0; cy < map.rows; cy++)
+    for (let cx = 0; cx < map.cols; cx++) {
+      if (map.tiles[cy * map.cols + cx] !== Tile.Rail) continue;
+      // a 2-tile-high track bed: draw the track once, on its upper tile
+      if (cy > 0 && map.tiles[(cy - 1) * map.cols + cx] === Tile.Rail) continue;
+      const x0 = cx * map.cell;
+      const yMid = cy * map.cell + map.cell; // centre of the 2-cell bed
+      for (let s = 0.4; s < map.cell; s += 0.65) fill('#5a4636', x0 + s, yMid - 1.4, 0.28, 2.8); // sleepers
+      fill('#8a8a86', x0, yMid - 0.78, map.cell, 0.12); // rails
+      fill('#8a8a86', x0, yMid + 0.66, map.cell, 0.12);
+    }
 
   // 5) a painted helipad and vehicle lane in the base
   const b = map.baseRect;

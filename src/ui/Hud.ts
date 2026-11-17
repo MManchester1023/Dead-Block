@@ -94,7 +94,8 @@ export class Hud {
     root.addEventListener('pointerdown', (e) => {
       if (e.button === 0) this.click(e);
     });
-    game.world.events.on('districtUnlocked', (e) => this.showBriefing(e.name, e.unlocks));
+    game.world.events.on('districtUnlocked', (e) => this.showBriefing(e.districtId, e.name, e.unlocks));
+    game.world.events.on('powerRestored', (e) => e.first && this.showPowerBriefing());
     game.world.events.on('victory', (e) => this.showEnd(true, e.reason));
     game.world.events.on('defeat', (e) => this.showEnd(false, e.reason));
     this.showIntro();
@@ -240,6 +241,10 @@ export class Hud {
         <label>Infestation ${Math.ceil(d.infestation)}%</label><div class="bar red"><i style="width:${d.infestation}%"></i></div>
         <label>Noise</label><div class="bar amber"><i style="width:${d.noise}%"></i></div>
         ${hive.map((h) => `<div class="row small"><span>Hive stage ${h.stage}/4</span><span>next pulse ${fmtTime(Math.max(0, h.pulseTimer))}</span></div>`).join('')}
+        ${(() => {
+          const st = w.structures.find((x) => x.alive && x.def.restore && x.districtId === d.def.id);
+          return st ? `<div class="row small"><span>Power station</span>${st.built ? '<span class="good">ONLINE</span>' : '<span class="bad">OFFLINE</span>'}</div>` : '';
+        })()}
       </div>`;
     }
     this.set(this.districts, html);
@@ -253,11 +258,16 @@ export class Hud {
     const id = cur.def.id;
     const hiveDown = w.hives.filter((h) => h.districtId === id).every((h) => !h.alive);
     const step = regions.indexOf(cur) + 1;
-    const items = [
-      [hiveDown, 'Destroy the hive <small>(engineer demo charge — bullets won\'t do it)</small>'],
+    const hiveCount = cur.def.hiveSites.length;
+    const station = w.structures.find((s) => s.alive && s.def.restore && s.districtId === id);
+    const items: [boolean, string][] = [
+      [hiveDown, `Destroy the ${hiveCount > 1 ? `${hiveCount} hives` : 'hive'} <small>(engineer demo charge — bullets won't do it)</small>`],
+      ...(cur.def.powerStations?.length
+        ? [[!!station?.built || w.unlocked.has('medBay'), `Restore the power station <small>(clear the yard, then right-click it with engineers${station && !station.built ? `: ${Math.floor((station.buildProgress / station.def.buildTime) * 100)}%` : ''})</small>`] as [boolean, string]]
+        : []),
       [cur.cleared || cur.secured, `Clear ${cur.def.name} to 0% <small>(${Math.ceil(cur.infestation)}%)</small>`],
       [cur.secured, 'Build an outpost there with engineers'],
-    ] as const;
+    ];
     const region = `<div class="row small"><span>Region ${step} of ${regions.length}: <b>${cur.def.name}</b></span></div>`;
     const head = `<h3 class="collapsible" data-act="collapse:objectives">${this.collapsed.has('objectives') ? '▸' : '▾'} Objectives</h3>`;
     if (this.collapsed.has('objectives')) return this.set(this.objectives, head);
@@ -319,7 +329,7 @@ export class Hud {
     let cmds = btn('attackMove', 'Attack-move', 'Ctrl+A', undefined, mode.kind === 'attackMove') + btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'Ctrl+S') + `<button class="cmd" data-act="disband" title="Walk back to the Barracks and stand down: frees command and upkeep, refunds ${BALANCE.economy.disbandRefund * 100}% of the cost">Disband</button>`;
     if (eng) {
       const b = (id: string, key: string) => btn(`build:${id}`, STRUCTURES[id].name, key, STRUCTURES[id].cost, mode.kind === 'build' && mode.defId === id);
-      cmds += '<div class="sep"></div>' + b('sandbags', 'F') + b('wire', 'G') + b('mgNest', 'T') + (g.world.unlocked.has('guardTower') ? b('guardTower', 'V') : '') + b('outpost', 'O') + btn('charge', 'Demo Charge', 'C', ABILITIES.demoCharge.cost, mode.kind === 'charge') + btn('deconstruct', 'Deconstruct', 'X', undefined, mode.kind === 'deconstruct');
+      cmds += '<div class="sep"></div>' + b('sandbags', 'F') + b('wire', 'G') + b('mgNest', 'T') + (g.world.unlocked.has('guardTower') ? b('guardTower', 'V') : '') + (g.world.unlocked.has('medBay') ? b('medBay', 'N') : '') + b('outpost', 'O') + btn('charge', 'Demo Charge', 'C', ABILITIES.demoCharge.cost, mode.kind === 'charge') + btn('deconstruct', 'Deconstruct', 'X', undefined, mode.kind === 'deconstruct');
     }
     const modeHint =
       mode.kind === 'build' ? `Placing ${STRUCTURES[mode.defId].name} — click to place · R ${STRUCTURES[mode.defId].arc ? `turns its ${STRUCTURES[mode.defId].arc}° field of fire` : 'rotate'} · Shift to keep placing · right-click cancel`
@@ -377,7 +387,7 @@ export class Hud {
             <li><kbd>RMB</kbd> move · on a zombie = attack it · on a car/sandbags = take cover · on hive = charge it · on a building = search it (5 s, sometimes supplies, sometimes company)</li>
             <li><kbd>Ctrl</kbd>+<kbd>A</kbd> attack-move · <kbd>H</kbd> hold · <kbd>Ctrl</kbd>+<kbd>S</kbd> stop</li>
             <li><kbd>Shift</kbd>+<kbd>RMB</kbd> queue waypoints · <kbd>Ctrl</kbd>+<kbd>1-9</kbd> groups</li>
-            <li>Engineers: <kbd>F</kbd> sandbags · <kbd>G</kbd> wire · <kbd>T</kbd> MG nest · <kbd>V</kbd> guard tower (region 2) · <kbd>O</kbd> outpost · <kbd>C</kbd> demo charge · <kbd>X</kbd> deconstruct · <kbd>R</kbd> rotate</li>
+            <li>Engineers: <kbd>F</kbd> sandbags · <kbd>G</kbd> wire · <kbd>T</kbd> MG nest · <kbd>V</kbd> guard tower (region 2) · <kbd>N</kbd> Med Bay (after power) · <kbd>O</kbd> outpost · <kbd>C</kbd> demo charge · <kbd>X</kbd> deconstruct · <kbd>R</kbd> rotate</li>
             <li><kbd>WASD</kbd>/arrows/edge/<kbd>Shift</kbd>+<kbd>MMB</kbd> pan · wheel zoom · <kbd>MMB</kbd> drag or <kbd>Q</kbd>/<kbd>E</kbd> rotate · <kbd>M</kbd> ops map</li>
             <li>Click the <b>Barracks</b> (<kbd>B</kbd>) to recruit and set the rally point · click the <b>Command Post</b> for support</li>
             <li><kbd>Space</kbd> pause · <kbd>+</kbd>/<kbd>-</kbd> speed</li>
@@ -399,16 +409,38 @@ export class Hud {
   }
 
   /** A tutorial region just opened (doc §17): what's new there, game paused while you read. */
-  private showBriefing(name: string, unlocks: string[]): void {
+  private showBriefing(id: string, name: string, unlocks: string[]): void {
     const tower = unlocks.includes('guardTower');
     const T = STRUCTURES.guardTower;
+    const intro: Record<string, string> = {
+      gasStrip: `<p>The wire on the east road is cut. Expect a step up: a bigger crowd, <b>Runner packs</b> that hunt together, and a hive that's already at <b>stage 2</b>. Its hordes will go for your newest outpost, so leave it defended.</p>`,
+      railSiding: `<p>The fence south of the strip is down. <b>Rail Siding</b> is the last training region and the biggest: a goods yard cut in two by a line of boxcars, <b>two hives</b>, and the dead at full strength.</p>
+      <h3>New: the power system</h3>
+      <p>In the east yard stands a <b>power station</b>, dead. Clear the yard, then <b>right-click the station with engineers</b> to restore it. They can only work while no zombie is within 30 m, so hold the ground around them. Power brings the base back to life and unlocks the <b>Med Bay</b>. If the dead wreck the station it goes dark again until your engineers restore it.</p>`,
+    };
     this.game.paused = true;
     this.modal.innerHTML = `<div class="dialog small">
       <p class="tag">NEW REGION OPEN</p>
       <h1>${esc(name)}</h1>
-      <p>The wire on the east road is cut. Expect a step up: a bigger crowd, <b>Runner packs</b> that hunt together, and a hive that's already at <b>stage 2</b>. Its hordes will go for your newest outpost, so leave it defended.</p>
+      ${intro[id] ?? `<p>The fence is down. Same drill: find the hive, kill it, plant an outpost.</p>`}
       ${tower ? `<h3>New: Guard Tower</h3>
       <p>Engineers can now build a <b>Guard Tower</b> (<kbd>V</kbd>, $${T.cost.money} · ${T.cost.supplies}▣). <b>Right-click it</b> with a squad to man it: they shoot <b>${Math.round(((T.garrison?.rangeMult ?? 1) - 1) * 100)}% further</b>, see over cars and walls, and the dead can't claw at them. They have to tear the tower down first. Any other order brings the squad back down.</p>` : ''}
+      <button class="big" data-act="continue">GOT IT</button>
+    </div>`;
+    this.modal.classList.add('open');
+  }
+
+  /** The first time the power comes on (v4.17): the Med Bay is unlocked. */
+  private showPowerBriefing(): void {
+    const M = STRUCTURES.medBay;
+    const H = M.heal!;
+    this.game.paused = true;
+    this.modal.innerHTML = `<div class="dialog small">
+      <p class="tag">POWER RESTORED</p>
+      <h1>Med Bay unlocked</h1>
+      <p>Engineers can now build a <b>Med Bay</b> inside the main base (<kbd>N</kbd>, $${M.cost.money} · ${M.cost.supplies}▣).</p>
+      <p>A squad that <b>rests next to it</b> (not moving, not hit for ${H.restAfterHitSec} s) heals about ${Math.round(H.perSec * 100 * 60)}% of its health a minute, paid for in supplies. As its health climbs back, <b>lost soldiers rejoin</b> the squad. A squad that's wiped out is still gone for good.</p>
+      <p>The Med Bay runs on the station's power: if the dead wreck the station, the Med Bay goes dark until your engineers restore it.</p>
       <button class="big" data-act="continue">GOT IT</button>
     </div>`;
     this.modal.classList.add('open');

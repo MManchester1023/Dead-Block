@@ -85,7 +85,7 @@ export class Renderer {
   private anim = new Map<number, { clip: Clip; t: number; rate: number; seen: number }>();
   private animFrame = 0;
   private rallyFlag: THREE.Group;
-  private borders = new Map<string, THREE.Mesh>();
+  private borders = new Map<string, THREE.Object3D>();
   private crateBlobs = new Map<number, THREE.Mesh>();
   private flyovers = new Map<number, { mesh: THREE.Mesh; dir: Vec2; done: boolean }>();
   private ghostArrow: THREE.Mesh;
@@ -244,8 +244,9 @@ export class Renderer {
 
     // fences closing off tutorial regions that haven't opened yet (doc §17)
     for (const d of m.districts) {
-      if (!d.locked || !d.border) continue;
-      const fence = makeBorder(m, d.border);
+      if (!d.locked || !d.borders) continue;
+      const fence = new THREE.Group();
+      for (const b of d.borders) fence.add(makeBorder(m, b));
       this.scene.add(fence);
       this.borders.set(d.id, fence);
     }
@@ -409,6 +410,31 @@ export class Renderer {
         g.add(gun);
         break;
       }
+      case 'powerStation': {
+        // turbine hall, transformer yard, stack and pylon; the status lamp shows offline/online
+        add(new THREE.BoxGeometry(w * 0.55, 7, h - 1), 0x8a8a80, 3.5, -w * 0.2, 0); // turbine hall
+        add(new THREE.BoxGeometry(w * 0.55 + 0.3, 0.4, h - 0.7), 0x5a5a56, 7.2, -w * 0.2, 0); // roof edge
+        add(new THREE.CylinderGeometry(0.9, 1.1, 14, 10), 0x7a706a, 7, -w * 0.38, -h * 0.25); // stack
+        for (let k = 0; k < 3; k++) add(new THREE.BoxGeometry(1.6, 2.2, 1.4), 0x4e5a52, 1.1, w * 0.18 + (k % 2) * 2.4 - 1, (k - 1) * 3); // transformers
+        add(new THREE.BoxGeometry(w * 0.4, 0.15, h - 0.6), 0x6a6a64, 0.08, w * 0.25, 0); // yard slab
+        add(new THREE.BoxGeometry(0.25, 11, 0.25), 0x5a5a5a, 5.5, w * 0.42, 0); // pylon mast
+        add(new THREE.BoxGeometry(0.15, 0.15, 4.5), 0x5a5a5a, 10.2, w * 0.42, 0); // pylon arm
+        const lamp = add(new THREE.SphereGeometry(0.45, 10, 8), 0xc83a2a, 7.9, -w * 0.05, 0);
+        lamp.name = 'lamp';
+        break;
+      }
+      case 'medBay': {
+        // field hospital: white tent block with a red cross, generator, stretchers
+        add(new THREE.BoxGeometry(w - 1, 3.2, h - 1), 0xd8d6cc, 1.6);
+        add(new THREE.BoxGeometry(w - 0.6, 0.3, h - 0.6), 0xb8b6ac, 3.35);
+        add(new THREE.BoxGeometry(2.4, 0.7, 0.05), 0xc8302a, 2.1, 0, h / 2 - 0.47);
+        add(new THREE.BoxGeometry(0.7, 2.4, 0.05), 0xc8302a, 2.1, 0, h / 2 - 0.47);
+        add(new THREE.BoxGeometry(1.2, 1, 0.9), 0x4a5a3a, 0.5, w / 2 - 0.4, -h / 2 + 0.8); // generator
+        for (const x of [-1.6, 1.6]) add(new THREE.BoxGeometry(2, 0.35, 0.7), 0x6a6a5a, 0.5, x, h / 2 + 0.6); // stretchers
+        const lamp = add(new THREE.SphereGeometry(0.3, 8, 6), 0x404040, 3.7, w / 2 - 1, 0);
+        lamp.name = 'lamp';
+        break;
+      }
       case 'guardTower': {
         // timber watchtower: four legs with cross-bracing, plank platform, sandbag parapet, ladder
         const H = s.def.garrison?.height ?? 5;
@@ -514,8 +540,10 @@ export class Renderer {
       if (!fence) return;
       this.scene.remove(fence);
       this.borders.delete(e.districtId);
-      const b = this.world.districts.get(e.districtId)?.def.border;
-      if (b) for (let y = b.y + 6; y < b.y + b.h; y += 24) this.spawnSmoke({ x: b.x + b.w / 2, y }, 0x9a8a6a, 3);
+      for (const b of this.world.districts.get(e.districtId)?.def.borders ?? []) {
+        const vertical = b.h > b.w;
+        for (let s = 6; s < (vertical ? b.h : b.w); s += 24) this.spawnSmoke(vertical ? { x: b.x + b.w / 2, y: b.y + s } : { x: b.x + s, y: b.y + b.h / 2 }, 0x9a8a6a, 3);
+      }
     });
     // a searched building gets a spray-painted X by the door (v4.9 #46)
     ev.on('buildingSearched', (e) => {
@@ -873,18 +901,29 @@ export class Renderer {
       if (!s.alive) continue;
       sseen.add(s.id);
       const o = this.structView(s);
-      const k = s.built ? 1 : 0.15 + 0.85 * Math.min(1, s.buildProgress / s.def.buildTime);
+      // a power station being restored is a whole (dead) building, not a half-built site (v4.17)
+      const whole = s.built || !!s.def.restore;
+      const k = whole ? 1 : 0.15 + 0.85 * Math.min(1, s.buildProgress / s.def.buildTime);
       o.scale.y = k;
       o.traverse((c) => {
         const mat = (c as THREE.Mesh).material as THREE.MeshLambertMaterial | undefined;
-        if (mat && 'opacity' in mat) mat.opacity = s.built ? 1 : 0.55;
+        if (mat && 'opacity' in mat) mat.opacity = whole ? 1 : 0.55;
       });
+      // power lamps: red = offline / no power, green = running (v4.17)
+      const lamp = o.getObjectByName('lamp') as THREE.Mesh | undefined;
+      if (lamp) {
+        const on = s.def.restore ? s.built : s.built && w.powerOnline;
+        (lamp.material as THREE.MeshLambertMaterial).color.set(on ? 0x5ad06a : 0xc83a2a);
+        (lamp.material as THREE.MeshLambertMaterial).emissive.set(on ? 0x2a7a32 : 0x5a1a12);
+      }
       const turret = o.getObjectByName('turret');
       if (turret) turret.rotation.y = -s.facing;
       // progress bar while unfinished, health bar while damaged (v4.4: resume / repair)
       // build progress always shows; health only on hover / selection (#35)
       const focus = this.hovered === s.id || this.selectedStructure === s.id;
-      const needsBar = !s.built || (focus && s.hp < s.def.hp - 0.5);
+      // power objects always say what state they're in
+      const powerNote = s.def.restore ? (s.built ? 'POWER STATION · ONLINE' : 'POWER STATION · OFFLINE') : s.def.needsPower && s.built && !w.powerOnline ? 'MED BAY · NO POWER' : '';
+      const needsBar = !s.built || (focus && s.hp < s.def.hp - 0.5) || !!powerNote;
       let lab = this.structLabels.get(s.id);
       if (needsBar) {
         if (!lab) {
@@ -894,8 +933,10 @@ export class Renderer {
           this.structLabels.set(s.id, lab);
         }
         const pct = s.built ? (s.hp / s.def.hp) * 100 : Math.min(100, (s.buildProgress / s.def.buildTime) * 100);
-        this.placeLabel(lab, s.pos, 2.5, () =>
-          `<span>${s.built ? 'Damaged' : 'Unfinished'} ${Math.floor(pct)}%</span><div class="bar ${s.built ? 'hp' : 'build'}"><i style="width:${pct.toFixed(0)}%"></i></div>`,
+        const what = s.def.restore && !s.built ? `${s.buildProgress > 0 ? 'Restoring' : 'Offline · engineers can restore it'}` : s.built ? 'Damaged' : 'Unfinished';
+        const showBar = !s.built || (focus && s.hp < s.def.hp - 0.5);
+        this.placeLabel(lab, s.pos, s.def.restore ? 9 : 2.5, () =>
+          `${powerNote ? `<b class="${powerNote.includes('ONLINE') ? 'good' : 'bad'}">${powerNote}</b><br>` : ''}${showBar ? `<span>${what} ${Math.floor(pct)}%</span><div class="bar ${s.built ? 'hp' : 'build'}"><i style="width:${pct.toFixed(0)}%"></i></div>` : ''}`,
         );
       } else if (lab) {
         lab.remove();

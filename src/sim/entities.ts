@@ -59,6 +59,10 @@ export class Squad implements Targetable {
   stunned = 0;
   /** Sim time this squad last took damage (interrupts planting a charge). */
   lastHit = -1;
+  /** Throttle for "can't do that" radio lines. */
+  lastBlockedMsg?: number;
+  /** Sim time the squad last got treatment at a Med Bay. */
+  healing = -99;
   selected = false;
   moving = false;
   /**

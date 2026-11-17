@@ -22,6 +22,9 @@ export interface GameEvents {
   districtSecured: { districtId: string; name: string };
   districtLost: { districtId: string; name: string };
   districtUnlocked: { districtId: string; name: string; unlocks: string[] };
+  powerRestored: { id: number; first: boolean };
+  powerLost: { id: number };
+  memberRejoined: { squadId: number; squadName: string; pos: Vec2 };
   unitProduced: { id: number; defId: string; name: string };
   newDay: { day: number; upkeep: number; paid: boolean };
   levelUp: { squadId: number; squadName: string; level: string };

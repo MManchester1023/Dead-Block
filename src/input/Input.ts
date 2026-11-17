@@ -277,6 +277,9 @@ export class Input {
         if (b) g.selectStructure(b.id);
         break;
       }
+      case 'n':
+        g.startBuild('medBay');
+        break;
       case 'v':
         g.startBuild('guardTower');
         break;

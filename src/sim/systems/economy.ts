@@ -47,3 +47,38 @@ export function updateEconomy(w: World, dt: number): void {
     }
   }
 }
+
+/**
+ * Med Bay (v4.17): squads resting next to a powered Med Bay heal over time, paying supplies, and
+ * soldiers rejoin as the squad's health climbs back past each member's share. A wiped squad is gone.
+ */
+export function updateMedical(w: World, dt: number): void {
+  if (!w.powerOnline) return;
+  for (const bay of w.structures) {
+    const H = bay.def.heal;
+    if (!H || !bay.alive || !bay.built) continue;
+    for (const s of w.squadHash.query(bay.pos, H.radius + bay.radius + 4)) {
+      if (!s.alive || s.moving || s.pool >= s.poolMax) continue;
+      if (Math.hypot(s.pos.x - bay.pos.x, s.pos.y - bay.pos.y) > H.radius + bay.radius) continue;
+      if (w.time - s.lastHit < H.restAfterHitSec) continue;
+      let hp = Math.min(s.poolMax - s.pool, s.poolMax * H.perSec * dt);
+      const cost = hp * H.suppliesPerHp;
+      if (w.supplies < cost) {
+        if (w.supplies <= 0) continue;
+        hp = w.supplies / H.suppliesPerHp;
+      }
+      w.supplies = Math.max(0, w.supplies - hp * H.suppliesPerHp);
+      s.pool += hp;
+      s.healing = w.time;
+      // lost soldiers rejoin as health comes back
+      while (s.aliveCount < s.membersSupported) {
+        const m = s.members.find((x) => !x.alive);
+        if (!m) break;
+        m.alive = true;
+        m.pos.x = bay.pos.x;
+        m.pos.y = bay.pos.y + bay.radius;
+        w.events.emit('memberRejoined', { squadId: s.id, squadName: s.name, pos: { ...m.pos } });
+      }
+    }
+  }
+}

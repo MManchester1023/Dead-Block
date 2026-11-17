@@ -147,7 +147,8 @@ export class Game {
 
     // engineers + right-click own structure: resume an unfinished site, or repair damage (v4.4)
     const eng = sq.filter((s) => s.def.canBuild?.length);
-    const own = w.structures.find((s) => s.alive && s.def.cost.money + s.def.cost.supplies > 0 && dist(s.pos, p) < s.radius + 1);
+    // (a power station counts too: engineers restore it, v4.17)
+    const own = w.structures.find((s) => s.alive && (s.def.cost.money + s.def.cost.supplies > 0 || !!s.def.restore) && dist(s.pos, p) < s.radius + 1);
     if (eng.length && own && (!own.built || own.hp < own.def.hp)) {
       const err = own.built ? w.orderRepair(eng, own, queue) : w.orderResume(eng, own, queue);
       if (err) this.toast(err);

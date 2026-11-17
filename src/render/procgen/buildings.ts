@@ -52,7 +52,8 @@ export function frontOf(map: CityMap, b: BuildingDef): Side {
 /** Build every building; `sink` receives each one (its own batch, already in world space). */
 export function buildCity(map: CityMap, sink: (b: BuildingDef, batch: Batch) => void): void {
   for (const b of map.buildings) {
-    const side = frontOf(map, b);
+    // boxcars sit along their track; no "front" to find
+    const side = b.kind === 'boxcar' ? (b.rect.w >= b.rect.h ? 's' : 'e') : frontOf(map, b);
     const rot = { s: 0, n: Math.PI, e: Math.PI / 2, w: -Math.PI / 2 }[side];
     const along = side === 'n' || side === 's';
     const frontage = along ? b.rect.w : b.rect.h;
@@ -74,6 +75,9 @@ export function buildCity(map: CityMap, sink: (b: BuildingDef, batch: Batch) => 
         break;
       case 'warehouse':
         warehouse(local, frontage, depth, rng);
+        break;
+      case 'boxcar':
+        boxcar(local, frontage, depth, rng);
         break;
     }
     const m = new THREE.Matrix4().compose(
@@ -367,6 +371,27 @@ function shop(B: Batch, frontage: number, depth: number, rng: Rng): void {
 }
 
 // ---------------------------------------------------------------- warehouse
+
+/** A rusty goods wagon on the siding (v4.17): ribbed box on a frame and bogies, sliding door. */
+function boxcar(B: Batch, frontage: number, depth: number, rng: Rng): void {
+  const body = rng.pick([0x7a3a2a, 0x8a4a2e, 0x5a4a3a, 0x3e4a52, 0x6a5a2e]);
+  const rib = new THREE.Color(body).offsetHSL(0, 0, -0.06).getHex();
+  const L = frontage - 1.2;
+  const W = Math.min(3, depth - 2);
+  const y0 = 1.1;
+  const H = 3.2;
+  for (const x of [-L / 2 + 1.6, L / 2 - 1.6]) {
+    B.box(2.4, 0.7, W - 0.4, 0x2a2a28, x, 0.45, 0); // bogie
+    for (const z of [-W / 2 + 0.35, W / 2 - 0.35]) for (const dx of [-0.7, 0.7]) B.add(new THREE.CylinderGeometry(0.42, 0.42, 0.15, 10).rotateX(Math.PI / 2), 0x1c1c1c, B.trs(x + dx, 0.42, z));
+  }
+  B.box(L, 0.25, W, 0x2e2e2c, 0, y0 - 0.1, 0); // frame
+  B.box(L, H, W, body, 0, y0 + H / 2, 0);
+  for (let x = -L / 2 + 0.5; x < L / 2; x += 0.9) for (const z of [W / 2 + 0.03, -W / 2 - 0.03]) B.box(0.1, H, 0.06, rib, x, y0 + H / 2, z);
+  B.box(L + 0.1, 0.15, W + 0.15, rib, 0, y0 + H + 0.05, 0); // roof edge
+  const open = rng.chance(0.4);
+  B.box(2.6, H - 0.4, 0.08, open ? 0x141414 : rib, open ? 1.2 : 0, y0 + H / 2, W / 2 + 0.06); // door / open doorway
+  if (rng.chance(0.5)) B.box(L * 0.5, 0.9, 0.02, rng.pick([0xd8d0c0, 0x2a6a8a, 0xc8a83a]), -L * 0.15, y0 + H * 0.65, -W / 2 - 0.05); // faded lettering
+}
 
 function warehouse(B: Batch, frontage: number, depth: number, rng: Rng): void {
   const wall = rng.pick([0x8a8e88, 0x9a8e78, 0x7a8288]);

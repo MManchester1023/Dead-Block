@@ -9,6 +9,7 @@ export function squadStatus(s: Squad, w: World): { text: string; tone: StatusTon
   const firing = !!t && t.alive;
   if (s.stunned > 0) return { text: 'STAGGERED', tone: 'bad' };
   if (s.garrisonedIn != null) return { text: 'IN TOWER', tone: 'fight' };
+  if (w.time - s.healing < 0.5) return { text: 'TREATED', tone: 'work' };
   const o = s.currentOrder?.type;
   switch (o) {
     case 'move':

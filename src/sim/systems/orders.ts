@@ -183,6 +183,17 @@ function doBuild(w: World, s: Squad, dt: number): void {
   }
   s.path = [];
   s.facing = Math.atan2(site.pos.y - s.pos.y, site.pos.x - s.pos.x);
+  // restoring a power station only happens with the area held (v4.17)
+  if (site.def.restore) {
+    const near = w.zombieHash.query(site.pos, site.def.restore.clearRadius + site.radius).some((z) => z.alive);
+    if (near) {
+      if (w.time - (s.lastBlockedMsg ?? -99) > 12) {
+        s.lastBlockedMsg = w.time;
+        w.events.emit('radio', { speaker: s.name, text: "Can't work on the station with the dead this close. Clear the yard!", tone: 'warn' });
+      }
+      return;
+    }
+  }
   const crew = s.aliveCount / s.def.members;
   site.buildProgress += dt * crew;
   site.hp = Math.min(site.def.hp, site.hp + (site.def.hp / site.def.buildTime) * dt * crew);
@@ -192,6 +203,13 @@ function doBuild(w: World, s: Squad, dt: number): void {
     site.hp = site.def.hp;
     if (site.def.slow) w.grid.setSlow(site.tile.x, site.tile.y, site.size.w, site.size.h, site.def.slow, site.id);
     w.events.emit('structureBuilt', { id: site.id, defId: site.def.id, pos: site.pos });
+    if (site.def.restore) {
+      const first = !w.unlocked.has('medBay');
+      w.unlocked.add('power');
+      w.unlocked.add('medBay');
+      w.events.emit('powerRestored', { id: site.id, first });
+      w.events.emit('radio', { speaker: s.name, text: first ? "Power's on! Lights, pumps, the lot. Tell the doc the Med Bay's a go." : 'Station is back online.', tone: 'good' });
+    }
     s.orders.shift();
   }
 }

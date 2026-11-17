@@ -14,7 +14,7 @@ import { updateOrders } from './systems/orders';
 import { updateCombat } from './systems/combat';
 import { updateZombies } from './systems/zombies';
 import { pickMedium, updateHives } from './systems/hives';
-import { updateEconomy } from './systems/economy';
+import { updateEconomy, updateMedical } from './systems/economy';
 import { updateDistricts } from './systems/districts';
 import { updateNoise } from './systems/noise';
 import { updateSupport, type PendingImpact, type SupplyCrate } from './systems/support';
@@ -96,7 +96,7 @@ export class World {
     for (const d of this.map.districts)
       this.districts.set(d.id, { def: d, infestation: d.initialInfestation, noise: 0, noiseHold: 0, secured: d.id === 'base', outpostId: null, cleared: d.initialInfestation === 0, locked: !!d.locked, quietUntil: 0 });
     // locked tutorial regions are fenced off until they open
-    for (const d of this.map.districts) if (d.locked && d.border) this.setBorder(d, true);
+    for (const d of this.map.districts) if (d.locked && d.borders) this.setBorder(d, true);
 
     if (opts.populate !== false) this.populate();
   }
@@ -147,8 +147,9 @@ export class World {
   /** Hives plus the district's own starting population mix. */
   private seedDistrict(d: DistrictState): void {
     const T = this.tier(d.def.id);
-    for (const site of d.def.hiveSites) {
-      const stage = d.def.hiveStage ?? 1;
+    for (const [i, site] of d.def.hiveSites.entries()) {
+      const hs = d.def.hiveStage ?? 1;
+      const stage = Array.isArray(hs) ? (hs[i] ?? 1) : hs;
       const hive = new Hive({ ...site }, d.def.id, BALANCE.hive.hpByStage[stage - 1], T.firstPulseDelaySec);
       hive.stage = stage;
       this.hives.push(hive);
@@ -159,14 +160,17 @@ export class World {
     const r = d.def.rect;
     // v4.15 (#77): a region opened mid-game keeps its dead well back from the cut fence and out of
     // sight of the squads waiting there, so opening it doesn't start a fight on the spot
-    const border = d.def.border;
-    const clearOfBorder = border ? Math.max(12, border.x + border.w - r.x + 50) : 12;
+    const borders = d.def.borders ?? [];
+    const toRect = (p: Vec2, b: { x: number; y: number; w: number; h: number }) =>
+      Math.hypot(Math.max(b.x - p.x, 0, p.x - (b.x + b.w)), Math.max(b.y - p.y, 0, p.y - (b.y + b.h)));
+    const ok = (p: Vec2) =>
+      borders.every((b) => toRect(p, b) > 50) && !this.squads.some((s) => s.alive && Math.hypot(s.pos.x - p.x, s.pos.y - p.y) < 40);
     const spot = () => {
-      for (let k = 0; k < 12; k++) {
-        const p = this.grid.nearestFree({ x: this.rng.range(r.x + clearOfBorder, r.x + r.w - 6), y: this.rng.range(r.y + 6, r.y + r.h - 6) });
-        if (!this.squads.some((s) => s.alive && Math.hypot(s.pos.x - p.x, s.pos.y - p.y) < 40)) return p;
+      for (let k = 0; k < 16; k++) {
+        const p = this.grid.nearestFree({ x: this.rng.range(r.x + 12, r.x + r.w - 6), y: this.rng.range(r.y + 6, r.y + r.h - 6) });
+        if (ok(p)) return p;
       }
-      return this.grid.nearestFree({ x: r.x + r.w - 20, y: this.rng.range(r.y + 6, r.y + r.h - 6) });
+      return this.grid.nearestFree({ x: r.x + r.w - 20, y: r.y + r.h - 20 });
     };
     // medium zombies get their own share of the starting crowd, with a minimum so they're actually met (#70, #75)
     const mediums = Math.max(T.mediumStartMin, Math.round(count * T.mediumStart));
@@ -188,9 +192,8 @@ export class World {
   }
 
   private setBorder(d: DistrictDef, closed: boolean): void {
-    const b = d.border!;
     const c = this.grid.cell;
-    this.grid.setRect(Math.round(b.x / c), Math.round(b.y / c), Math.round(b.w / c), Math.round(b.h / c), closed);
+    for (const b of d.borders ?? []) this.grid.setRect(Math.round(b.x / c), Math.round(b.y / c), Math.round(b.w / c), Math.round(b.h / c), closed);
   }
 
   /** Open a tutorial region (doc §17): cut the fence, seed it, wake its hive. */
@@ -198,13 +201,15 @@ export class World {
     const d = this.districts.get(id);
     if (!d || !d.locked) return;
     d.locked = false;
-    if (d.def.border) this.setBorder(d.def, false);
+    if (d.def.borders) this.setBorder(d.def, false);
     this.seedDistrict(d);
+    // the region's power station(s), offline until restored (v4.17)
+    for (const ps of d.def.powerStations ?? []) this.addStructure('powerStation', ps, false);
     d.quietUntil = this.time + BALANCE.noise.openingQuietSec;
     const unlocks = d.def.unlocksOnOpen ?? [];
     for (const u of unlocks) this.unlocked.add(u);
     this.events.emit('districtUnlocked', { districtId: id, name: d.def.name, unlocks });
-    this.events.emit('radio', { speaker: 'Command', text: `Engineers have cut the wire on the east road. ${d.def.name} is open. Same drill: find the hive, kill it, plant an outpost.`, tone: 'warn' });
+    this.events.emit('radio', { speaker: 'Command', text: `Engineers have cut the wire. ${d.def.name} is open. Same drill: find the ${d.def.hiveSites.length > 1 ? 'hives' : 'hive'}, kill ${d.def.hiveSites.length > 1 ? 'them' : 'it'}, plant an outpost.`, tone: 'warn' });
   }
 
   // ---------- entity management ----------
@@ -359,6 +364,12 @@ export class World {
     if (!def) return 'Unknown structure';
     if (def.requires && !isEnabled(def.requires as never)) return 'Locked';
     if (def.unlock && !this.unlocked.has(def.unlock)) return 'Not unlocked yet';
+    if (def.restore) return "Can't be built: it's restored where it stands";
+    if (def.baseOnly) {
+      const fp0 = this.footprint(defId, rotated);
+      const d = this.districtAt({ x: (tile.x + fp0.w / 2) * this.grid.cell, y: (tile.y + fp0.h / 2) * this.grid.cell });
+      if (d?.def.id !== 'base') return `${def.name} goes inside the main base`;
+    }
     const fp = this.footprint(defId, rotated);
     if (!this.grid.rectFree(tile.x, tile.y, fp.w, fp.h)) return 'Blocked';
     if (def.requiresSecured) {
@@ -489,8 +500,27 @@ export class World {
     }
   }
 
+  /** Is any power station working? (v4.17 power system) */
+  get powerOnline(): boolean {
+    return this.structures.some((s) => s.alive && s.built && !!s.def.restore);
+  }
+
   damageStructure(s: Structure, amount: number): void {
     s.hp -= amount;
+    if (s.def.restore) {
+      // a wrecked power station goes dark, it isn't destroyed: engineers can restore it again
+      if (s.hp <= 0 && s.alive) {
+        const wasOn = s.built;
+        s.hp = s.def.hp * 0.1;
+        s.built = false;
+        s.buildProgress = s.def.buildTime * 0.5;
+        if (wasOn) {
+          this.events.emit('powerLost', { id: s.id });
+          this.events.emit('radio', { speaker: 'Command', text: 'We just lost the power station. The Med Bay is dark until engineers get it running again.', tone: 'bad' });
+        }
+      }
+      return;
+    }
     if (s.hp <= 0 && s.alive) {
       this.removeStructure(s);
       this.events.emit('structureDestroyed', { id: s.id, defId: s.def.id, pos: s.pos });
@@ -756,6 +786,7 @@ export class World {
     updateNoise(this, dt);
     updateDistricts(this, dt);
     updateEconomy(this, dt);
+    updateMedical(this, dt);
     updateSupport(this);
 
     this.refreshHazards();
