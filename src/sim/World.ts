@@ -30,6 +30,8 @@ export interface DistrictState {
   cleared: boolean;
   /** Tutorial region not opened yet (v4.10): fenced off, empty, ignored by the systems. */
   locked: boolean;
+  /** Until this sim time a just-opened region's dead ignore distant noise (v4.15 #77). */
+  quietUntil: number;
 }
 
 export interface NoiseEvent {
@@ -63,6 +65,10 @@ export class World {
   structures: Structure[] = [];
   charges: DemoCharge[] = [];
   clouds: ToxicCloud[] = [];
+  /** Cells under a live toxic cloud (v4.15 #83); squads path around them. Rebuilt when clouds change. */
+  hazard!: Uint8Array;
+  hazardVersion = 0;
+  private hazardKey = '';
   noiseEvents: NoiseEvent[] = [];
   /** Command Post support (v4.4): cooldowns, incoming shells, parachuted crates. */
   supportReadyAt = new Map<string, number>();
@@ -80,6 +86,7 @@ export class World {
     this.map = opts.map ?? buildStarterMap();
     this.grid = new NavGrid(this.map.cols, this.map.rows, this.map.cell);
     this.flow = new FlowFields(this.grid);
+    this.hazard = new Uint8Array(this.map.cols * this.map.rows);
     for (const b of this.map.buildings) {
       const c = b.cells;
       this.grid.setRect(c.x, c.y, c.w, c.h, true);
@@ -87,7 +94,7 @@ export class World {
     }
     for (const p of this.map.props) this.grid.setRect(p.cells.x, p.cells.y, p.cells.w, p.cells.h, true, p.id);
     for (const d of this.map.districts)
-      this.districts.set(d.id, { def: d, infestation: d.initialInfestation, noise: 0, noiseHold: 0, secured: d.id === 'base', outpostId: null, cleared: d.initialInfestation === 0, locked: !!d.locked });
+      this.districts.set(d.id, { def: d, infestation: d.initialInfestation, noise: 0, noiseHold: 0, secured: d.id === 'base', outpostId: null, cleared: d.initialInfestation === 0, locked: !!d.locked, quietUntil: 0 });
     // locked tutorial regions are fenced off until they open
     for (const d of this.map.districts) if (d.locked && d.border) this.setBorder(d, true);
 
@@ -150,7 +157,17 @@ export class World {
     const count = Math.round(d.infestation * d.def.density * T.density);
     const kinds = Object.entries(d.def.mix);
     const r = d.def.rect;
-    const spot = () => this.grid.nearestFree({ x: this.rng.range(r.x + 12, r.x + r.w - 6), y: this.rng.range(r.y + 6, r.y + r.h - 6) });
+    // v4.15 (#77): a region opened mid-game keeps its dead well back from the cut fence and out of
+    // sight of the squads waiting there, so opening it doesn't start a fight on the spot
+    const border = d.def.border;
+    const clearOfBorder = border ? Math.max(12, border.x + border.w - r.x + 50) : 12;
+    const spot = () => {
+      for (let k = 0; k < 12; k++) {
+        const p = this.grid.nearestFree({ x: this.rng.range(r.x + clearOfBorder, r.x + r.w - 6), y: this.rng.range(r.y + 6, r.y + r.h - 6) });
+        if (!this.squads.some((s) => s.alive && Math.hypot(s.pos.x - p.x, s.pos.y - p.y) < 40)) return p;
+      }
+      return this.grid.nearestFree({ x: r.x + r.w - 20, y: this.rng.range(r.y + 6, r.y + r.h - 6) });
+    };
     // medium zombies get their own share of the starting crowd, with a minimum so they're actually met (#70, #75)
     const mediums = Math.max(T.mediumStartMin, Math.round(count * T.mediumStart));
     for (let i = 0; i < count; i++) {
@@ -183,6 +200,7 @@ export class World {
     d.locked = false;
     if (d.def.border) this.setBorder(d.def, false);
     this.seedDistrict(d);
+    d.quietUntil = this.time + BALANCE.noise.openingQuietSec;
     const unlocks = d.def.unlocksOnOpen ?? [];
     for (const u of unlocks) this.unlocked.add(u);
     this.events.emit('districtUnlocked', { districtId: id, name: d.def.name, unlocks });
@@ -510,6 +528,29 @@ export class World {
     this.events.emit('structureDismantled', { id: s.id, defId: s.def.id, pos: s.pos, refund });
   }
 
+  /** Mark the cells under toxic clouds; bump `hazardVersion` so squads re-plan their routes. */
+  private refreshHazards(): void {
+    const key = this.clouds.map((c) => c.id).join(',');
+    if (key === this.hazardKey) return;
+    this.hazardKey = key;
+    this.hazard.fill(0);
+    const g = this.grid;
+    for (const c of this.clouds) {
+      const r = c.radius + 1;
+      for (let y = g.c(c.pos.y - r); y <= g.c(c.pos.y + r); y++)
+        for (let x = g.c(c.pos.x - r); x <= g.c(c.pos.x + r); x++) {
+          if (x < 0 || y < 0 || x >= this.map.cols || y >= this.map.rows) continue;
+          if (Math.hypot(g.center(x) - c.pos.x, g.center(y) - c.pos.y) <= r) this.hazard[y * this.map.cols + x] = 1;
+        }
+    }
+    this.hazardVersion++;
+  }
+
+  /** Changes whenever routes may need re-planning: walls built/removed, or gas clouds appearing/clearing. */
+  get navVersion(): number {
+    return this.grid.version * 4096 + this.hazardVersion;
+  }
+
   /** Building under a point (metres), if any. */
   buildingAt(p: Vec2): BuildingDef | undefined {
     return this.map.buildings.find((b) => p.x >= b.rect.x && p.y >= b.rect.y && p.x < b.rect.x + b.rect.w && p.y < b.rect.y + b.rect.h);
@@ -716,6 +757,8 @@ export class World {
     updateDistricts(this, dt);
     updateEconomy(this, dt);
     updateSupport(this);
+
+    this.refreshHazards();
 
     // compaction
     if (this.zombies.some((z) => !z.alive)) this.zombies = this.zombies.filter((z) => z.alive);

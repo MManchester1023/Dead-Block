@@ -23,6 +23,40 @@ export type Mode =
  */
 const SELECTABLE = new Set(['commandPost', 'barracks']);
 
+/** Something squads can hide behind: an abandoned car, a pump island, or built sandbags/walls. */
+interface CoverSpot {
+  id: number;
+  pos: Vec2;
+  /** Long axis runs east-west. */
+  horiz: boolean;
+  /** Positions along the long axis (metres from the centre) where a squad can shelter. */
+  slots: number[];
+}
+
+const CAR_SLOTS = [-1.4, 1.4];
+const WALL_SLOTS = [0, -3, 3];
+
+function allCover(w: World): CoverSpot[] {
+  const out: CoverSpot[] = w.map.props.map((c) => ({ id: c.id, pos: c.pos, horiz: c.w > c.h, slots: CAR_SLOTS }));
+  for (const st of w.structures)
+    if (st.alive && st.built && st.def.cover && st.def.id !== 'mgNest' && !st.def.garrison) out.push({ id: st.id, pos: st.pos, horiz: st.size.w > st.size.h, slots: WALL_SLOTS });
+  return out;
+}
+
+function coverAt(w: World, p: Vec2): CoverSpot | undefined {
+  const prop = w.map.props.find((c) => dist(c.pos, p) < 3);
+  if (prop) return { id: prop.id, pos: prop.pos, horiz: prop.w > prop.h, slots: CAR_SLOTS };
+  const st = w.structures.find((s) => s.built && s.def.cover && s.def.id !== 'mgNest' && !s.def.garrison && dist(s.pos, p) < s.radius + 1.5);
+  return st ? { id: st.id, pos: st.pos, horiz: st.size.w > st.size.h, slots: WALL_SLOTS } : undefined;
+}
+
+/** Just behind the cover, on the side facing `from` (where the squads are coming from). */
+function coverSpot(c: CoverSpot, from: Vec2, along = 0): Vec2 {
+  return c.horiz
+    ? { x: c.pos.x + along, y: c.pos.y + Math.sign(from.y - c.pos.y || 1) * 3 }
+    : { x: c.pos.x + Math.sign(from.x - c.pos.x || 1) * 3, y: c.pos.y + along };
+}
+
 export class Game {
   readonly world: World;
   readonly renderer: Renderer;
@@ -148,17 +182,26 @@ export class Game {
       return;
     }
 
-    const prop = w.map.props.find((c) => dist(c.pos, p) < 3);
-    if (prop) {
-      // take cover on the side of the car facing the squads (i.e. car between us and the click direction)
-      sq.forEach((s, i) => {
-        const dx = s.pos.x - prop.pos.x;
-        const dy = s.pos.y - prop.pos.y;
-        const horiz = prop.w > prop.h;
-        const side = horiz ? { x: prop.pos.x + (i - (sq.length - 1) / 2) * 4, y: prop.pos.y + Math.sign(dy || 1) * 3.5 } : { x: prop.pos.x + Math.sign(dx || 1) * 3.5, y: prop.pos.y + (i - (sq.length - 1) / 2) * 4 };
-        w.issueOrder([s], { type: 'cover', pos: w.grid.nearestFree(side), targetId: prop.id }, queue);
+    // take cover (round 7 #81): every selected squad gets its own car / pump / sandbags. The clicked
+    // one goes to the first squad, the rest take the nearest other cover, all on the same side.
+    const clicked = coverAt(w, p);
+    if (clicked) {
+      const n = sq.length;
+      const center = sq.reduce((a, s) => ({ x: a.x + s.pos.x / n, y: a.y + s.pos.y / n }), { x: 0, y: 0 });
+      const others = allCover(w)
+        .filter((c) => c.id !== clicked.id && dist(c.pos, clicked.pos) < 25)
+        .sort((a, b) => dist(a.pos, clicked.pos) - dist(b.pos, clicked.pos));
+      // a car shelters two squads (one at each end), a sandbag wall three
+      const spots = [clicked, ...others].flatMap((c) => c.slots.map((along) => ({ ...c, along })));
+      // closest squad to the clicked cover takes it, and so on
+      const order = [...sq].sort((a, b) => dist(a.pos, clicked.pos) - dist(b.pos, clicked.pos));
+      order.forEach((s, i) => {
+        const c = spots[i];
+        if (c) w.issueOrder([s], { type: 'cover', pos: w.grid.nearestFree(coverSpot(c, center, c.along)), targetId: c.id }, queue);
+        else w.issueOrder([s], { type: 'move', pos: w.grid.nearestFree({ x: clicked.pos.x + (i - n / 2) * 3, y: clicked.pos.y + Math.sign(center.y - clicked.pos.y || 1) * 6 }) }, queue);
       });
-      this.renderer.marker(prop.pos, 0x7ab0e0);
+      if (sq.length > spots.length) this.toast(`Only enough cover here for ${spots.length} of ${sq.length} squads`);
+      this.renderer.marker(clicked.pos, 0x7ab0e0);
       return;
     }
 
@@ -168,18 +211,6 @@ export class Game {
       const err = w.orderSearch(sq, bld, queue);
       if (err) this.toast(err);
       else this.renderer.marker({ x: bld.rect.x + bld.rect.w / 2, y: bld.rect.y + bld.rect.h / 2 }, 0xd0c070);
-      return;
-    }
-
-    const cover = w.structures.find((s) => s.built && s.def.cover && dist(s.pos, p) < s.radius + 1.5);
-    if (cover && cover.def.id !== 'mgNest') {
-      sq.forEach((s) => {
-        const away = { x: s.pos.x - cover.pos.x, y: s.pos.y - cover.pos.y };
-        const horiz = cover.size.w > cover.size.h;
-        const spot = horiz ? { x: p.x, y: cover.pos.y + Math.sign(away.y || 1) * 3.5 } : { x: cover.pos.x + Math.sign(away.x || 1) * 3.5, y: p.y };
-        w.issueOrder([s], { type: 'cover', pos: w.grid.nearestFree(spot), targetId: cover.id }, queue);
-      });
-      this.renderer.marker(cover.pos, 0x7ab0e0);
       return;
     }
 

@@ -42,6 +42,28 @@ export function updateOrders(w: World, dt: number): void {
       }
     }
     const o = s.currentOrder;
+    // standing in Bloater gas with nothing to do: step out of it (v4.15 #83)
+    if (!o && w.hazard[w.grid.c(s.pos.y) * w.map.cols + w.grid.c(s.pos.x)]) {
+      // nearest open cell that's clear of gas
+      const g = w.grid;
+      const cx = g.c(s.pos.x);
+      const cy = g.c(s.pos.y);
+      let best: { x: number; y: number } | null = null;
+      for (let r = 1; r <= 8 && !best; r++)
+        for (let dy = -r; dy <= r && !best; dy++)
+          for (let dx = -r; dx <= r; dx++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+            const x = cx + dx;
+            const y = cy + dy;
+            if (x < 0 || y < 0 || x >= w.map.cols || y >= w.map.rows || g.isBlocked(x, y) || w.hazard[y * w.map.cols + x]) continue;
+            best = { x: g.center(x), y: g.center(y) };
+            break;
+          }
+      if (best) {
+        s.orders.push({ type: 'move', pos: best });
+        s.holding = false;
+      }
+    }
     if (o) {
       switch (o.type) {
         case 'move':
@@ -122,9 +144,9 @@ function applyKnock(w: World, s: Squad, dt: number): void {
 export function moveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: number): boolean {
   if (dist(s.pos, dest) <= arrive) return true;
   if (s.pathFor && dist(s.pathFor, dest) > 3) s.path = []; // destination moved (chasing a target)
-  if (!s.path.length || s.pathVersion !== w.grid.version) {
-    s.path = findPath(w.grid, s.pos, dest) ?? [];
-    s.pathVersion = w.grid.version;
+  if (!s.path.length || s.pathVersion !== w.navVersion) {
+    s.path = findPath(w.grid, s.pos, dest, 6000, w.hazard) ?? [];
+    s.pathVersion = w.navVersion;
     s.pathFor = { ...dest };
     if (!s.path.length) return true; // unreachable: give up gracefully
   }
@@ -357,8 +379,10 @@ function separate(w: World, s: Squad, dt: number): void {
   for (const o of w.squadHash.query(s.pos, 4.5)) {
     if (o === s) continue;
     const d = dist(s.pos, o.pos);
-    if (d < 4 && d > 0.001) {
-      const push = ((4 - d) / 4) * 5 * dt;
+    // two squads holding behind the same car can stand closer (round 7 #81: they used to shove each other out of cover)
+    const min = s.holding && o.holding && !s.moving && !o.moving ? 2.4 : 4;
+    if (d < min && d > 0.001) {
+      const push = ((min - d) / min) * 5 * dt;
       const dir = norm(sub(s.pos, o.pos));
       moveWithCollision(w.grid, s.pos, dir.x * push, dir.y * push, BODY);
     }

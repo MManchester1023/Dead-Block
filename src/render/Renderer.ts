@@ -78,13 +78,15 @@ export class Renderer {
 
   /** Animated character crowds (null → box placeholders, e.g. if the models failed to load). */
   private crowds: Record<string, Crowd> | null = null;
-  private prevPos = new Map<number, { x: number; y: number }>();
+  private prevPos = new Map<number, { x: number; y: number; v: number }>();
+  private gaits = new Map<number, 0 | 1 | 2>();
   private corpses: { key: string; x: number; z: number; facing: number; t0: number; sx: number; sy: number; tint?: number }[] = [];
   private animClock = 0;
   private anim = new Map<number, { clip: Clip; t: number; rate: number; seen: number }>();
   private animFrame = 0;
   private rallyFlag: THREE.Group;
   private borders = new Map<string, THREE.Mesh>();
+  private crateBlobs = new Map<number, THREE.Mesh>();
   private flyovers = new Map<number, { mesh: THREE.Mesh; dir: Vec2; done: boolean }>();
   private ghostArrow: THREE.Mesh;
   private ghostRange: THREE.Mesh;
@@ -676,12 +678,20 @@ export class Renderer {
         const chute = new THREE.Mesh(new THREE.SphereGeometry(3, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xd8d0b8, side: THREE.DoubleSide }));
         chute.position.y = 6;
         chute.name = 'chute';
+        chute.castShadow = true; // round 7 #82
         const lines = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 0.5, 5, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0x8a8670, wireframe: true }));
         lines.position.y = 3.5;
         lines.name = 'lines';
         v.add(crate, band, chute, lines);
         this.scene.add(v);
         this.crateViews.set(c.id, v);
+        // soft shadow right under the falling crate (the sun shadow lands far to the side when it's high)
+        const blob = new THREE.Mesh(new THREE.CircleGeometry(3, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthWrite: false }));
+        blob.rotation.x = -Math.PI / 2;
+        blob.position.set(c.pos.x, 0.08, c.pos.y);
+        blob.name = 'blob';
+        this.scene.add(blob);
+        this.crateBlobs.set(c.id, blob);
       }
       // round 4 #37: a cargo plane's shadow sweeps over first; the crate leaves the ramp as it passes
       const untilLand = c.landsAt - w.time;
@@ -690,6 +700,13 @@ export class Renderer {
       this.flyover(c.id, c.pos, untilLand - CRATE_FALL_SEC);
       const height = c.landed ? 0 : Math.max(0, untilLand) * 7;
       v.position.set(c.pos.x, height, c.pos.y);
+      const blob = this.crateBlobs.get(c.id);
+      if (blob) {
+        const k = released && !c.landed ? 1 - Math.min(1, height / 45) : 0; // 0 high up → 1 at the ground
+        (blob.material as THREE.MeshBasicMaterial).opacity = 0.12 + 0.3 * k;
+        blob.visible = released && !c.landed;
+        blob.scale.setScalar(1.6 - 0.8 * k);
+      }
       v.getObjectByName('chute')!.visible = !c.landed;
       v.getObjectByName('lines')!.visible = !c.landed;
     }
@@ -697,6 +714,9 @@ export class Renderer {
       if (!seen.has(id)) {
         this.scene.remove(v);
         this.crateViews.delete(id);
+        const blob = this.crateBlobs.get(id);
+        if (blob) this.scene.remove(blob);
+        this.crateBlobs.delete(id);
       }
     for (const [id, f] of this.flyovers)
       if (!seen.has(id) && f.done) {
@@ -1009,10 +1029,32 @@ export class Renderer {
     const C = this.crowds!;
     for (const c of Object.values(C)) c.begin();
     const t = this.animClock;
+    // Round 7 #79: the renderer runs ~60 fps but the sim steps at 30 Hz, so on frames without a sim
+    // step nothing has moved. Measuring speed then read 0 and flipped every walker to idle and back
+    // ~30 times a second. Now speed is only measured when the sim has stepped, and smoothed.
     const speedOf = (id: number, x: number, y: number) => {
       const p = this.prevPos.get(id);
-      this.prevPos.set(id, { x, y });
-      return p && simDt > 0 ? Math.hypot(x - p.x, y - p.y) / simDt : 0;
+      if (!p) {
+        this.prevPos.set(id, { x, y, v: 0 });
+        return 0;
+      }
+      if (simDt > 0) {
+        const raw = Math.hypot(x - p.x, y - p.y) / simDt;
+        p.v += (raw - p.v) * Math.min(1, simDt * 10);
+        p.x = x;
+        p.y = y;
+      }
+      return p.v;
+    };
+    /** Walk/run state with hysteresis (start above `on`, stop below `off`), so shuffling never flickers (#78). */
+    const gait = (key: number, v: number, on: number, off: number, runOn = Infinity, runOff = Infinity): 0 | 1 | 2 => {
+      const a = this.gaits.get(key) ?? 0;
+      let g: 0 | 1 | 2 = a;
+      if (a === 2) g = v < runOff ? (v > off ? 1 : 0) : 2;
+      else if (a === 1) g = v > runOn ? 2 : v < off ? 0 : 1;
+      else g = v > runOn ? 2 : v > on ? 1 : 0;
+      this.gaits.set(key, g);
+      return g;
     };
 
     this.animFrame++;
@@ -1032,10 +1074,12 @@ export class Renderer {
         if (!m.alive) return;
         const key = s.id * 8 + i + 1e7;
         const v = speedOf(key, m.pos.x, m.pos.y);
+        // soldiers drift around their spot at up to ~1.2 m/s while resting: that isn't walking
+        const walking = gait(key, v, s.moving ? 0.6 : 1.6, s.moving ? 0.3 : 1.2) > 0;
         let clip: Clip = 'idle';
         let rate = 1;
         if (working && crowd.has('work')) clip = 'work';
-        else if (v > 0.4) {
+        else if (walking) {
           clip = 'walk';
           rate = Math.min(3, Math.max(0.7, v / 2.2));
         } else if (engaged && w.time - m.lastShot < s.def.weapon.cooldown * 2.5) clip = 'shoot';
@@ -1048,19 +1092,23 @@ export class Renderer {
       const look = zombieLook(z.id, z.def.id);
       const crowd = C[look.key];
       const v = speedOf(z.id, z.pos.x, z.pos.y);
+      const g = gait(z.id, v, 0.45, 0.2, crowd.has('run') ? 4.5 : Infinity, 3.5);
       let clip: Clip = 'idle';
       let rate = 1;
       if (z.state === 'attack') clip = 'punch';
-      else if (v > 4 && crowd.has('run')) {
+      else if (g === 2) {
         clip = 'run';
         rate = Math.min(1.8, Math.max(0.8, v / 6));
-      } else if (v > 0.3) {
+      } else if (g === 1) {
         clip = 'walk';
         rate = Math.min(3.2, Math.max(0.6, v / 1.8));
       }
       crowd.add(clip, this.animTime(z.id, clip, rate, simDt), z.pos.x, z.pos.y, z.facing, look.sx, look.tint, 0, look.sy);
     }
-    if (this.prevPos.size > 8000) this.prevPos.clear();
+    if (this.prevPos.size > 8000) {
+      this.prevPos.clear();
+      this.gaits.clear();
+    }
     // forget animation state of characters that are gone
     if (this.animFrame % 300 === 0) for (const [k, a] of this.anim) if (this.animFrame - a.seen > 60) this.anim.delete(k);
 
@@ -1115,9 +1163,9 @@ export class Renderer {
   squadAtLabel(x: number, y: number): number | null {
     for (const [id, v] of this.squadViews) {
       if (v.label.style.display === 'none') continue;
-      const n = v.label.querySelector('.sname');
-      if (!n) continue;
-      const r = n.getBoundingClientRect();
+      // round 7 #84: the whole label (name, status, bar) is a click target, not just the name
+      const r = v.label.getBoundingClientRect();
+      if (!r.width) continue;
       if (x >= r.left - 3 && x <= r.right + 3 && y >= r.top - 3 && y <= r.bottom + 3) return id;
     }
     return null;

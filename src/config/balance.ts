@@ -25,9 +25,9 @@ export const BALANCE = {
     holdSec: 3,
     decayPerSec: 1.25,
     pulseThreshold: 100,
-    // Gunshots carry well beyond sight (zombie sight ~14 m) and scale with the map, not with weapon
-    // range: a rifle (2.2) is heard ~110 m away (over half a 192 m district), an MG (3.2) ~160 m.
-    hearingRadiusPerLoudness: 50, // metres per loudness point (v4.4: wider again)
+    // Gunshots carry well beyond sight (zombie sight ~14 m). v4.15 (#76): a rifle (2.2) is heard ~60 m
+    // away, a carbine (1.8) ~49 m, an MG (3.2) ~87 m; explosions further.
+    hearingRadiusPerLoudness: 27.3, // metres per loudness point
     maxHearingRadius: 260,
     mergeRadius: 6, // same-tick sounds this close merge into one louder event
     // v4.9: distant sounds pull only part of the crowd. Every zombie within half the hearing radius
@@ -35,7 +35,10 @@ export const BALANCE = {
     // shots don't eventually drag everyone). Hive guards stay home unless the sound is close.
     farResponse: 0.3,
     guardRadius: 35,
-    guardHearing: 55,
+    guardHearing: 40,
+    // v4.15 (#77): a freshly opened region's dead ignore distant gunfire for a while (close shots still count)
+    openingQuietSec: 30,
+    openingQuietRange: 25,
   },
 
   zombie: {

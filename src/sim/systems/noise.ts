@@ -38,6 +38,10 @@ export function updateNoise(w: World, dt: number): void {
 function responds(w: World, z: Zombie, d: number, heard: number): boolean {
   const N = BALANCE.noise;
   if (z.state === 'chase' || z.state === 'attack') return true; // lure() ignores them anyway
+  if (d > N.openingQuietRange) {
+    const home = w.districtAt(z.pos);
+    if (home && w.time < home.quietUntil) return false;
+  }
   if (z.homeHiveId != null && d > N.guardHearing) {
     const home = w.get(z.homeHiveId);
     if (home instanceof Hive && home.alive && dist(z.pos, home.pos) < N.guardRadius) return false;

@@ -93,12 +93,13 @@ describe('world rules', () => {
   });
 
   describe('gunfire is heard beyond sight (doc §9 noise)', () => {
-    // squad on the main road, zombie tucked behind the building at x42–49, y20–29 (19 tiles away, no line of sight)
+    // squad on the main road, zombie tucked behind the building at x42–49, y20–29 (~40 m away, no line of sight;
+    // v4.15 #76: a rifle is heard ~60 m)
     const setup = (shoot: boolean) => {
       const w = new World({ populate: false, seed: 5 });
       const sq = w.spawnSquad('rifle', M(45.5, 36.5));
       w.issueOrder([sq], { type: 'hold', pos: sq.pos });
-      const hidden = w.spawnZombie('runner', M(45.5, 17.5))!;
+      const hidden = w.spawnZombie('runner', M(41, 24))!;
       if (shoot) w.spawnZombie('walker', M(52, 36.5)); // something to shoot at
       let closest = Infinity;
       for (let i = 0; i < 30 * 15; i++) {
@@ -106,7 +107,7 @@ describe('world rules', () => {
         if (hidden.alive) closest = Math.min(closest, Math.hypot(hidden.pos.x - sq.pos.x, hidden.pos.y - sq.pos.y));
         else closest = 0; // it came close enough to be shot
       }
-      return { closest, sees: w.grid.lineClear(sq.pos, M(45.5, 17.5)) };
+      return { closest, sees: w.grid.lineClear(sq.pos, M(41, 24)) };
     };
 
     it('the hidden zombie really is out of sight', () => {

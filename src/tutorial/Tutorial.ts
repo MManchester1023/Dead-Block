@@ -191,7 +191,7 @@ export const ROADSIDE_MOTEL_TUTORIAL: TutorialStep[] = [
   {
     id: 'noise',
     title: 'Noise and targets',
-    text: 'Gunfire is <b>loud</b>: every zombie within ~100 m hears a rifle and comes looking. The district <b>Noise</b> meter (top right) fills as you fight; fill it and the whole district comes at once.<br><br>Squads lock onto one zombie and finish it, unless something gets right on top of them. <b>Right-click a zombie</b> to make them shoot that one.',
+    text: 'Gunfire is <b>loud</b>: every zombie within ~60 m hears a rifle and comes looking. The district <b>Noise</b> meter (top right) fills as you fight; fill it and the whole district comes at once.<br><br>Squads lock onto one zombie and finish it, unless something gets right on top of them. <b>Right-click a zombie</b> to make them shoot that one.',
     highlight: '.hud-districts',
   },
   {
