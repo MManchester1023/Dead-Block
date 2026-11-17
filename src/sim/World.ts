@@ -6,6 +6,7 @@ import { isEnabled } from '../config/features';
 import { STRUCTURES, UNITS, ZOMBIES } from '../config/units';
 import { buildStarterMap, type CityMap, type DistrictDef } from './map';
 import { NavGrid } from './grid';
+import { FlowFields } from './flowfield';
 import { SpatialHash } from './spatial';
 import { Hive, Squad, Structure, Zombie, newId, type DemoCharge, type ToxicCloud } from './entities';
 import type { DamageType, Order, Targetable } from './types';
@@ -40,6 +41,8 @@ export class World {
   readonly rng: Rng;
   readonly map: CityMap;
   readonly grid: NavGrid;
+  /** Shared crowd navigation (flow fields per destination). */
+  readonly flow: FlowFields;
 
   time = 0;
   day = 1;
@@ -72,6 +75,7 @@ export class World {
     this.rng = new Rng(opts.seed ?? 1337);
     this.map = opts.map ?? buildStarterMap();
     this.grid = new NavGrid(this.map.cols, this.map.rows, this.map.cell);
+    this.flow = new FlowFields(this.grid);
     for (const b of this.map.buildings) {
       const c = b.cells;
       this.grid.setRect(c.x, c.y, c.w, c.h, true);
@@ -353,7 +357,6 @@ export class World {
     if (attacker && attacker.alive && z.alive && z.state !== 'attack') {
       const cur = this.get(z.targetId);
       if (!(cur instanceof Squad) || cur === attacker || dist(z.pos, attacker.pos) < dist(z.pos, cur.pos)) {
-        if (z.targetId !== attacker.id) z.path = [];
         z.targetId = attacker.id;
         z.state = 'chase';
         z.aggro = BALANCE.zombie.aggroTimeSec;

@@ -1,15 +1,11 @@
-import { dist, norm, sub, type Vec2 } from '../../core/math';
+import { dist, type Vec2 } from '../../core/math';
 import { BALANCE } from '../../config/balance';
 import { Hive, Squad, Structure, type Zombie } from '../entities';
-import { findPath } from '../pathfinding';
 import type { Targetable } from '../types';
 import type { World } from '../World';
 import { blockingTile, moveWithCollision } from './movement';
 
-const PATH_BUDGET_PER_TICK = 6;
-
 export function updateZombies(w: World, dt: number): void {
-  let pathBudget = PATH_BUDGET_PER_TICK;
   for (const z of w.zombies) {
     if (!z.alive) continue;
 
@@ -29,7 +25,6 @@ export function updateZombies(w: World, dt: number): void {
     }
     z.attackCooldown -= dt;
     z.aggro = Math.max(0, z.aggro - dt);
-    z.repathTimer -= dt;
 
     const target = w.get(z.targetId);
     let dest: Vec2 | null = null;
@@ -53,42 +48,37 @@ export function updateZombies(w: World, dt: number): void {
     if (!dest) continue;
     if (dist(z.pos, dest) < 1.2) {
       z.goal = null;
-      z.path = [];
       if (z.state !== 'chase') z.state = 'idle';
       continue;
     }
 
-    // destination behind a building (a sound, or prey that ducked out of sight)? get a real path
-    // instead of face-planting into the wall; re-plan as a fleeing target moves
-    const stale = !z.pathFor || dist(z.pathFor, dest) > 6;
-    if ((!z.path.length || (stale && z.repathTimer <= 0)) && pathBudget > 0 && dist(z.pos, dest) > 8 && !w.grid.lineClear(z.pos, dest)) {
-      pathBudget--;
-      z.repathTimer = BALANCE.zombie.repathSec;
-      z.pathFor = { ...dest };
-      z.path = findPath(w.grid, z.pos, dest, 3000) ?? [];
-    } else if (z.path.length && w.grid.lineClear(z.pos, dest) && dist(z.pos, dest) < 20) {
-      z.path = []; // clear view of the target again: just go straight for it
+    // Can we see where we're going? Checked a couple of times a second, not every tick. If not (a sound
+    // behind a building, prey that ducked out of sight, or we're stuck), follow the shared flow field
+    // toward the destination instead of face-planting into walls (v4.5 crowd tech; replaces per-zombie A*).
+    z.losTimer -= dt;
+    const roaming = z.state === 'wander' || z.state === 'idle';
+    if (z.losTimer <= 0) {
+      z.losTimer = 0.4 + ((z.id * 0.37) % 1) * 0.3;
+      z.useField = !roaming && (z.stuckFor > 0 || (dist(z.pos, dest) > 8 && !w.grid.lineClear(z.pos, dest)));
+      if (z.stuckFor > 0) z.stuckFor -= 1;
     }
-
-    // steer along an A* path if we have one, else beeline
-    let wp = dest;
-    if (z.path.length) {
-      wp = z.path[0];
-      if (dist(z.pos, wp) < 1.2) {
-        z.path.shift();
-        wp = z.path[0] ?? dest;
-      }
+    let dx = dest.x - z.pos.x;
+    let dy = dest.y - z.pos.y;
+    if (z.useField) {
+      const f = w.flow.direction(w.flow.field(dest), z.pos);
+      if (f) (dx = f.x), (dy = f.y);
     }
-    const slow = w.grid.slowAt(z.pos);
-    const speed = z.def.speed * (z.state === 'idle' || z.state === 'wander' ? 0.5 : 1) * slow;
-    const dir = norm(sub(wp, z.pos));
-    z.facing = Math.atan2(dir.y, dir.x);
-    const blocked = moveWithCollision(w.grid, z.pos, dir.x * speed * dt, dir.y * speed * dt, z.radius * 0.6);
+    const dl = Math.hypot(dx, dy) || 1;
+    dx /= dl;
+    dy /= dl;
+    const speed = z.def.speed * (roaming ? 0.5 : 1) * w.grid.slowAt(z.pos);
+    z.facing = Math.atan2(dy, dx);
+    const blocked = moveWithCollision(w.grid, z.pos, dx * speed * dt, dy * speed * dt, z.radius * 0.6);
 
     if (blocked) {
       // scratch at whatever player structure is in the way (sandbags, walls, outposts…)
       // Tier 2 hook: pile-ups let crowds climb `climbable` structures instead (doc §9).
-      const occ = blockingTile(w.grid, z.pos, dir.x, dir.y, z.radius);
+      const occ = blockingTile(w.grid, z.pos, dx, dy, z.radius);
       const st = occ ? w.get(occ) : undefined;
       if (st instanceof Structure && st.alive && (z.state === 'chase' || z.state === 'pulse' || z.state === 'investigate')) {
         z.targetId = st.id;
@@ -96,35 +86,41 @@ export function updateZombies(w: World, dt: number): void {
       }
     }
 
-    // stuck detection → request a real path (budgeted)
+    // stuck (pressed against a car, a corner…): switch to the flow field for a few checks
     z.stuckTimer += dt;
     if (z.stuckTimer > 0.8) {
-      const moved = dist(z.pos, z.lastPos);
-      z.lastPos = { ...z.pos };
+      const moved = Math.hypot(z.pos.x - z.lastPos.x, z.pos.y - z.lastPos.y);
+      z.lastPos.x = z.pos.x;
+      z.lastPos.y = z.pos.y;
       z.stuckTimer = 0;
-      if (moved < 1 && pathBudget > 0) {
-        pathBudget--;
-        z.path = findPath(w.grid, z.pos, dest, 2500) ?? [];
+      if (moved < 1 && !roaming) {
+        z.stuckFor = 4;
+        z.useField = true;
       }
     }
   }
 
-  // crowd separation
+  // crowd separation: sum the pushes from overlapping neighbours, then one collision-checked move
   const tmp: Zombie[] = [];
   for (const z of w.zombies) {
     if (!z.alive) continue;
     tmp.length = 0;
     w.zombieHash.query(z.pos, 1.6, tmp);
+    let px = 0;
+    let py = 0;
     for (const o of tmp) {
       if (o === z) continue;
-      const d = dist(z.pos, o.pos);
+      const ox = z.pos.x - o.pos.x;
+      const oy = z.pos.y - o.pos.y;
+      const d = Math.hypot(ox, oy);
       const min = z.radius + o.radius;
       if (d < min && d > 0.0001) {
         const push = ((min - d) / 2) * 0.5;
-        const dir = norm(sub(z.pos, o.pos));
-        moveWithCollision(w.grid, z.pos, dir.x * push, dir.y * push, z.radius * 0.6);
+        px += (ox / d) * push;
+        py += (oy / d) * push;
       }
     }
+    if (px || py) moveWithCollision(w.grid, z.pos, px, py, z.radius * 0.6);
   }
 }
 
@@ -154,7 +150,6 @@ function think(w: World, z: Zombie): void {
     }
   }
   if (best instanceof Squad) {
-    if (best.id !== z.targetId) z.path = [];
     z.targetId = best.id;
     z.state = 'chase';
     z.aggro = BALANCE.zombie.aggroTimeSec;
@@ -174,7 +169,6 @@ function think(w: World, z: Zombie): void {
     }
   }
   if (best) {
-    if (best.id !== z.targetId) z.path = [];
     z.targetId = best.id;
     z.state = 'chase';
     return;
@@ -185,7 +179,6 @@ function think(w: World, z: Zombie): void {
     const home = (z.homeHiveId && (w.get(z.homeHiveId) as Hive | undefined)?.pos) || z.pos;
     z.goal = w.grid.nearestFree({ x: home.x + w.rng.range(-14, 14), y: home.y + w.rng.range(-14, 14) });
     z.state = 'wander';
-    z.path = [];
   }
 }
 
@@ -200,5 +193,5 @@ export function lure(z: Zombie, pos: Vec2, state: 'investigate' | 'pulse'): void
   const moved = !z.goal || (z.goal.x - goal.x) ** 2 + (z.goal.y - goal.y) ** 2 > 64;
   z.goal = goal;
   z.state = state;
-  if (moved) z.path = [];
+  if (moved) z.useField = false; // new destination: re-check line of sight
 }

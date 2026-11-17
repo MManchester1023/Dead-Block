@@ -30,7 +30,6 @@ export function updateHives(w: World, dt: number): void {
         z.targetId = intruder.id;
         z.state = 'chase';
         z.aggro = BALANCE.zombie.aggroTimeSec;
-        z.path = [];
       }
     }
 

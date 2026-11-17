@@ -113,7 +113,6 @@ export class Zombie implements Targetable {
   targetId: number | null = null;
   attackCooldown = 0;
   thinkTimer: number;
-  path: Vec2[] = [];
   stuckTimer = 0;
   lastPos: Vec2;
   vel: Vec2 = { x: 0, y: 0 };
@@ -123,8 +122,10 @@ export class Zombie implements Targetable {
   burning = 0;
   /** Seconds of "I know you're there" left after last seeing the target (doc §9, v4.2 aggro rule). */
   aggro = 0;
-  repathTimer = 0;
-  pathFor: Vec2 | null = null;
+  /** Following the shared flow field (destination out of sight, or stuck). Re-checked every ~0.5 s. */
+  useField = false;
+  losTimer = 0;
+  stuckFor = 0;
 
   constructor(public def: ZombieDef, public pos: Vec2) {
     this.hp = def.hp;
