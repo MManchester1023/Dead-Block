@@ -58,7 +58,7 @@ The city is built as one connected world. Districts are named regions of that wo
 
 ### District structure
 
-The campaign opens with seven starter areas: three small starter zones (each 64 × 64 world units), then the remaining four starter districts arranged into two larger maps (two districts per map). These establish the core systems before hives and bosses are introduced. After that, the campaign expands into the larger district progression. The player can only push into territory connected to areas they already hold.
+**[v4.9]** The campaign opens with three tutorial regions: two small ones, then one big one, each attached to the map as the previous one is cleared (§17). The other starter districts then open as the first part of the open world, and the player can only push into territory connected to areas they already hold.
 
 | District | Terrain / identity | Key progression or threat |
 |---|---|---|
@@ -692,7 +692,7 @@ Leaving a region unattended can therefore cost territory, income and forward pre
 ## 20. Clarifications to earlier rules
 
 - Engineers may build field fortifications anywhere on the map, not only at the main base or outposts.
-- The seven starter regions stay part of the persistent open world after the tutorial.
+- The three tutorial regions stay part of the persistent open world after the tutorial.
 - The old rule that a fallen outpost leaves the region at a fixed 40% infestation is superseded by the takeover rule: a full zombie retake replaces the outpost with a hive.
 - Hives spawn zombies while active, go through four escalating threat stages, have a spawn/population limit for performance, and can only be destroyed with fire or explosives. Bosses are separate from hive destruction.
 - **[v4]** Pile-ups can scale barricades, vehicles, small buildings and rooftops, **but not tall concrete walls**.
@@ -722,7 +722,7 @@ Every feature, ranked by importance to the game being fun and shippable. The MVP
 12. Explosion knockback
 13. Power stations and base building unlocks
 14. Region takeover → hive (§19)
-15. Seven-mission tutorial flow
+15. Three-region tutorial flow
 
 ### Tier 2: Escalation and spectacle
 16. Day/night cycle and flares
