@@ -22,7 +22,7 @@ export enum ThreatClass {
   Boss = 3,
 }
 
-export type OrderType = 'move' | 'attackMove' | 'hold' | 'cover' | 'build' | 'charge' | 'patrol';
+export type OrderType = 'move' | 'attackMove' | 'hold' | 'cover' | 'build' | 'charge' | 'patrol' | 'attack' | 'deconstruct';
 
 export interface Order {
   type: OrderType;

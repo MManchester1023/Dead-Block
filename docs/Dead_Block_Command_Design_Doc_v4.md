@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.2** | Playtest feedback round 1 (§22): force-attack, middle-mouse camera rotation, rifle range, time-then-distance zombie aggro, HUD click fix, looser squads, weaker basic zombies, engineer deconstruction, car wheels, 12-minute days. Plus hive alarm and 3 s charge planting. |
 | **v4.1** | §14 "Target look for the finished game" (art direction from reference images, scale, crowd tech, camera rotation). §16 adds the open production questions. MVP: gunfire is now heard well beyond sight. |
 
 Where earlier wording conflicts with a v4 rule, the v4 rule wins. Every v4 change is marked **[v4]**.
@@ -110,6 +111,9 @@ Conventional RTS selection and orders, plus an optional direct-control mode. Ord
 | Right-click terrain / map | Move | Walk or drive to the location. Works from the minimap or full map. |
 | Right-click cover | Take cover | Infantry move to the cover position and fight from it. |
 | Right-click building **[v4]** | Garrison / roof | Elite infantry enter the building and take the roof (see §5). |
+| Right-click zombie **[v4.2]** | Force attack | Selected units close to range and shoot that zombie, overriding threat priority. |
+| Middle-mouse drag **[v4.2]** | Rotate camera | Free rotation. Q / E snap 90°. Shift + middle-drag pans. |
+| X then click **[v4.2]** | Deconstruct | Engineers take down something they built (see §6). |
 | M | Operations map | Full map: units, base, districts captured and uncaptured, fog of war. |
 | A + click | Attack-move | Move toward a destination, engaging enemies that come in range along the way. |
 | Sneak | Quiet movement | Move as quietly as possible; ignore zombies unless they get danger-close. |
@@ -139,6 +143,10 @@ Squads fight on their own when not directly controlled. They pick targets, hold 
 - Patrol routes keep local vision and intercept enemies.
 - Vehicles and helicopters hold and engage nearby threats when idle, and should return to base (RTB) when servicing is needed.
 
+### Squads that look alive [v4.2]
+
+Squad members are not welded to formation slots. Each soldier drifts around their slot, moves at their own pace (squads string out on the move and bunch up on arrival), mills about when idle, and glances around when holding. Holding or in cover keeps them tighter.
+
 ### Target priority and focus fire [v4]
 
 Units **pick one target and keep firing at it until it is dead** instead of spreading fire across a crowd. Picking a new target is driven by threat:
@@ -148,6 +156,8 @@ Units **pick one target and keep firing at it until it is dead** instead of spre
 3. **Then everything else**, nearest first.
 
 A unit only drops its current target early if (a) the target dies or leaves range, or (b) something enters danger-close range and outranks it. This stops wasteful switching while keeping squads from being overrun. Squads share a target where possible so members finish targets quickly.
+
+**Forced target [v4.2].** Right-clicking a zombie orders the selected units to attack it. They move until it is in range and visible, then shoot only it (ignoring the priority rules) until it dies.
 
 ### Elite rooftop access [v4]
 
@@ -203,6 +213,8 @@ Engineers can build predefined defensive structures **anywhere on the map**, not
 | Lure **[v4]** | Craftable loudspeaker (see below) |
 | Base defenses | Sniper towers, mounted HMGs, mounted grenade launchers, mounted flamethrowers |
 | Strategic support | Artillery strikes on districts, unlocked through base progression |
+
+**Deconstruction [v4.2].** Engineers can take down anything the player built (not base facilities). An unstarted construction site refunds in full; a finished structure refunds half its cost and takes half its build time to dismantle. Dismantling your own outpost gives up the district quietly. Only a zombie takeover turns it into a hive.
 
 **Tall concrete walls [v4].** Very expensive, slow-to-build walls about forty feet tall. They are the **one exception** to the pile-up rule: zombies cannot pile high enough to get over them. They are the "hold this forever" option, priced so they can't ring the whole city. They can be destroyed by explosives, Brutes and bosses (balance TBD).
 
@@ -359,6 +371,8 @@ For performance, each hive has a spawn budget and counts toward a global active-
 
 - Horde pulses grow with the difficulty of the region sending them.
 - **Noise** is a core mechanic. Weapons, engines and loud actions raise a noise level that attracts hordes. Quiet weapons and Sneak lower detection. **Loudspeakers [v4]** use this on purpose.
+- **Aggro [v4.2]: time first, then distance.** A zombie that has seen a squad hunts it for ~20 s even after losing sight (it keeps pathing toward the squad), then keeps coming while the squad is within ~60 m. Simply running away no longer shakes them; breaking contact takes distance *and* time.
+- **Hive alarm [v4.2].** A squad within ~20 m of a hive draws every zombie around the hive (~45 m) onto it. Charges are planted over 3 s and getting hit restarts the plant, so engineers need covering fire. (Playtest bots found that a lone engineer could sprint past walkers and one-shot a stage-1 hive.)
 - **Pile-ups.** Zombies can pile up and climb over each other to get over barricades, vehicles, small buildings **and onto rooftops [v4]**. Height and barriers don't guarantee safety. **Exception [v4]:** tall concrete walls (§6) are too high to pile over.
 - Walkers and Runners can cling to helicopters hovering low or landed, which makes low hovering, landing **and rappelling [v4]** risky in infested areas.
 - Vehicles can run over Walkers and Runners without taking damage. Specials such as Pukers and Draggers can damage vehicles. **Vehicles with sheet-metal armor [v4]** can't be climbed.
@@ -599,7 +613,7 @@ These are left open on purpose so they don't block the core design or the protot
 - **Guerrillas:** squad size, weapons, recruitment, progression.
 - **Infantry loadouts:** weapon availability, per-member inventory, costs.
 - **Engineer construction:** exact structures, build times, prices, upgrades, repair/salvage. Confirmed: engineers can build anywhere.
-- **Day length and upkeep timing:** day length; how the player is warned before supply deductions; **night difficulty modifiers [v4]**.
+- **Day length and upkeep timing:** ~~day length~~ **12 real minutes per in-game day [v4.2]** (4 min felt far too fast); how the player is warned before supply deductions; **night difficulty modifiers [v4]**.
 - **RTB rules:** which vehicles return, how servicing works, whether helicopters use separate rearm points.
 - **Direct-control input mapping.**
 - **Continuous-world performance:** simulation detail at strategic zoom, entity limits, streaming, the point where a desktop build makes sense. **Rubble and destruction add to this [v4].**
@@ -712,3 +726,26 @@ Every feature, ranked by importance to the game being fun and shippable. The MVP
 33. Reward items catalogue, full campaign balancing
 
 *Design status: v3 decisions remain confirmed. v4 additions are confirmed direction except where marked "candidate", "proposed" or "open question". All numbers are subject to playtesting.*
+
+---
+
+## 22. Playtest feedback log [v4.2]
+
+First hands-on playtest of the browser MVP (November 2026). Every note, and what was done about it.
+
+| # | Note | Status |
+|---|---|---|
+| 1 | Zombies don't react to gunfire, only to sight | **Fixed (v4.1).** Hearing radius was below sight range. Gunfire is now heard ~73 m (rifle) to ~106 m (MG) and zombies path around buildings toward it. |
+| 2 | Right-click a zombie to force units to attack it | **Done.** Forced target overrides threat priority (§5). |
+| 3 | Rotate the camera with middle mouse held | **Done.** Middle-drag rotates freely; Q/E snap 90°; Shift + middle-drag pans. |
+| 4 | Riflemen need a bit more range | **Done.** 18 → 24 m (carbines 14 → 18 m). |
+| 5 | Zombie aggro should be time-based first, then distance-based; they give up too easily if you run | **Done.** 20 s hunt after losing sight, then a 60 m leash (§9). |
+| 6 | UI buttons sometimes need several clicks; rotating sandbags only updates when the mouse moves | **Fixed.** The HUD re-rendered 8×/s and swallowed clicks; panels now only redraw when their content changes, and buttons act on press. The placement preview refreshes every frame. |
+| 7 | Units are too stiff; they should move around a bit instead of a strict formation | **Done.** Loose, drifting, individually paced squad members (§5). |
+| 8 | Normal zombies (walkers, runners, screamers) should be a bit weaker | **Done.** HP: Walker 45 → 36, Runner 28 → 22, Screamer 50 → 40. |
+| 9 | Engineers should be able to deconstruct things they've built | **Done.** X / Deconstruct button; refunds per §6. |
+| 10 | Static cars have no wheels | **Fixed.** Wheels (some flat), bumpers, head/tail lights. |
+| 11 | Day/night cycle is really fast | **Done.** 12 real minutes per in-game day; daily supply income raised to match. |
+
+**Balance after this round** (scripted bots, 6 seeds): a careful "advance, let the wave come, clear, advance" push wins 6/6 with no losses, so careful play is now on the easy side for a starter zone. Blob-rushing the hive and the lone-sapper sprint both fail 6/6. Watch whether human play feels too safe; the knobs are walker HP, hive spawn rate and the alarm radius in `config/balance.ts`.
+

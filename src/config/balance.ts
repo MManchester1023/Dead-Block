@@ -8,10 +8,10 @@ export const BALANCE = {
     startSupplies: 100,
     supplyCap: 150,
     commandCap: 8,
-    dayLengthSec: 240,
-    baseSuppliesPerDay: 40,
+    dayLengthSec: 720, // 12 real minutes per in-game day (playtest: 4 min felt far too fast)
+    baseSuppliesPerDay: 60,
     securedDistrictMoneyPerMin: 30,
-    securedDistrictSuppliesPerDay: 25,
+    securedDistrictSuppliesPerDay: 40,
     hiveBounty: 120,
     districtClearBounty: 200,
   },
@@ -26,6 +26,15 @@ export const BALANCE = {
     mergeRadius: 6, // same-tick sounds this close merge into one louder event
   },
 
+  zombie: {
+    // Aggro is time-based first, then distance-based (playtest: they gave up too easily).
+    // Once a zombie has seen you it hunts you for aggroTimeSec even out of sight; after that it
+    // keeps coming as long as you're within leashDistance.
+    aggroTimeSec: 20,
+    leashDistance: 60,
+    repathSec: 1.5,
+  },
+
   horde: {
     pulseIntervalSec: 240,
     firstPulseDelaySec: 480, // starter zones: ~10–15 min pacing (doc §3), so the first pulse waits
@@ -34,6 +43,8 @@ export const BALANCE = {
   },
 
   hive: {
+    alarmRadius: 20, // a squad this close to a hive sets it off…
+    alarmCallRadius: 45, // …and every zombie this close to the hive comes for it
     hpByStage: [500, 750, 1000, 1250], // grows as it matures — kill it early
     stageDurationSec: [600, 420, 480], // time to advance stage 1→2, 2→3, 3→4
     spawnIntervalSec: [9, 5, 3.5, 2],

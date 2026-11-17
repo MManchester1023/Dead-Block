@@ -166,6 +166,37 @@ export class Renderer {
         o.castShadow = true;
         g.add(o);
       }
+      // wheels (v4.2 playtest note) — abandoned cars sit a bit low, some on flats
+      const tyre = new THREE.MeshLambertMaterial({ color: 0x1c1c1c });
+      const rim = new THREE.MeshLambertMaterial({ color: 0x8a8a86 });
+      const wheelGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.24, 12).rotateX(Math.PI / 2);
+      const rimGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.26, 8).rotateX(Math.PI / 2);
+      for (const [wx, wz] of [[1.45, 0.86], [1.45, -0.86], [-1.45, 0.86], [-1.45, -0.86]]) {
+        const flat = (p.id + wx * 3 + wz * 7) % 5 === 0;
+        const y = flat ? 0.24 : 0.34;
+        const wh = new THREE.Mesh(wheelGeo, tyre);
+        wh.position.set(wx, y, wz);
+        const r = new THREE.Mesh(rimGeo, rim);
+        r.position.set(wx, y, wz);
+        wh.castShadow = true;
+        g.add(wh, r);
+      }
+      body.position.y = 0.72; // lifted onto its wheels
+      cab.position.y = 1.32;
+      glass.position.y = 1.34;
+      // bumpers + lights for a bit more silhouette
+      for (const sx of [2.33, -2.33]) {
+        const bump = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.22, 1.8), new THREE.MeshLambertMaterial({ color: 0x3a3a3a }));
+        bump.position.set(sx, 0.48, 0);
+        g.add(bump);
+      }
+      for (const lz of [0.65, -0.65]) {
+        const head = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.32), new THREE.MeshBasicMaterial({ color: 0xd8d2b0 }));
+        head.position.set(2.31, 0.78, lz);
+        const tail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.32), new THREE.MeshBasicMaterial({ color: 0x8a2020 }));
+        tail.position.set(-2.31, 0.78, lz);
+        g.add(head, tail);
+      }
       g.position.set(p.pos.x, 0, p.pos.y);
       if (p.h > p.w) g.rotation.y = Math.PI / 2;
       g.rotation.y += ((p.id % 7) - 3) * 0.04; // abandoned, not parked neatly
@@ -453,7 +484,7 @@ export class Renderer {
         if (!m.alive) return;
         const bob = s.moving ? Math.abs(Math.sin(this.time * 10 + i)) * 0.1 : 0;
         g.position.set(m.pos.x, bob, m.pos.y);
-        g.rotation.y = -s.facing;
+        g.rotation.y = -m.facing;
         g.scale.y = SOLDIER_SCALE * (s.inCover && !s.moving ? 0.82 : 1); // crouch behind cover
       });
       this.placeLabel(v.label, s.pos, 3.4, () => this.squadLabelHtml(s, selected.has(s.id)));

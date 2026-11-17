@@ -49,10 +49,22 @@ export class Hud {
     game.onChange(() => (this.dirty = true));
     game.toast = (m) => this.toast(m);
 
-    root.addEventListener('click', (e) => this.click(e));
+    // act on pointerdown: the HUD re-renders several times a second, and a 'click' is lost if the
+    // button is replaced between mousedown and mouseup (that was the "click twice" bug)
+    root.addEventListener('pointerdown', (e) => {
+      if (e.button === 0) this.click(e);
+    });
     game.world.events.on('victory', (e) => this.showEnd(true, e.reason));
     game.world.events.on('defeat', (e) => this.showEnd(false, e.reason));
     this.showIntro();
+  }
+
+  private cache = new WeakMap<HTMLElement, string>();
+  /** Only touch the DOM when a panel's content actually changed (keeps buttons, scroll and <details> stable). */
+  private set(el: HTMLElement, html: string): void {
+    if (this.cache.get(el) === html) return;
+    this.cache.set(el, html);
+    el.innerHTML = html;
   }
 
   toast(msg: string): void {
@@ -61,7 +73,7 @@ export class Hud {
     this.toastTimer = 2.2;
   }
 
-  private click(e: MouseEvent): void {
+  private click(e: PointerEvent): void {
     const btn = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
     if (!btn || btn.classList.contains('disabled')) return;
     const g = this.game;
@@ -70,6 +82,7 @@ export class Hud {
       case 'produce': g.produce(arg); break;
       case 'build': g.startBuild(arg); break;
       case 'charge': g.setMode({ kind: 'charge' }); break;
+      case 'deconstruct': g.setMode({ kind: 'deconstruct' }); break;
       case 'attackMove': g.setMode({ kind: 'attackMove' }); break;
       case 'hold': g.hold(); break;
       case 'stop': g.stop(); break;
@@ -126,7 +139,7 @@ export class Hud {
     const dayPct = (w.dayTimer / BALANCE.economy.dayLengthSec) * 100;
     const upkeep = w.squads.reduce((n, s) => n + s.def.upkeep, 0);
     const speeds = [1, 2, 4].map((s) => `<button class="${g.speed === s ? 'on' : ''}" data-act="speed:${s}">${s}×</button>`).join('');
-    this.top.innerHTML = `
+    this.set(this.top, `
       <div class="brand">DEAD BLOCK <span>COMMAND</span></div>
       <div class="res" title="Money — the hard resource"><b>$</b>${Math.floor(w.money)}</div>
       <div class="res" title="Supplies (cap)"><b>▣</b>${Math.floor(w.supplies)}<small>/${w.supplyCap}</small></div>
@@ -138,7 +151,7 @@ export class Hud {
         <button class="${g.paused ? 'on warn' : ''}" data-act="pause">${g.paused ? '▶ PAUSED' : '❚❚'}</button>${speeds}
         <button data-act="rot:-1" title="Rotate camera (Q)">⟲</button><span class="compass" title="Camera heading">VIEW ${Math.round(g.renderer.rig.headingDeg)}° ${g.renderer.rig.headingLabel}</span><button data-act="rot:1" title="Rotate camera (E)">⟳</button>
         <button data-act="ops" title="Operations map (M)">${g.renderer.rig.strategic ? 'STREET' : 'OPS MAP'}</button>
-      </div>`;
+      </div>`);
   }
 
   private renderDistricts(): void {
@@ -155,7 +168,7 @@ export class Hud {
         ${hive.map((h) => `<div class="row small"><span>Hive stage ${h.stage}/4</span><span>next pulse ${fmtTime(Math.max(0, h.pulseTimer))}</span></div>`).join('')}
       </div>`;
     }
-    this.districts.innerHTML = html;
+    this.set(this.districts, html);
   }
 
   private renderObjectives(): void {
@@ -167,7 +180,7 @@ export class Hud {
       [motel.cleared || motel.secured, `Clear Roadside Motel to 0% <small>(${Math.ceil(motel.infestation)}%)</small>`],
       [motel.secured, 'Build an outpost there with engineers'],
     ] as const;
-    this.objectives.innerHTML = `<h3>Objectives</h3>${items.map(([done, t]) => `<div class="obj ${done ? 'done' : ''}">${done ? '☑' : '☐'} ${t}</div>`).join('')}`;
+    this.set(this.objectives, `<h3>Objectives</h3>${items.map(([done, t]) => `<div class="obj ${done ? 'done' : ''}">${done ? '☑' : '☐'} ${t}</div>`).join('')}`);
   }
 
   private renderSelection(): void {
@@ -175,14 +188,14 @@ export class Hud {
     const sq = g.selectedSquads;
     if (!sq.length) {
       const all = g.world.squads.map((s) => `<button class="chip" data-act="focus:${s.id}">${esc(s.name)} <small>${s.aliveCount}/${s.members.length}</small></button>`).join('');
-      this.selection.innerHTML = `<h3>Forces</h3><div class="chips">${all || '<i>No squads left.</i>'}</div><p class="hint">Click or drag to select · right-click to move · right-click a car for cover</p>`;
+      this.set(this.selection, `<h3>Forces</h3><div class="chips">${all || '<i>No squads left.</i>'}</div><p class="hint">Click or drag to select · right-click to move · right-click a car for cover</p>`);
       return;
     }
     const cards = sq
       .slice(0, 6)
       .map((s) => {
         const pips = s.members.map((m) => `<span class="pip ${!m.alive ? 'dead' : m.hp / m.maxHp < 0.35 ? 'low' : m.hp / m.maxHp < 0.7 ? 'mid' : ''}"></span>`).join('');
-        const order = s.holding ? 'Holding' : s.currentOrder ? { move: 'Moving', attackMove: 'Attack-moving', cover: 'To cover', build: 'Building', charge: 'Planting charge', hold: 'Holding', patrol: 'Patrol' }[s.currentOrder.type] : 'Idle';
+        const order = s.holding ? 'Holding' : s.currentOrder ? { move: 'Moving', attackMove: 'Attack-moving', cover: 'To cover', build: 'Building', charge: 'Planting charge', hold: 'Holding', patrol: 'Patrol', attack: 'Attacking target', deconstruct: 'Deconstructing' }[s.currentOrder.type] : 'Idle';
         const lv = BALANCE.combat.levels;
         const next = lv[s.level + 1];
         const xp = next ? `${s.xp}/${next.xp} xp` : 'max';
@@ -202,14 +215,15 @@ export class Hud {
     let cmds = btn('attackMove', 'Attack-move', 'A', undefined, mode.kind === 'attackMove') + btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'S');
     if (eng) {
       const b = (id: string, key: string) => btn(`build:${id}`, STRUCTURES[id].name, key, STRUCTURES[id].cost, mode.kind === 'build' && mode.defId === id);
-      cmds += '<div class="sep"></div>' + b('sandbags', 'F') + b('wire', 'G') + b('mgNest', 'T') + b('outpost', 'O') + btn('charge', 'Demo Charge', 'C', ABILITIES.demoCharge.cost, mode.kind === 'charge');
+      cmds += '<div class="sep"></div>' + b('sandbags', 'F') + b('wire', 'G') + b('mgNest', 'T') + b('outpost', 'O') + btn('charge', 'Demo Charge', 'C', ABILITIES.demoCharge.cost, mode.kind === 'charge') + btn('deconstruct', 'Deconstruct', 'X', undefined, mode.kind === 'deconstruct');
     }
     const modeHint =
       mode.kind === 'build' ? `Placing ${STRUCTURES[mode.defId].name} — click to place · R rotate · Shift to keep placing · right-click cancel`
       : mode.kind === 'attackMove' ? 'Attack-move: click a destination'
       : mode.kind === 'charge' ? 'Click a hive to plant a demo charge'
-      : `${sq.length} selected · Shift+right-click queues waypoints · Ctrl+1–9 sets a group`;
-    this.selection.innerHTML = `<div class="cards">${cards}</div><div class="cmds">${cmds}</div><p class="hint">${modeHint}</p>`;
+      : mode.kind === 'deconstruct' ? 'Click something your engineers built to take it down (unstarted: full refund, built: half)'
+      : `${sq.length} selected · right-click a zombie to focus it · Shift+right-click queues · Ctrl+1–9 groups`;
+    this.set(this.selection, `<div class="cards">${cards}</div><div class="cmds">${cmds}</div><p class="hint">${modeHint}</p>`);
   }
 
   private renderProduction(): void {
@@ -227,13 +241,13 @@ export class Hud {
       .join('');
     const q = queue.map((j, i) => `<div class="qitem">${UNITS[j.defId].name}${i === 0 ? ` <small>${Math.ceil(j.remaining)}s</small>` : ''}</div>`).join('');
     const lockedHtml = locked.map((u) => `<div class="locked" title="${esc(u.unlock)}">🔒 ${u.name}<small>${esc(u.unlock)}</small></div>`).join('');
-    this.production.innerHTML = `<h3>Barracks</h3>${rows}${q ? `<div class="queue">${q}</div>` : ''}
-      <details><summary>Roster roadmap (${locked.length} locked)</summary>${lockedHtml}</details>`;
+    this.set(this.production, `<h3>Barracks</h3>${rows}${q ? `<div class="queue">${q}</div>` : ''}
+      <details><summary>Roster roadmap (${locked.length} locked)</summary>${lockedHtml}</details>`);
   }
 
   private renderRadio(): void {
     const lines = this.radio.lines.slice(-7);
-    this.radioEl.innerHTML = `<h3>Radio</h3>${lines.map((l) => `<div class="line ${l.tone}"><b>${esc(l.speaker)}:</b> ${esc(l.text)}</div>`).join('')}`;
+    this.set(this.radioEl, `<h3>Radio</h3>${lines.map((l) => `<div class="line ${l.tone}"><b>${esc(l.speaker)}:</b> ${esc(l.text)}</div>`).join('')}`);
     this.radioEl.scrollTop = this.radioEl.scrollHeight;
   }
 
@@ -250,11 +264,11 @@ export class Hud {
         <div><h3>Controls</h3>
           <ul>
             <li><kbd>LMB</kbd> select · drag to box-select · <kbd>Shift</kbd> add</li>
-            <li><kbd>RMB</kbd> move · on a car/sandbags = take cover · on hive = charge it</li>
+            <li><kbd>RMB</kbd> move · on a zombie = attack it · on a car/sandbags = take cover · on hive = charge it</li>
             <li><kbd>A</kbd> attack-move · <kbd>H</kbd> hold · <kbd>S</kbd> stop</li>
             <li><kbd>Shift</kbd>+<kbd>RMB</kbd> queue waypoints · <kbd>Ctrl</kbd>+<kbd>1-9</kbd> groups</li>
-            <li>Engineers: <kbd>F</kbd> sandbags · <kbd>G</kbd> wire · <kbd>T</kbd> MG nest · <kbd>O</kbd> outpost · <kbd>C</kbd> demo charge · <kbd>R</kbd> rotate</li>
-            <li><kbd>Arrows</kbd>/edge/<kbd>MMB</kbd> pan · wheel zoom · <kbd>Q</kbd>/<kbd>E</kbd> rotate · <kbd>M</kbd> ops map</li>
+            <li>Engineers: <kbd>F</kbd> sandbags · <kbd>G</kbd> wire · <kbd>T</kbd> MG nest · <kbd>O</kbd> outpost · <kbd>C</kbd> demo charge · <kbd>X</kbd> deconstruct · <kbd>R</kbd> rotate</li>
+            <li><kbd>Arrows</kbd>/edge/<kbd>Shift</kbd>+<kbd>MMB</kbd> pan · wheel zoom · <kbd>MMB</kbd> drag or <kbd>Q</kbd>/<kbd>E</kbd> rotate · <kbd>M</kbd> ops map</li>
             <li><kbd>Space</kbd> pause · <kbd>+</kbd>/<kbd>-</kbd> speed · <kbd>P</kbd> pixel filter</li>
           </ul></div>
         <div><h3>Field notes</h3>

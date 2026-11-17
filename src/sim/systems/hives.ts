@@ -1,7 +1,7 @@
 import { dist, type Vec2 } from '../../core/math';
 import { BALANCE } from '../../config/balance';
 import { isEnabled } from '../../config/features';
-import type { Hive } from '../entities';
+import { Squad, type Hive } from '../entities';
 import type { World } from '../World';
 import { lure } from './zombies';
 
@@ -18,6 +18,19 @@ export function updateHives(w: World, dt: number): void {
         h.stage++;
         h.hp += H.hpByStage[h.stage - 1] - H.hpByStage[h.stage - 2]; // matures: tougher to crack
         w.events.emit('hiveStage', { hiveId: h.id, stage: h.stage, districtId: h.districtId });
+      }
+    }
+
+    // hive alarm: intruders near the hive draw every zombie around it (no sprinting in to plant a charge)
+    const intruder = w.squadHash.query(h.pos, H.alarmRadius + h.radius).find((s) => s.alive);
+    if (intruder) {
+      for (const z of w.zombieHash.query(h.pos, H.alarmCallRadius)) {
+        if (!z.alive || z.targetId === intruder.id) continue;
+        if (z.state === 'attack' && w.get(z.targetId) instanceof Squad) continue; // already busy eating someone
+        z.targetId = intruder.id;
+        z.state = 'chase';
+        z.aggro = BALANCE.zombie.aggroTimeSec;
+        z.path = [];
       }
     }
 

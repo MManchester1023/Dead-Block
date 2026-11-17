@@ -325,6 +325,7 @@ export class World {
     // hit the member nearest the source (the one in front)
     const alive = sq.members.filter((m) => m.alive);
     if (!alive.length) return;
+    sq.lastHit = this.time;
     const victim = source ? alive.reduce((a, b) => (dist(a.pos, source) < dist(b.pos, source) ? a : b)) : this.rng.pick(alive);
     victim.hp -= dmg;
     if (victim.hp <= 0) {
@@ -376,13 +377,53 @@ export class World {
   damageStructure(s: Structure, amount: number): void {
     s.hp -= amount;
     if (s.hp <= 0 && s.alive) {
-      s.alive = false;
-      this.byId.delete(s.id);
-      const def = s.def;
-      if (def.blocksMovement) this.grid.setRect(s.tile.x, s.tile.y, s.size.w, s.size.h, false);
-      if (def.slow) this.grid.setSlow(s.tile.x, s.tile.y, s.size.w, s.size.h, 1);
-      this.events.emit('structureDestroyed', { id: s.id, defId: def.id, pos: s.pos });
+      this.removeStructure(s);
+      this.events.emit('structureDestroyed', { id: s.id, defId: s.def.id, pos: s.pos });
     }
+  }
+
+  private removeStructure(s: Structure): void {
+    s.alive = false;
+    this.byId.delete(s.id);
+    const def = s.def;
+    if (def.blocksMovement) this.grid.setRect(s.tile.x, s.tile.y, s.size.w, s.size.h, false);
+    if (def.slow) this.grid.setSlow(s.tile.x, s.tile.y, s.size.w, s.size.h, 1);
+  }
+
+  /** Engineers can take back what they built (v4.2): full refund for an unstarted site, half otherwise. */
+  canDeconstruct(s: Structure): string | null {
+    if (!s.alive) return 'Already gone';
+    if (!s.def.cost.money && !s.def.cost.supplies) return "Base facilities can't be dismantled";
+    return null;
+  }
+
+  dismantle(s: Structure): void {
+    if (this.canDeconstruct(s)) return;
+    const k = !s.built && s.buildProgress <= 0 ? 1 : 0.5;
+    const refund = { money: Math.round(s.def.cost.money * k), supplies: Math.round(s.def.cost.supplies * k) };
+    this.money += refund.money;
+    this.addSupplies(refund.supplies);
+    // dismantling your own outpost gives up the district quietly — no hive (that's for a zombie retake)
+    for (const d of this.districts.values())
+      if (d.outpostId === s.id) {
+        d.secured = false;
+        d.outpostId = null;
+      }
+    this.removeStructure(s);
+    this.events.emit('structureDismantled', { id: s.id, defId: s.def.id, pos: s.pos, refund });
+  }
+
+  orderDeconstruct(engineers: Squad[], s: Structure, queue = false): string | null {
+    const eng = engineers.filter((e) => e.def.canBuild?.length);
+    if (!eng.length) return 'Only engineers can deconstruct';
+    const err = this.canDeconstruct(s);
+    if (err) return err;
+    this.issueOrder(eng, { type: 'deconstruct', pos: s.pos, targetId: s.id }, queue);
+    return null;
+  }
+
+  orderAttack(squads: Squad[], target: Targetable, queue = false): void {
+    this.issueOrder(squads, { type: 'attack', pos: { ...target.pos }, targetId: target.id }, queue);
   }
 
   /** Area damage with knockback by distance (doc §5 v4: friend and foe both get thrown). */

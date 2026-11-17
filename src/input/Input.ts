@@ -4,7 +4,7 @@ import type { Game } from '../Game';
 export class Input {
   private dragStart: { x: number; y: number } | null = null;
   private dragging = false;
-  private panning: { x: number; y: number } | null = null;
+  private panning: { x: number; y: number; rotate: boolean } | null = null;
   private mouse = { x: 0, y: 0, inside: false };
   private keys = new Set<string>();
   private box: HTMLDivElement;
@@ -36,7 +36,8 @@ export class Input {
 
   private down(e: MouseEvent): void {
     if (e.button === 1) {
-      this.panning = { x: e.clientX, y: e.clientY };
+      // middle-drag rotates the camera; Shift + middle-drag pans
+      this.panning = { x: e.clientX, y: e.clientY, rotate: !e.shiftKey };
       e.preventDefault();
       return;
     }
@@ -60,6 +61,11 @@ export class Input {
       if (!e.shiftKey) g.setMode({ kind: 'normal' });
       return;
     }
+    if (g.mode.kind === 'deconstruct') {
+      g.deconstructAt(p, e.shiftKey);
+      if (!e.shiftKey) g.setMode({ kind: 'normal' });
+      return;
+    }
     if (g.mode.kind === 'charge') {
       g.commandAt(p, e.shiftKey);
       g.setMode({ kind: 'normal' });
@@ -73,8 +79,11 @@ export class Input {
     this.mouse.x = e.clientX;
     this.mouse.y = e.clientY;
     if (this.panning) {
-      this.game.renderer.rig.panScreen(this.panning.x - e.clientX, this.panning.y - e.clientY, window.innerHeight);
-      this.panning = { x: e.clientX, y: e.clientY };
+      const rig = this.game.renderer.rig;
+      if (this.panning.rotate) rig.rotateBy((e.clientX - this.panning.x) * 0.006);
+      else rig.panScreen(this.panning.x - e.clientX, this.panning.y - e.clientY, window.innerHeight);
+      this.panning = { ...this.panning, x: e.clientX, y: e.clientY };
+      this.game.changed();
       return;
     }
     if (this.dragStart) {
@@ -87,13 +96,16 @@ export class Input {
         Object.assign(this.box.style, { display: 'block', left: `${x}px`, top: `${y}px`, width: `${Math.abs(dx)}px`, height: `${Math.abs(dy)}px` });
       }
     }
+  }
+
+  /** Placement preview — refreshed every frame so rotating (R), panning or zooming updates it immediately. */
+  private updateGhost(): void {
     const g = this.game;
-    if (g.mode.kind === 'build') {
-      const p = this.ground(e);
-      const tile = g.buildTile(p, g.mode.defId, g.mode.rotated);
-      const ok = !g.world.canPlace(g.mode.defId, tile, g.mode.rotated);
-      g.renderer.setGhost(tile, g.world.footprint(g.mode.defId, g.mode.rotated), ok);
-    }
+    if (g.mode.kind !== 'build' || !this.mouse.inside) return;
+    const p = this.ground(this.mouse.x === 0 && this.mouse.y === 0 ? { clientX: innerWidth / 2, clientY: innerHeight / 2 } : { clientX: this.mouse.x, clientY: this.mouse.y });
+    const tile = g.buildTile(p, g.mode.defId, g.mode.rotated);
+    const ok = !g.world.canPlace(g.mode.defId, tile, g.mode.rotated);
+    g.renderer.setGhost(tile, g.world.footprint(g.mode.defId, g.mode.rotated), ok);
   }
 
   private up(e: MouseEvent): void {
@@ -207,6 +219,10 @@ export class Input {
       case 'r':
         if (g.mode.kind === 'build') g.setMode({ ...g.mode, rotated: !g.mode.rotated });
         break;
+      case 'x':
+        if (g.selectedEngineers.length) g.setMode({ kind: 'deconstruct' });
+        else g.toast('Select an Engineer Team to deconstruct');
+        break;
       case '+':
       case '=':
         g.setSpeed(g.speed * 2);
@@ -224,6 +240,7 @@ export class Input {
 
   /** Called every frame: keyboard and edge-of-screen panning. */
   update(dt: number): void {
+    this.updateGhost();
     const rig = this.game.renderer.rig;
     const sp = 900 * dt;
     let dx = 0;

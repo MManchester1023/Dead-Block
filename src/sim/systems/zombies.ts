@@ -1,5 +1,6 @@
 import { dist, norm, sub, type Vec2 } from '../../core/math';
-import { Hive, Structure, type Zombie } from '../entities';
+import { BALANCE } from '../../config/balance';
+import { Hive, Squad, Structure, type Zombie } from '../entities';
 import { findPath } from '../pathfinding';
 import type { Targetable } from '../types';
 import type { World } from '../World';
@@ -27,6 +28,8 @@ export function updateZombies(w: World, dt: number): void {
       think(w, z);
     }
     z.attackCooldown -= dt;
+    z.aggro = Math.max(0, z.aggro - dt);
+    z.repathTimer -= dt;
 
     const target = w.get(z.targetId);
     let dest: Vec2 | null = null;
@@ -55,10 +58,16 @@ export function updateZombies(w: World, dt: number): void {
       continue;
     }
 
-    // heard something behind a building? get a real path instead of face-planting into the wall
-    if (!z.path.length && z.goal && dest === z.goal && pathBudget > 0 && dist(z.pos, dest) > 8 && !w.grid.lineClear(z.pos, dest)) {
+    // destination behind a building (a sound, or prey that ducked out of sight)? get a real path
+    // instead of face-planting into the wall; re-plan as a fleeing target moves
+    const stale = !z.pathFor || dist(z.pathFor, dest) > 6;
+    if ((!z.path.length || (stale && z.repathTimer <= 0)) && pathBudget > 0 && dist(z.pos, dest) > 8 && !w.grid.lineClear(z.pos, dest)) {
       pathBudget--;
+      z.repathTimer = BALANCE.zombie.repathSec;
+      z.pathFor = { ...dest };
       z.path = findPath(w.grid, z.pos, dest, 3000) ?? [];
+    } else if (z.path.length && w.grid.lineClear(z.pos, dest) && dist(z.pos, dest) < 20) {
+      z.path = []; // clear view of the target again: just go straight for it
     }
 
     // steer along an A* path if we have one, else beeline
@@ -121,7 +130,6 @@ export function updateZombies(w: World, dt: number): void {
 
 function think(w: World, z: Zombie): void {
   const cur = w.get(z.targetId);
-  // keep scratching at a structure only while nothing tastier is near
   let best: Targetable | null = null;
   let bestD = z.def.sight;
   for (const s of w.squadHash.query(z.pos, z.def.sight)) {
@@ -132,6 +140,28 @@ function think(w: World, z: Zombie): void {
       bestD = d;
     }
   }
+
+  // Aggro (v4.2): time-based first, then distance-based. A zombie that has seen a squad hunts it
+  // for aggroTimeSec even out of sight, then keeps coming while it's within leashDistance.
+  if (cur instanceof Squad && cur.alive) {
+    if (best === cur) z.aggro = BALANCE.zombie.aggroTimeSec; // still in view: refresh
+    const curD = dist(z.pos, cur.pos);
+    const hunting = z.aggro > 0 || curD <= BALANCE.zombie.leashDistance;
+    // only switch prey for something clearly closer
+    if (hunting && !(best && best !== cur && bestD < curD * 0.6)) {
+      z.state = 'chase';
+      return;
+    }
+  }
+  if (best instanceof Squad) {
+    if (best.id !== z.targetId) z.path = [];
+    z.targetId = best.id;
+    z.state = 'chase';
+    z.aggro = BALANCE.zombie.aggroTimeSec;
+    return;
+  }
+
+  // keep scratching at a structure only while nothing tastier is near
   if (!best && cur instanceof Structure && cur.alive && dist(z.pos, cur.pos) < cur.radius + 6) return;
   if (!best) {
     for (const st of w.structures) {

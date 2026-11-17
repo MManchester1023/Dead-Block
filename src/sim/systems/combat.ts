@@ -56,9 +56,14 @@ function fire(w: World, from: Vec2, t: Targetable, weapon: WeaponDef, dmgMult: n
 export function updateCombat(w: World, dt: number): void {
   for (const s of w.squads) {
     if (!s.alive || s.stunned > 0) continue;
-    const order = s.currentOrder?.type;
-    const busy = order === 'build' || order === 'charge';
-    const t = acquire(w, s, s.faction, s.def.weapon);
+    const order = s.currentOrder;
+    const busy = order?.type === 'build' || order?.type === 'charge' || order?.type === 'deconstruct';
+    // forced target (right-clicked zombie) overrides threat priority once it's in range and visible
+    const forced = order?.type === 'attack' ? w.get(order.targetId ?? null) : undefined;
+    const forcedOk =
+      forced && forced.alive && dist(s.pos, forced.pos) - forced.radius <= s.def.weapon.range && canHurt(s.def.weapon, forced) && w.grid.lineClear(s.pos, forced.pos);
+    if (forcedOk) s.targetId = forced.id;
+    const t = forcedOk ? forced : acquire(w, s, s.faction, s.def.weapon);
     if (!t) continue;
     if (!s.moving) s.facing = Math.atan2(t.pos.y - s.pos.y, t.pos.x - s.pos.x);
     // builders only defend themselves against danger-close threats

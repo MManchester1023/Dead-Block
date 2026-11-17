@@ -15,7 +15,7 @@ export function updateOrders(w: World, dt: number): void {
     applyKnock(w, s, dt);
     if (s.stunned > 0) {
       s.stunned -= dt;
-      updateMembers(s, dt);
+      updateMembers(w, s, dt);
       continue;
     }
     s.moving = false;
@@ -45,13 +45,19 @@ export function updateOrders(w: World, dt: number): void {
         case 'charge':
           doCharge(w, s, dt);
           break;
+        case 'attack':
+          doAttack(w, s, dt);
+          break;
+        case 'deconstruct':
+          doDeconstruct(w, s, dt);
+          break;
         default:
           s.orders.shift();
       }
     }
     separate(w, s, dt);
     updateCover(w, s);
-    updateMembers(s, dt);
+    updateMembers(w, s, dt);
   }
 }
 
@@ -67,9 +73,11 @@ function applyKnock(w: World, s: Squad, dt: number): void {
 /** Returns true on arrival. */
 export function moveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: number): boolean {
   if (dist(s.pos, dest) <= arrive) return true;
+  if (s.pathFor && dist(s.pathFor, dest) > 3) s.path = []; // destination moved (chasing a target)
   if (!s.path.length || s.pathVersion !== w.grid.version) {
     s.path = findPath(w.grid, s.pos, dest) ?? [];
     s.pathVersion = w.grid.version;
+    s.pathFor = { ...dest };
     if (!s.path.length) return true; // unreachable: give up gracefully
   }
   const wp = s.path[0];
@@ -117,6 +125,49 @@ function doBuild(w: World, s: Squad, dt: number): void {
   }
 }
 
+/** Forced attack (right-click a zombie): close to weapon range with line of sight, then combat locks onto it. */
+function doAttack(w: World, s: Squad, dt: number): void {
+  const o = s.currentOrder!;
+  const t = w.get(o.targetId ?? null);
+  if (!t || !t.alive) {
+    s.orders.shift();
+    s.path = [];
+    return;
+  }
+  const inRange = dist(s.pos, t.pos) - t.radius <= s.def.weapon.range * 0.9 && w.grid.lineClear(s.pos, t.pos);
+  if (inRange) {
+    s.path = [];
+    s.facing = Math.atan2(t.pos.y - s.pos.y, t.pos.x - s.pos.x);
+    return;
+  }
+  moveToward(w, s, t.pos, dt, 0);
+}
+
+function doDeconstruct(w: World, s: Squad, dt: number): void {
+  const o = s.currentOrder!;
+  const site = w.get(o.targetId ?? null);
+  if (!(site instanceof Structure) || !site.alive) {
+    s.orders.shift();
+    s.buildProgress = 0;
+    return;
+  }
+  const st = approach(w, s, site.pos, site.radius, site.radius + 4, dt);
+  if (st === 'moving') return;
+  if (st === 'blocked') {
+    s.orders.shift();
+    return;
+  }
+  s.path = [];
+  s.facing = Math.atan2(site.pos.y - s.pos.y, site.pos.x - s.pos.x);
+  s.buildProgress += dt * (s.aliveCount / s.def.members);
+  w.makeNoise(s.pos, 0.8 * dt * 10);
+  if (s.buildProgress >= Math.max(2, site.def.buildTime * 0.5)) {
+    w.dismantle(site);
+    s.buildProgress = 0;
+    s.orders.shift();
+  }
+}
+
 function doCharge(w: World, s: Squad, dt: number): void {
   const o = s.currentOrder!;
   const hive = w.get(o.targetId ?? null);
@@ -132,6 +183,16 @@ function doCharge(w: World, s: Squad, dt: number): void {
     return;
   }
   const ab = ABILITIES.demoCharge;
+  // planting takes a few seconds and getting hit starts it over — engineers need cover fire
+  s.path = [];
+  s.facing = Math.atan2(hive.pos.y - s.pos.y, hive.pos.x - s.pos.x);
+  if (s.lastHit >= w.time - dt * 1.5) {
+    s.buildProgress = 0;
+    return;
+  }
+  s.buildProgress += dt;
+  if (s.buildProgress < ab.plantTime) return;
+  s.buildProgress = 0;
   if (!w.spend(ab.cost)) {
     w.events.emit('radio', { speaker: s.name, text: 'No budget for charges, Command. Need $25 and 10 supplies.', tone: 'warn' });
     s.orders.shift();
@@ -198,15 +259,46 @@ function updateCover(w: World, s: Squad): void {
   }
 }
 
-function updateMembers(s: Squad, dt: number): void {
+/**
+ * Members aren't welded to formation slots (v4.2 "less stiff"): each one drifts around its slot,
+ * moves at its own pace (so squads string out on the move and bunch up on arrival), and faces
+ * where it's going or, at rest, roughly where the squad is looking with its own glances around.
+ * Fully deterministic (phase from squad id + member index) so the sim stays reproducible.
+ */
+function updateMembers(w: World, s: Squad, dt: number): void {
+  const t = w.time;
   const c = Math.cos(s.facing + Math.PI / 2);
   const si = Math.sin(s.facing + Math.PI / 2);
-  const k = 1 - Math.exp(-8 * dt);
+  const resting = !s.moving;
+  const amp = resting ? (s.holding || s.inCover ? 0.5 : 1.3) : 0.6;
   for (const m of s.members) {
     if (!m.alive) continue;
-    const tx = s.pos.x + m.offset.x * c - m.offset.y * si;
-    const ty = s.pos.y + m.offset.x * si + m.offset.y * c;
-    m.pos.x += (tx - m.pos.x) * k;
-    m.pos.y += (ty - m.pos.y) * k;
+    const ph = s.id * 1.7 + m.index * 2.3;
+    const driftX = (Math.sin(t * 0.21 + ph) + 0.5 * Math.sin(t * 0.53 + ph * 1.9)) * amp;
+    const driftY = (Math.cos(t * 0.17 + ph * 1.3) + 0.5 * Math.sin(t * 0.47 + ph * 0.7)) * amp;
+    const ox = m.offset.x * 1.15 + driftX;
+    const oy = m.offset.y * 1.15 + driftY;
+    let tx = s.pos.x + ox * c - oy * si;
+    let ty = s.pos.y + ox * si + oy * c;
+    if (w.grid.isBlockedXY(tx, ty)) {
+      tx = s.pos.x + (tx - s.pos.x) * 0.3;
+      ty = s.pos.y + (ty - s.pos.y) * 0.3;
+    }
+    const dx = tx - m.pos.x;
+    const dy = ty - m.pos.y;
+    const d = Math.hypot(dx, dy);
+    // each soldier has their own pace; resting shuffles are slow
+    const pace = resting ? 0.9 + 0.3 * Math.sin(ph) : s.def.speed * (1.05 + 0.12 * Math.sin(ph * 3.1));
+    const step = Math.min(d, pace * dt + (d > 4 ? (d - 4) * dt * 4 : 0)); // catch up if left far behind
+    if (d > 0.001) {
+      m.pos.x += (dx / d) * step;
+      m.pos.y += (dy / d) * step;
+    }
+    const glance = Math.sin(t * 0.3 + ph * 2.1) * 0.5;
+    const want = d > 0.25 && !resting ? Math.atan2(dy, dx) : s.facing + (s.targetId ? glance * 0.3 : glance);
+    let diff = want - m.facing;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    m.facing += diff * Math.min(1, dt * 6);
   }
 }

@@ -79,9 +79,17 @@ export class CameraRig {
     this.zoom = clamp(this.zoom * factor, this.minZoom, this.maxZoom);
   }
 
-  /** Rotate by quarter turns (Q / E). Smoothly animated in apply(). */
+  /** Rotate by quarter turns (Q / E), snapping to the four iso views. Smoothly animated in apply(). */
   rotate(quarterTurns: number): void {
-    this.goalYaw += (quarterTurns * Math.PI) / 2;
+    const q = Math.PI / 2;
+    const base = Math.PI / 4;
+    this.goalYaw = base + (Math.round((this.goalYaw - base) / q) + quarterTurns) * q;
+  }
+
+  /** Free rotation (middle-mouse drag), immediate. */
+  rotateBy(rad: number): void {
+    this.goalYaw += rad;
+    this.yaw += rad;
   }
 
   focus(p: Vec2): void {

@@ -177,4 +177,64 @@ describe('world rules', () => {
     expect(w.zombies.filter((z) => z.alive).length).toBe(0);
     expect(w.squads.length).toBe(2);
   });
+
+  describe('v4.2 playtest fixes', () => {
+    it('right-click attack: the squad kills the chosen zombie before a closer one', () => {
+      const w = new World({ populate: false, seed: 9 });
+      const sq = w.spawnSquad('rifle', M(20, 36));
+      w.issueOrder([sq], { type: 'hold', pos: sq.pos });
+      const near = w.spawnZombie('walker', { x: sq.pos.x + 12, y: sq.pos.y })!;
+      const chosen = w.spawnZombie('walker', { x: sq.pos.x + 20, y: sq.pos.y + 2 })!;
+      near.state = chosen.state = 'idle';
+      near.def = { ...near.def, speed: 0, sight: 0 }; // keep both still so only targeting is tested
+      chosen.def = { ...chosen.def, speed: 0, sight: 0 };
+      w.orderAttack([sq], chosen);
+      let chosenDiedFirst = false;
+      for (let i = 0; i < 30 * 20 && near.alive; i++) {
+        w.step(1 / 30);
+        if (!chosen.alive && near.alive) chosenDiedFirst = true;
+      }
+      expect(chosenDiedFirst).toBe(true);
+    });
+
+    it('zombie aggro is time-based: it keeps hunting a squad that runs out of sight', () => {
+      const w = new World({ populate: false, seed: 4 });
+      const sq = w.spawnSquad('rifle', M(15, 36));
+      sq.members.forEach((m) => (m.hp = m.maxHp = 1e6)); // survive the test
+      const z = w.spawnZombie('walker', { x: sq.pos.x + 8, y: sq.pos.y })!;
+      for (let i = 0; i < 15; i++) w.step(1 / 30); // it spots us
+      expect(z.state).toBe('chase');
+      // run west, far beyond its 14 m sight, without shooting
+      sq.def = { ...sq.def, weapon: { ...sq.def.weapon, range: 0 } };
+      w.issueOrder([sq], { type: 'move', pos: M(5, 30) });
+      for (let i = 0; i < 30 * 8; i++) w.step(1 / 30);
+      expect(Math.hypot(z.pos.x - sq.pos.x, z.pos.y - sq.pos.y)).toBeGreaterThan(z.def.sight);
+      expect(z.targetId).toBe(sq.id); // still hunting after 8 s out of sight
+    });
+
+    it('engineers deconstruct: full refund before work starts, half once built', () => {
+      const w = new World({ populate: false });
+      w.money = 500;
+      w.supplies = 100;
+      const site = w.addStructure('sandbags', { x: 20, y: 40 }, false);
+      const m0 = w.money;
+      w.dismantle(site);
+      expect(w.money).toBe(m0 + 15);
+      const built = w.addStructure('mgNest', { x: 20, y: 44 }, true);
+      const m1 = w.money;
+      w.dismantle(built);
+      expect(w.money).toBe(m1 + 40);
+      expect(w.grid.isBlocked(20, 44)).toBe(false);
+      expect(w.canDeconstruct(w.structures.find((s) => s.def.id === 'barracks') ?? built)).not.toBeNull();
+    });
+
+    it('an engineer team walks over and takes down its sandbags', () => {
+      const w = new World({ populate: false });
+      const eng = w.spawnSquad('engineer', M(20, 36));
+      const bags = w.addStructure('sandbags', { x: 24, y: 34 }, true);
+      expect(w.orderDeconstruct([eng], bags)).toBeNull();
+      for (let i = 0; i < 30 * 15 && bags.alive; i++) w.step(1 / 30);
+      expect(bags.alive).toBe(false);
+    });
+  });
 });

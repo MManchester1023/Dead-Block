@@ -4,12 +4,14 @@ import { dist, type Vec2 } from './core/math';
 import { World } from './sim/World';
 import { Squad } from './sim/entities';
 import { Renderer } from './render/Renderer';
+import type { Targetable } from './sim/types';
 
 export type Mode =
   | { kind: 'normal' }
   | { kind: 'attackMove' }
   | { kind: 'build'; defId: string; rotated: boolean }
-  | { kind: 'charge' };
+  | { kind: 'charge' }
+  | { kind: 'deconstruct' };
 
 /**
  * Owns the fixed-step loop, pause/speed (doc §2), the current selection and the
@@ -94,6 +96,22 @@ export class Game {
       return;
     }
 
+    // right-click a zombie: everyone selected focuses it (v4.2)
+    let zed: Targetable | null = null;
+    let zd = 2.2;
+    for (const z of w.zombieHash.query(p, 2.2)) {
+      const d = dist(z.pos, p);
+      if (z.alive && d < zd) {
+        zed = z;
+        zd = d;
+      }
+    }
+    if (zed) {
+      w.orderAttack(sq, zed, queue);
+      this.renderer.marker(zed.pos, 0xd2443a);
+      return;
+    }
+
     const prop = w.map.props.find((c) => dist(c.pos, p) < 3);
     if (prop) {
       // take cover on the side of the car facing the squads (i.e. car between us and the click direction)
@@ -122,6 +140,17 @@ export class Game {
 
     w.issueOrder(sq, { type: 'move', pos: w.grid.nearestFree(p) }, queue);
     this.renderer.marker(p, 0x9fe07a);
+  }
+
+  deconstructAt(p: Vec2, queue: boolean): void {
+    const st = this.world.structures.find((s) => s.alive && dist(s.pos, p) < s.radius + 1);
+    if (!st) {
+      this.toast('Click a structure to deconstruct');
+      return;
+    }
+    const err = this.world.orderDeconstruct(this.selectedEngineers, st, queue);
+    if (err) this.toast(err);
+    else this.renderer.marker(st.pos, 0xd0c070);
   }
 
   attackMoveAt(p: Vec2, queue: boolean): void {

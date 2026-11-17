@@ -34,8 +34,8 @@ export interface UnitDef {
   tags?: string[];
 }
 
-const rifle: WeaponDef = { name: 'Service rifle', range: 18, damage: 9, cooldown: 0.9, accuracy: 0.62, type: 'bullet', loudness: 2.2 };
-const carbine: WeaponDef = { name: 'Carbine', range: 14, damage: 7, cooldown: 1.0, accuracy: 0.7, type: 'bullet', loudness: 1.8 };
+const rifle: WeaponDef = { name: 'Service rifle', range: 24, damage: 9, cooldown: 0.9, accuracy: 0.62, type: 'bullet', loudness: 2.2 };
+const carbine: WeaponDef = { name: 'Carbine', range: 18, damage: 7, cooldown: 1.0, accuracy: 0.7, type: 'bullet', loudness: 1.8 };
 
 /**
  * Full roster from doc §7. Only units whose `requires` feature is on (or which have none)
@@ -85,10 +85,10 @@ export interface ZombieDef {
 }
 
 export const ZOMBIES: Record<string, ZombieDef> = {
-  walker: { id: 'walker', name: 'Walker', hp: 45, speed: 2.7, damage: 7, attackCooldown: 1.2, sight: 14, hearing: 1, threat: ThreatClass.Normal, radius: 0.4 },
-  runner: { id: 'runner', name: 'Runner', hp: 28, speed: 7.6, damage: 5, attackCooldown: 0.8, sight: 18, hearing: 1.4, threat: ThreatClass.Normal, radius: 0.38 },
+  walker: { id: 'walker', name: 'Walker', hp: 36, speed: 2.7, damage: 7, attackCooldown: 1.2, sight: 14, hearing: 1, threat: ThreatClass.Normal, radius: 0.4 },
+  runner: { id: 'runner', name: 'Runner', hp: 22, speed: 7.6, damage: 5, attackCooldown: 0.8, sight: 18, hearing: 1.4, threat: ThreatClass.Normal, radius: 0.38 },
   bloater: { id: 'bloater', name: 'Bloater', hp: 120, speed: 1.8, damage: 10, attackCooldown: 1.6, sight: 12, hearing: 0.8, threat: ThreatClass.Special, radius: 0.75, onDeath: 'toxicCloud' },
-  screamer: { id: 'screamer', name: 'Screamer', hp: 50, speed: 3.2, damage: 3, attackCooldown: 1.5, sight: 24, hearing: 1.2, threat: ThreatClass.Special, radius: 0.4, requires: 'specialZombies' },
+  screamer: { id: 'screamer', name: 'Screamer', hp: 40, speed: 3.2, damage: 3, attackCooldown: 1.5, sight: 24, hearing: 1.2, threat: ThreatClass.Special, radius: 0.4, requires: 'specialZombies' },
   brute: { id: 'brute', name: 'Brute', hp: 300, speed: 2.8, damage: 25, attackCooldown: 1.8, sight: 16, hearing: 1, threat: ThreatClass.Special, radius: 0.9, requires: 'specialZombies' },
 };
 
@@ -125,5 +125,5 @@ export const STRUCTURES: Record<string, StructureDef> = {
 };
 
 export const ABILITIES = {
-  demoCharge: { name: 'Demo Charge', fuse: 5, damage: 520, radius: 7, type: 'explosive' as DamageType, cost: { money: 25, supplies: 10 }, loudness: 30 },
+  demoCharge: { name: 'Demo Charge', plantTime: 3, fuse: 5, damage: 520, radius: 7, type: 'explosive' as DamageType, cost: { money: 25, supplies: 10 }, loudness: 30 },
 };

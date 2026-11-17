@@ -12,8 +12,9 @@ export interface Member {
   cooldown: number;
   /** Formation slot relative to squad center. */
   offset: Vec2;
-  /** Rendered position (lags the squad center a little so squads look alive). */
+  /** Member position, metres (drifts around its slot — see updateMembers). */
   pos: Vec2;
+  facing: number;
   /** Per-member loadout/cosmetics hook for Armory customization (doc §7, Tier 4). */
   loadout?: { weapon?: string; attachments?: string[]; cosmetics?: Record<string, string> };
 }
@@ -41,6 +42,8 @@ export class Squad implements Targetable {
   orders: Order[] = [];
   path: Vec2[] = [];
   pathVersion = -1;
+  /** Where the current cached path leads (lets us re-plan when chasing a moving target). */
+  pathFor: Vec2 | null = null;
   targetId: number | null = null;
   holding = false;
   inCover = 0; // current cover damage reduction
@@ -54,6 +57,8 @@ export class Squad implements Targetable {
   garrisonedIn: number | null = null;
   knock: Vec2 = { x: 0, y: 0 };
   stunned = 0;
+  /** Sim time this squad last took damage (interrupts planting a charge). */
+  lastHit = -1;
   selected = false;
   moving = false;
 
@@ -66,6 +71,7 @@ export class Squad implements Targetable {
       cooldown: (i / def.members) * def.weapon.cooldown, // staggered volleys
       offset: FORMATION_SLOTS[i % FORMATION_SLOTS.length],
       pos: { x: pos.x + FORMATION_SLOTS[i % 4].x, y: pos.y + FORMATION_SLOTS[i % 4].y },
+      facing: 0,
     }));
   }
 
@@ -112,6 +118,10 @@ export class Zombie implements Targetable {
   facing: number;
   homeHiveId: number | null = null;
   burning = 0;
+  /** Seconds of "I know you're there" left after last seeing the target (doc §9, v4.2 aggro rule). */
+  aggro = 0;
+  repathTimer = 0;
+  pathFor: Vec2 | null = null;
 
   constructor(public def: ZombieDef, public pos: Vec2) {
     this.hp = def.hp;

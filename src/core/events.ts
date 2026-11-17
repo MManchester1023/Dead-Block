@@ -18,6 +18,7 @@ export interface GameEvents {
   noiseAlert: { districtId: string };
   structureBuilt: { id: number; defId: string; pos: Vec2 };
   structureDestroyed: { id: number; defId: string; pos: Vec2 };
+  structureDismantled: { id: number; defId: string; pos: Vec2; refund: { money: number; supplies: number } };
   districtSecured: { districtId: string; name: string };
   districtLost: { districtId: string; name: string };
   unitProduced: { id: number; defId: string; name: string };
