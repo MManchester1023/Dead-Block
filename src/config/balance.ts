@@ -21,8 +21,9 @@ export const BALANCE = {
 
   noise: {
     // v4.9: the meter holds after the last sound, then drains gently (it used to drop as fast as it filled)
-    holdSec: 12,
-    decayPerSec: 2.5,
+    // v4.12 (#72): hold 3 s after the last sound, then drain slowly
+    holdSec: 3,
+    decayPerSec: 1.25,
     pulseThreshold: 100,
     // Gunshots carry well beyond sight (zombie sight ~14 m) and scale with the map, not with weapon
     // range: a rifle (2.2) is heard ~110 m away (over half a 192 m district), an MG (3.2) ~160 m.
@@ -107,22 +108,34 @@ export interface DifficultyTier {
   density: number; // multiplier on starting population
   spawnIntervalSec: readonly number[];
   spawnGroup: readonly number[];
-  localCap: readonly number[];
+  /**
+   * v4.13 (#75): each hive's brood is two pools that together make its total. Normal = Walkers and
+   * Runners; medium = every other non-boss type. Per hive stage 1–4.
+   */
+  normalPool: readonly number[];
+  mediumPool: readonly number[];
+  /** Chance a hive spawn is a medium zombie (when the medium pool has room). */
+  mediumChance: readonly number[];
+  /** Share of normals that are Runners. */
+  runnerShare: readonly number[];
+  /** Medium share of the starting crowd, and the minimum number placed (so they're actually met). */
+  mediumStart: number;
+  mediumStartMin: number;
   firstPulseDelaySec: number;
   pulseIntervalSec: readonly number[];
   pulseSize: number; // multiplier on pulse size
-  /** Runners + Bloaters allowed in the district at once: share of its zombies, and a hard ceiling. */
-  specialShare: number;
-  specialMax: number;
 }
 
 export const DIFFICULTY: readonly DifficultyTier[] = [
   // Tutorial: young hives are busier than before (#32) but stages 3–4 are far calmer (#57)
-  { name: 'Tutorial', zombieHp: 0.7, density: 0.85, spawnIntervalSec: [13, 10, 10, 9], spawnGroup: [1, 2, 2, 2], localCap: [16, 32, 48, 64],
-    firstPulseDelaySec: 600, pulseIntervalSec: [420, 330, 270, 240], pulseSize: 0.7, specialShare: 0.1, specialMax: 6 },
-  { name: 'Easy', zombieHp: 0.85, density: 1, spawnIntervalSec: [20, 13, 9, 7], spawnGroup: [1, 2, 2, 3], localCap: [12, 32, 80, 150],
-    firstPulseDelaySec: 540, pulseIntervalSec: [360, 280, 230, 200], pulseSize: 0.85, specialShare: 0.14, specialMax: 14 },
-  { name: 'Standard', zombieHp: 1, density: 1, spawnIntervalSec: [18, 11, 7, 4], spawnGroup: [1, 2, 3, 4], localCap: [12, 40, 120, 300],
-    firstPulseDelaySec: 480, pulseIntervalSec: [300, 240, 200, 180], pulseSize: 1, specialShare: 0.2, specialMax: 40 },
+  { name: 'Tutorial', zombieHp: 0.7, density: 0.85, spawnIntervalSec: [13, 10, 10, 9], spawnGroup: [1, 2, 2, 2],
+    normalPool: [14, 28, 42, 56], mediumPool: [2, 4, 5, 7], mediumChance: [0.15, 0.18, 0.2, 0.22], runnerShare: [0.08, 0.14, 0.2, 0.25],
+    mediumStart: 0.06, mediumStartMin: 3, firstPulseDelaySec: 600, pulseIntervalSec: [420, 330, 270, 240], pulseSize: 0.7 },
+  // Easy (tutorial region 2, v4.13 #74): a real step up: more and tougher dead, Runner-heavy
+  { name: 'Easy', zombieHp: 0.9, density: 1.35, spawnIntervalSec: [12, 9, 8, 6], spawnGroup: [1, 2, 3, 3],
+    normalPool: [16, 36, 72, 140], mediumPool: [3, 6, 9, 14], mediumChance: [0.15, 0.2, 0.22, 0.25], runnerShare: [0.15, 0.25, 0.3, 0.35],
+    mediumStart: 0.07, mediumStartMin: 4, firstPulseDelaySec: 300, pulseIntervalSec: [330, 260, 210, 180], pulseSize: 1 },
+  { name: 'Standard', zombieHp: 1, density: 1, spawnIntervalSec: [18, 11, 7, 4], spawnGroup: [1, 2, 3, 4],
+    normalPool: [10, 34, 105, 270], mediumPool: [2, 6, 15, 30], mediumChance: [0.12, 0.18, 0.22, 0.25], runnerShare: [0.08, 0.15, 0.22, 0.3],
+    mediumStart: 0.06, mediumStartMin: 2, firstPulseDelaySec: 480, pulseIntervalSec: [300, 240, 200, 180], pulseSize: 1 },
 ];
-

@@ -81,11 +81,16 @@ export class Renderer {
   private prevPos = new Map<number, { x: number; y: number }>();
   private corpses: { key: string; x: number; z: number; facing: number; t0: number; sx: number; sy: number; tint?: number }[] = [];
   private animClock = 0;
+  private anim = new Map<number, { clip: Clip; t: number; rate: number; seen: number }>();
+  private animFrame = 0;
   private rallyFlag: THREE.Group;
   private borders = new Map<string, THREE.Mesh>();
   private flyovers = new Map<number, { mesh: THREE.Mesh; dir: Vec2; done: boolean }>();
   private ghostArrow: THREE.Mesh;
   private ghostRange: THREE.Mesh;
+  private ghostRangeKey = '';
+  /** Single-headed arrow showing which way an emplacement faces (v4.13 #71). */
+  private ghostAim: THREE.Mesh;
   /** Entity under the mouse (squad, structure or hive id): health bars only show on hover or selection (#35). */
   hovered: number | null = null;
   /** Selected base building, so its bar shows too. */
@@ -164,7 +169,15 @@ export class Renderer {
     this.ghostRange = new THREE.Mesh(new THREE.RingGeometry(0.97, 1, 64), new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide }));
     this.ghostRange.rotation.x = -Math.PI / 2;
     this.ghostRange.visible = false;
-    this.scene.add(this.ghostArrow, this.ghostRange);
+    const aimShape = new THREE.Shape();
+    aimShape.moveTo(-1.2, -0.25);
+    for (const [x, y] of [[1.2, -0.25], [1.2, -0.75], [3.2, 0], [1.2, 0.75], [1.2, 0.25], [-1.2, 0.25]] as [number, number][]) aimShape.lineTo(x, y);
+    aimShape.closePath();
+    this.ghostAim = new THREE.Mesh(new THREE.ShapeGeometry(aimShape), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthTest: false, side: THREE.DoubleSide }));
+    this.ghostAim.rotation.x = -Math.PI / 2;
+    this.ghostAim.renderOrder = 10;
+    this.ghostAim.visible = false;
+    this.scene.add(this.ghostArrow, this.ghostRange, this.ghostAim);
 
     // Barracks rally flag (round 4 #36): pole + blue pennant, follows world.map.rally
     this.rallyFlag = new THREE.Group();
@@ -708,10 +721,11 @@ export class Renderer {
     });
   }
 
-  setGhost(tile: { x: number; y: number } | null, size = { w: 1, h: 1 }, ok = true, range = 0): void {
+  setGhost(tile: { x: number; y: number } | null, size = { w: 1, h: 1 }, ok = true, range = 0, arc?: { aim: number; deg: number }): void {
     this.ghost.visible = !!tile;
-    this.ghostArrow.visible = !!tile && size.w !== size.h;
+    this.ghostArrow.visible = !!tile && size.w !== size.h && !arc;
     this.ghostRange.visible = !!tile && range > 0;
+    this.ghostAim.visible = !!tile && !!arc;
     if (!tile) return;
     const cx = (tile.x + size.w / 2) * CELL;
     const cz = (tile.y + size.h / 2) * CELL;
@@ -727,6 +741,22 @@ export class Renderer {
     if (this.ghostRange.visible) {
       this.ghostRange.position.set(cx, 0.12, cz);
       this.ghostRange.scale.setScalar(range);
+      // field of fire (v4.13 #71): a filled sector instead of a full ring
+      const key = arc ? `${arc.aim.toFixed(3)}:${arc.deg}` : 'ring';
+      if (this.ghostRangeKey !== key) {
+        this.ghostRangeKey = key;
+        this.ghostRange.geometry.dispose();
+        if (arc) {
+          const half = (arc.deg * Math.PI) / 360;
+          // ring geometry lies in XY; after the -90° X tilt, angle θ points along (cos θ, -sin θ) on the ground
+          this.ghostRange.geometry = new THREE.RingGeometry(0.06, 1, 48, 1, -arc.aim - half, half * 2);
+        } else this.ghostRange.geometry = new THREE.RingGeometry(0.97, 1, 64);
+        (this.ghostRange.material as THREE.MeshBasicMaterial).opacity = arc ? 0.22 : 0.5;
+      }
+    }
+    if (arc) {
+      this.ghostAim.position.set(cx, 1.9, cz);
+      this.ghostAim.rotation.z = -arc.aim;
     }
   }
 
@@ -965,25 +995,28 @@ export class Renderer {
       return p && simDt > 0 ? Math.hypot(x - p.x, y - p.y) / simDt : 0;
     };
 
+    this.animFrame++;
     for (const s of w.squads) {
       if (!s.alive) continue;
       const crowd = s.def.id === 'engineer' ? C.engineer : C.soldier;
       const order = s.currentOrder?.type;
-      const working = !s.moving && (order === 'build' || order === 'repair' || order === 'deconstruct' || order === 'charge');
+      const working = !s.moving && (order === 'build' || order === 'repair' || order === 'deconstruct' || order === 'charge' || order === 'search');
+      const tgt = w.get(s.targetId);
+      // round 6 #67: stay in the firing pose while engaged; dropping it between shots (fire every 0.9 s,
+      // pose shown for 0.7 s) is what made the arms jump up and down once a second
+      const engaged = !!tgt && tgt.alive;
       s.members.forEach((m, i) => {
         if (!m.alive) return;
         const key = s.id * 8 + i + 1e7;
         const v = speedOf(key, m.pos.x, m.pos.y);
-        const phase = (s.id * 0.37 + i * 0.61) % 1;
         let clip: Clip = 'idle';
-        let ct = t + phase * 4;
+        let rate = 1;
         if (working && crowd.has('work')) clip = 'work';
-        else if (w.time - m.lastShot < 0.7) clip = 'shoot';
         else if (v > 0.4) {
           clip = 'walk';
-          ct = t * Math.min(3, Math.max(0.7, v / 2.2)) + phase;
-        }
-        crowd.add(clip, ct, m.pos.x, m.pos.y, m.facing);
+          rate = Math.min(3, Math.max(0.7, v / 2.2));
+        } else if (engaged && w.time - m.lastShot < s.def.weapon.cooldown * 2.5) clip = 'shoot';
+        crowd.add(clip, this.animTime(key, clip, rate, simDt), m.pos.x, m.pos.y, m.facing);
       });
     }
 
@@ -992,20 +1025,21 @@ export class Renderer {
       const look = zombieLook(z.id, z.def.id);
       const crowd = C[look.key];
       const v = speedOf(z.id, z.pos.x, z.pos.y);
-      const phase = ((z.id * 0.618) % 1) * 3;
       let clip: Clip = 'idle';
-      let ct = t + phase;
+      let rate = 1;
       if (z.state === 'attack') clip = 'punch';
       else if (v > 4 && crowd.has('run')) {
         clip = 'run';
-        ct = t * Math.min(1.8, Math.max(0.8, v / 6)) + phase;
+        rate = Math.min(1.8, Math.max(0.8, v / 6));
       } else if (v > 0.3) {
         clip = 'walk';
-        ct = t * Math.min(3.2, Math.max(0.6, v / 1.8)) + phase;
+        rate = Math.min(3.2, Math.max(0.6, v / 1.8));
       }
-      crowd.add(clip, ct, z.pos.x, z.pos.y, z.facing, look.sx, look.tint, 0, look.sy);
+      crowd.add(clip, this.animTime(z.id, clip, rate, simDt), z.pos.x, z.pos.y, z.facing, look.sx, look.tint, 0, look.sy);
     }
     if (this.prevPos.size > 8000) this.prevPos.clear();
+    // forget animation state of characters that are gone
+    if (this.animFrame % 300 === 0) for (const [k, a] of this.anim) if (this.animFrame - a.seen > 60) this.anim.delete(k);
 
     // corpses: play the death once, lie there a while, then sink into the ground. Models whose death
     // clip doesn't end on the ground get tipped over backwards as it finishes (round 4 #34).
@@ -1024,6 +1058,27 @@ export class Renderer {
       crowd.add('death', age, c.x, c.z, c.facing, c.sx, c.tint, sink, c.sy, tilt);
     }
     for (const c of Object.values(C)) c.end();
+  }
+
+  /**
+   * Per-character animation clock (round 6 #67). It advances by dt × a smoothed rate, so a change of
+   * speed changes the tempo instead of jumping to a different frame. (It used to be the global clock
+   * × speed factor: with the clock in the thousands of seconds, any wobble in speed was a random jump.)
+   */
+  private animTime(key: number, clip: Clip, rate: number, dt: number): number {
+    let a = this.anim.get(key);
+    if (!a) {
+      a = { clip, t: (((key * 2654435761) >>> 0) / 4294967296) * 2, rate, seen: this.animFrame };
+      this.anim.set(key, a);
+    }
+    if (a.clip !== clip) {
+      a.clip = clip;
+      a.t = (((key * 40503) >>> 0) % 1000) / 2000; // small stagger so a squad doesn't move in lockstep
+    }
+    a.rate += (rate - a.rate) * Math.min(1, dt * 3);
+    a.t += dt * a.rate;
+    a.seen = this.animFrame;
+    return a.t;
   }
 
   /** Tier 2 hook (doc §14): day/night lighting from the in-game day fraction. */
@@ -1101,7 +1156,8 @@ function zombieLook(id: number, defId: string): { key: string; sx: number; sy: n
   const shade = 0.82 + h * 0.3;
   const grey = Math.round(Math.min(1, shade) * 255);
   const tint = (grey << 16) | (grey << 8) | grey;
-  if (defId === 'bloater') return { key: 'zombieM', sx: 1.7, sy: 1.12, tint: 0xd8f0a0 };
+  // v4.13 (#70): unmistakable at a glance: much wider, squat, sickly yellow-green
+  if (defId === 'bloater') return { key: 'zombieM', sx: 2.15, sy: 1.04, tint: 0xc8f070 };
   if (defId === 'runner') return { key: 'zombieF', sx: 0.92, sy: 1.02, tint };
   return { key: h < 0.3 ? 'zombieF' : 'zombieM', sx: 1, sy: 0.96 + h * 0.1, tint };
 }

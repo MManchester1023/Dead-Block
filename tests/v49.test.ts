@@ -3,7 +3,7 @@ import { World } from '../src/sim/World';
 import { BALANCE } from '../src/config/balance';
 import { CELL } from '../src/config/world';
 import { gainXp } from '../src/sim/systems/combat';
-import { specialRoom } from '../src/sim/systems/hives';
+import { broodRoom } from '../src/sim/systems/hives';
 
 const M = (x: number, y: number) => ({ x: x * CELL, y: y * CELL });
 const motelPoint = (w: World) => {
@@ -34,18 +34,25 @@ describe('v4.9 playtest round 5', () => {
     expect(d.cleared).toBe(true);
   });
 
-  it('tutorial-tier zombies are weaker and Runners/Bloaters are capped per district (#53, #59)', () => {
-    const w = new World({ populate: false });
+  it('tutorial-tier zombies are weaker; normal and medium zombies have separate pools (#59, #75)', () => {
+    const w = new World({ seed: 2 });
     const z = w.spawnZombie('walker', motelPoint(w))!;
     expect(z.maxHp).toBeLessThan(36);
-    const p = motelPoint(w);
-    for (let i = 0; i < 30; i++) w.spawnZombie('walker', { x: p.x + (i % 6) * 2, y: p.y + Math.floor(i / 6) * 2 });
-    const room = specialRoom(w, 'motel');
-    expect(room).toBeGreaterThan(0);
-    expect(room).toBeLessThanOrEqual(w.tier('motel').specialMax);
-    for (let i = 0; i < room; i++) w.spawnZombie('runner', { x: p.x - 10, y: p.y + i });
-    expect(specialRoom(w, 'motel')).toBe(0);
-  });
+    // the starting crowd always includes a few mediums (Bloaters), so they're actually met (#70)
+    const motel = w.districts.get('motel')!.def.rect;
+    const start = w.zombies.filter((x) => x.pos.x >= motel.x && x.pos.x < motel.x + motel.w && x.pos.y >= motel.y && x.pos.y < motel.y + motel.h);
+    expect(start.filter((x) => x.def.class === 'medium').length).toBeGreaterThanOrEqual(w.tier('motel').mediumStartMin);
+    // a hive fills both pools separately; together they make the brood total
+    const h = w.hives[0];
+    for (let i = 0; i < 30 * 600; i++) w.step(1 / 30);
+    const room = broodRoom(w, h);
+    const T = w.tier('motel');
+    const brood = [...h.spawned].map((id) => w.get(id)).filter(Boolean) as typeof w.zombies;
+    const med = brood.filter((x) => x.def.class === 'medium').length;
+    expect(med).toBeLessThanOrEqual(T.mediumPool[h.stage - 1]);
+    expect(brood.length - med).toBeLessThanOrEqual(T.normalPool[h.stage - 1]);
+    expect(room.normal + room.medium).toBe(T.normalPool[h.stage - 1] + T.mediumPool[h.stage - 1] - brood.length);
+  }, 60000);
 
   it('a promotion raises max health but does not heal (#48)', () => {
     const w = new World({ populate: false });
@@ -114,4 +121,18 @@ describe('v4.9 playtest round 5', () => {
     expect(w.zombies.filter((z) => z.alive).every((z) => z.targetId === sq.id)).toBe(true);
     expect(w.buildingState.get(b.id)!.nest).toBe(0);
   });
+
+  it('an MG emplacement only fires inside its field of fire (#71)', () => {
+    const w = new World({ populate: false });
+    const mg = w.addStructure('mgNest', { x: 20, y: 40 }, true, false, 0); // aimed east (+x)
+    const behind = w.spawnZombie('walker', { x: mg.pos.x - 12, y: mg.pos.y })!; // west: outside the arc
+    behind.def = { ...behind.def, speed: 0 };
+    for (let i = 0; i < 30 * 3; i++) w.step(1 / 30);
+    expect(behind.alive).toBe(true);
+    const front = w.spawnZombie('walker', { x: mg.pos.x + 12, y: mg.pos.y + 3 })!; // east: inside
+    front.def = { ...front.def, speed: 0 };
+    for (let i = 0; i < 30 * 5 && front.alive; i++) w.step(1 / 30);
+    expect(front.alive).toBe(false);
+  });
 });
+

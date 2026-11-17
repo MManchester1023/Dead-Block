@@ -149,7 +149,8 @@ export class Input {
     const p = this.ground(this.mouse.x === 0 && this.mouse.y === 0 ? { clientX: innerWidth / 2, clientY: innerHeight / 2 } : { clientX: this.mouse.x, clientY: this.mouse.y });
     const tile = g.buildTile(p, g.mode.defId, g.mode.rotated);
     const ok = !g.world.canPlace(g.mode.defId, tile, g.mode.rotated);
-    g.renderer.setGhost(tile, g.world.footprint(g.mode.defId, g.mode.rotated), ok, STRUCTURES[g.mode.defId].weapon?.range ?? 0);
+    const def = STRUCTURES[g.mode.defId];
+    g.renderer.setGhost(tile, g.world.footprint(g.mode.defId, g.mode.rotated), ok, def.weapon?.range ?? 0, def.arc ? { aim: g.mode.aim, deg: def.arc } : undefined);
   }
 
   private up(e: MouseEvent): void {
@@ -264,7 +265,11 @@ export class Input {
         else g.toast('Select an Engineer Team to plant a charge');
         break;
       case 'r':
-        if (g.mode.kind === 'build') g.setMode({ ...g.mode, rotated: !g.mode.rotated });
+        // R: walls flip 90°; armed emplacements turn their field of fire a quarter turn (v4.13 #71)
+        if (g.mode.kind === 'build') {
+          if (STRUCTURES[g.mode.defId].arc) g.setMode({ ...g.mode, aim: (g.mode.aim + Math.PI / 2) % (Math.PI * 2) });
+          else g.setMode({ ...g.mode, rotated: !g.mode.rotated });
+        }
         break;
       case 'b': {
         // jump to the Barracks (recruiting + rally point)

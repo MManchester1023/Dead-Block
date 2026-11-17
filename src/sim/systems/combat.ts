@@ -23,7 +23,14 @@ function candidatesFor(w: World, faction: Faction, pos: Vec2, range: number): Ta
   return out;
 }
 
-function acquire(w: World, shooter: { pos: Vec2; targetId: number | null }, faction: Faction, weapon: WeaponDef): Targetable | null {
+/** Is `t` inside a field of fire of `arcDeg` degrees centred on `aim`? */
+export function inArc(from: Vec2, aim: number, arcDeg: number, t: Vec2): boolean {
+  let d = Math.atan2(t.y - from.y, t.x - from.x) - aim;
+  d = Math.atan2(Math.sin(d), Math.cos(d));
+  return Math.abs(d) <= (arcDeg * Math.PI) / 360;
+}
+
+function acquire(w: World, shooter: { pos: Vec2; targetId: number | null }, faction: Faction, weapon: WeaponDef, arc?: { aim: number; deg: number }): Targetable | null {
   if (!isEnabled('threatTargeting')) {
     // fallback: nearest, no lock (useful for A/B playtesting the v4 rule)
     shooter.targetId = null;
@@ -34,7 +41,7 @@ function acquire(w: World, shooter: { pos: Vec2; targetId: number | null }, fact
     dangerClose: BALANCE.combat.dangerCloseRadius,
     current: w.get(shooter.targetId) ?? null,
     candidates: candidatesFor(w, faction, shooter.pos, weapon.range),
-    canEngage: (t) => canHurt(weapon, t) && w.grid.lineClear(shooter.pos, t.pos),
+    canEngage: (t) => canHurt(weapon, t) && (!arc || inArc(shooter.pos, arc.aim, arc.deg, t.pos)) && w.grid.lineClear(shooter.pos, t.pos),
   });
   shooter.targetId = t?.id ?? null;
   return t;
@@ -87,7 +94,8 @@ export function updateCombat(w: World, dt: number): void {
     const wpn = st.def.weapon;
     if (!wpn || !st.built || !st.alive) continue;
     st.cooldown -= dt;
-    const t = acquire(w, st, st.faction, wpn);
+    // v4.13 (#71): emplacements with a field of fire only engage inside it
+    const t = acquire(w, st, st.faction, wpn, st.def.arc ? { aim: st.aim, deg: st.def.arc } : undefined);
     if (!t) continue;
     st.facing = Math.atan2(t.pos.y - st.pos.y, t.pos.x - st.pos.x);
     if (st.cooldown <= 0) {

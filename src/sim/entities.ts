@@ -192,6 +192,8 @@ export class Structure implements Targetable {
   districtId: string | null = null;
   /** Footprint; sandbags and wire can be rotated 90°. */
   size: { w: number; h: number };
+  /** Direction the field of fire points (radians, sim frame), for structures with an `arc` (v4.13). */
+  aim = 0;
 
   /** `tile` is the top-left nav cell; `size` is in cells. `pos`/`radius` are metres. */
   constructor(public def: StructureDef, public tile: { x: number; y: number }, built: boolean, rotated = false) {

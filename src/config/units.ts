@@ -79,6 +79,8 @@ export interface ZombieDef {
   sight: number;
   hearing: number; // multiplier on noise radius
   threat: ThreatClass;
+  /** Spawn class (doc §9, v4.13): normal = Walker/Runner, medium = every other non-boss type. */
+  class: 'normal' | 'medium' | 'boss';
   radius: number;
   requires?: string;
   onDeath?: 'toxicCloud';
@@ -87,11 +89,11 @@ export interface ZombieDef {
 }
 
 export const ZOMBIES: Record<string, ZombieDef> = {
-  walker: { id: 'walker', name: 'Walker', hp: 36, speed: 2.7, damage: 7, attackCooldown: 1.2, sight: 14, hearing: 1, threat: ThreatClass.Normal, radius: 0.4, bounty: { money: 1, supplies: 1 } },
-  runner: { id: 'runner', name: 'Runner', hp: 22, speed: 7.6, damage: 5, attackCooldown: 0.8, sight: 18, hearing: 1.4, threat: ThreatClass.Normal, radius: 0.38, bounty: { money: 1, supplies: 1 } },
-  bloater: { id: 'bloater', name: 'Bloater', hp: 120, speed: 1.8, damage: 10, attackCooldown: 1.6, sight: 12, hearing: 0.8, threat: ThreatClass.Special, radius: 0.75, onDeath: 'toxicCloud', bounty: { money: 4, supplies: 3 } },
-  screamer: { id: 'screamer', name: 'Screamer', hp: 40, speed: 3.2, damage: 3, attackCooldown: 1.5, sight: 24, hearing: 1.2, threat: ThreatClass.Special, radius: 0.4, requires: 'specialZombies', bounty: { money: 3, supplies: 2 } },
-  brute: { id: 'brute', name: 'Brute', hp: 300, speed: 2.8, damage: 25, attackCooldown: 1.8, sight: 16, hearing: 1, threat: ThreatClass.Special, radius: 0.9, requires: 'specialZombies', bounty: { money: 10, supplies: 6 } },
+  walker: { id: 'walker', name: 'Walker', hp: 36, speed: 2.7, damage: 7, attackCooldown: 1.2, sight: 14, hearing: 1, threat: ThreatClass.Normal, class: 'normal', radius: 0.4, bounty: { money: 1, supplies: 1 } },
+  runner: { id: 'runner', name: 'Runner', hp: 22, speed: 7.6, damage: 5, attackCooldown: 0.8, sight: 18, hearing: 1.4, threat: ThreatClass.Normal, class: 'normal', radius: 0.38, bounty: { money: 1, supplies: 1 } },
+  bloater: { id: 'bloater', name: 'Bloater', hp: 120, speed: 1.8, damage: 10, attackCooldown: 1.6, sight: 12, hearing: 0.8, threat: ThreatClass.Special, class: 'medium', radius: 0.75, onDeath: 'toxicCloud', bounty: { money: 4, supplies: 3 } },
+  screamer: { id: 'screamer', name: 'Screamer', hp: 40, speed: 3.2, damage: 3, attackCooldown: 1.5, sight: 24, hearing: 1.2, threat: ThreatClass.Special, class: 'medium', radius: 0.4, requires: 'specialZombies', bounty: { money: 3, supplies: 2 } },
+  brute: { id: 'brute', name: 'Brute', hp: 300, speed: 2.8, damage: 25, attackCooldown: 1.8, sight: 16, hearing: 1, threat: ThreatClass.Special, class: 'medium', radius: 0.9, requires: 'specialZombies', bounty: { money: 10, supplies: 6 } },
 };
 
 export interface StructureDef {
@@ -111,6 +113,8 @@ export interface StructureDef {
   climbable?: boolean;
   lure?: number; // loudspeaker
   hotkey?: string;
+  /** Field of fire in degrees (v4.13, #71): the weapon only engages inside this arc around its aim. */
+  arc?: number;
 }
 
 export const STRUCTURES: Record<string, StructureDef> = {
@@ -121,7 +125,7 @@ export const STRUCTURES: Record<string, StructureDef> = {
   outpost: { id: 'outpost', name: 'Outpost', hp: 600, cost: { money: 100, supplies: 30 }, buildTime: 30, size: { w: 3, h: 3 }, blocksMovement: true, requiresSecured: true, hotkey: 'O' },
   sandbags: { id: 'sandbags', name: 'Sandbag Wall', hp: 260, cost: { money: 15, supplies: 10 }, buildTime: 6, size: { w: 3, h: 1 }, blocksMovement: true, cover: 0.55, climbable: true, hotkey: 'Q' },
   wire: { id: 'wire', name: 'Barbed Wire', hp: 120, cost: { money: 10, supplies: 5 }, buildTime: 4, size: { w: 3, h: 1 }, blocksMovement: false, slow: 0.35, hotkey: 'W' },
-  mgNest: { id: 'mgNest', name: 'MG Emplacement', hp: 380, cost: { money: 140, supplies: 45 }, buildTime: 12, size: { w: 2, h: 2 }, blocksMovement: true, cover: 0.5, hotkey: 'E', weapon: { name: 'Mounted HMG', range: 22, damage: 8, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 } },
+  mgNest: { id: 'mgNest', name: 'MG Emplacement', hp: 380, cost: { money: 140, supplies: 45 }, buildTime: 12, size: { w: 2, h: 2 }, blocksMovement: true, cover: 0.5, hotkey: 'E', arc: 120, weapon: { name: 'Mounted HMG', range: 22, damage: 8, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 } },
   tallWall: { id: 'tallWall', name: 'Tall Concrete Wall (40 ft)', hp: 4000, cost: { money: 400, supplies: 120 }, buildTime: 60, size: { w: 4, h: 1 }, blocksMovement: true, climbable: false, requires: 'tallWalls' },
   loudspeaker: { id: 'loudspeaker', name: 'Loudspeaker', hp: 80, cost: { money: 40, supplies: 10 }, buildTime: 8, size: { w: 1, h: 1 }, blocksMovement: false, lure: 6, requires: 'tallWalls' },
 };

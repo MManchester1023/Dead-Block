@@ -321,7 +321,7 @@ export class Hud {
       cmds += '<div class="sep"></div>' + b('sandbags', 'F') + b('wire', 'G') + b('mgNest', 'T') + b('outpost', 'O') + btn('charge', 'Demo Charge', 'C', ABILITIES.demoCharge.cost, mode.kind === 'charge') + btn('deconstruct', 'Deconstruct', 'X', undefined, mode.kind === 'deconstruct');
     }
     const modeHint =
-      mode.kind === 'build' ? `Placing ${STRUCTURES[mode.defId].name} — click to place · R rotate · Shift to keep placing · right-click cancel`
+      mode.kind === 'build' ? `Placing ${STRUCTURES[mode.defId].name} — click to place · R ${STRUCTURES[mode.defId].arc ? `turns its ${STRUCTURES[mode.defId].arc}° field of fire` : 'rotate'} · Shift to keep placing · right-click cancel`
       : mode.kind === 'attackMove' ? 'Attack-move: click a destination'
       : mode.kind === 'charge' ? 'Click a hive to plant a demo charge'
       : mode.kind === 'deconstruct' ? 'Click something your engineers built to take it down (unstarted: full refund, built: half)'

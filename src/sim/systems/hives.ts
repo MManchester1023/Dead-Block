@@ -2,6 +2,7 @@ import { dist, type Vec2 } from '../../core/math';
 import { BALANCE } from '../../config/balance';
 import { isEnabled } from '../../config/features';
 import { Squad, type Hive, type Zombie } from '../entities';
+import { ZOMBIES } from '../../config/units';
 import type { World } from '../World';
 import { lure } from './zombies';
 
@@ -38,15 +39,20 @@ export function updateHives(w: World, dt: number): void {
     for (const id of h.spawned) if (!w.get(id)) h.spawned.delete(id);
     h.spawnTimer -= dt;
     if (h.spawnTimer <= 0) {
-      const cap = T.localCap[h.stage - 1];
+      const room = broodRoom(w, h);
+      const cap = T.normalPool[h.stage - 1] + T.mediumPool[h.stage - 1];
       // a hive that's been bled dry rebuilds faster (v4.9, playtest #32)
       const thin = h.spawned.size < cap * H.reinforceBelow;
       h.spawnTimer = T.spawnIntervalSec[h.stage - 1] * (thin ? H.reinforceRate : 1);
-      const room = cap - h.spawned.size;
-      let specials = specialRoom(w, h.districtId);
-      for (let i = 0; i < Math.min(room, T.spawnGroup[h.stage - 1]); i++) {
-        const z = spawnAt(w, h, specials > 0);
-        if (z && isSpecial(z)) specials--;
+      for (let i = 0; i < T.spawnGroup[h.stage - 1]; i++) {
+        // separate pools (v4.13 #75): a medium if its pool has room and the roll says so, else a normal
+        const medium = room.medium > 0 && (room.normal <= 0 || w.rng.chance(T.mediumChance[h.stage - 1]));
+        if (!medium && room.normal <= 0) break;
+        const kind = medium ? pickMedium(w) : pickNormal(w, T.runnerShare[h.stage - 1]);
+        if (!kind) break;
+        if (!spawnAt(w, h, kind)) break;
+        if (medium) room.medium--;
+        else room.normal--;
       }
     }
 
@@ -65,33 +71,35 @@ export function updateHives(w: World, dt: number): void {
   }
 }
 
-const isSpecial = (z: Zombie | undefined): boolean => !!z && z.def.id !== 'walker';
-
 /**
- * How many more Runners/Bloaters the district may hold right now (v4.9, playtest #53): a share of
- * its zombies, never more than the tier's hard ceiling.
+ * Room left in a hive's two pools (doc §9, v4.13 #75). Normal (Walker, Runner) and medium (every other
+ * non-boss type) are counted separately; together they're the hive's total brood.
  */
-export function specialRoom(w: World, districtId: string): number {
-  const d = w.districts.get(districtId);
-  if (!d) return 0;
-  const T = w.tier(districtId);
-  const r = d.def.rect;
-  let total = 0;
-  let specials = 0;
-  for (const z of w.zombies) {
-    if (!z.alive || z.pos.x < r.x || z.pos.y < r.y || z.pos.x >= r.x + r.w || z.pos.y >= r.y + r.h) continue;
-    total++;
-    if (isSpecial(z)) specials++;
+export function broodRoom(w: World, h: Hive): { normal: number; medium: number } {
+  const T = w.tier(h.districtId);
+  let normal = 0;
+  let medium = 0;
+  for (const id of h.spawned) {
+    const z = w.get(id) as Zombie | undefined;
+    if (!z || !z.alive) continue;
+    if (z.def.class === 'medium') medium++;
+    else if (z.def.class === 'normal') normal++;
   }
-  return Math.max(0, Math.min(T.specialMax, Math.floor(total * T.specialShare) + 1) - specials);
+  return { normal: T.normalPool[h.stage - 1] - normal, medium: T.mediumPool[h.stage - 1] - medium };
 }
 
-function spawnAt(w: World, h: Hive, allowSpecial: boolean): Zombie | null {
-  const roll = w.rng.next();
-  // mostly Walkers while young; Runners and Bloaters creep in as the hive matures (capped per district)
-  const bloater = 0.02 + 0.02 * (h.stage - 1);
-  const runner = bloater + 0.06 + 0.07 * (h.stage - 1);
-  const kind = !allowSpecial ? 'walker' : roll < bloater ? 'bloater' : roll < runner ? 'runner' : 'walker';
+/** Walker or Runner. */
+export function pickNormal(w: World, runnerShare: number): string {
+  return w.rng.chance(runnerShare) ? 'runner' : 'walker';
+}
+
+/** Any enabled medium type (only the Bloater until special zombies are switched on). */
+export function pickMedium(w: World): string | null {
+  const types = Object.values(ZOMBIES).filter((d) => d.class === 'medium' && (!d.requires || isEnabled(d.requires as never)));
+  return types.length ? w.rng.pick(types).id : null;
+}
+
+function spawnAt(w: World, h: Hive, kind: string): Zombie | null {
   const a = w.rng.range(0, Math.PI * 2);
   const p = w.grid.nearestFree({ x: h.pos.x + Math.cos(a) * (h.radius + 2), y: h.pos.y + Math.sin(a) * (h.radius + 2) });
   const z = w.spawnZombie(kind, p, h.id);
@@ -119,7 +127,7 @@ export function pulseTarget(w: World, from: Vec2): Vec2 {
 
 export function pulse(w: World, h: Hive, bonus = 0): void {
   const size = Math.round((BALANCE.horde.basePulseSize + BALANCE.horde.perStagePulseSize * (h.stage - 1)) * w.tier(h.districtId).pulseSize) + bonus;
-  let specials = specialRoom(w, h.districtId);
+  const runnerShare = w.tier(h.districtId).runnerShare[h.stage - 1];
   const target = pulseTarget(w, h.pos);
   let sent = 0;
   // recruit idle zombies near the hive first, then spawn the remainder
@@ -131,9 +139,8 @@ export function pulse(w: World, h: Hive, bonus = 0): void {
   }
   while (sent < size) {
     const a = w.rng.range(0, Math.PI * 2);
-    const runner = specials > 0 && w.rng.chance(0.1 + 0.07 * (h.stage - 1));
-    if (runner) specials--;
-    const z = w.spawnZombie(runner ? 'runner' : 'walker', w.grid.nearestFree({ x: h.pos.x + Math.cos(a) * (h.radius + 3), y: h.pos.y + Math.sin(a) * (h.radius + 3) }), h.id);
+    // pulses are normals; the medium pool is for the hive's own brood
+    const z = w.spawnZombie(pickNormal(w, runnerShare), w.grid.nearestFree({ x: h.pos.x + Math.cos(a) * (h.radius + 3), y: h.pos.y + Math.sin(a) * (h.radius + 3) }), h.id);
     if (!z) break;
     h.spawned.add(z.id);
     lure(z, target, 'pulse');

@@ -13,7 +13,7 @@ import type { DamageType, Order, Targetable } from './types';
 import { updateOrders } from './systems/orders';
 import { updateCombat } from './systems/combat';
 import { updateZombies } from './systems/zombies';
-import { updateHives } from './systems/hives';
+import { pickMedium, updateHives } from './systems/hives';
 import { updateEconomy } from './systems/economy';
 import { updateDistricts } from './systems/districts';
 import { updateNoise } from './systems/noise';
@@ -137,20 +137,35 @@ export class World {
 
   /** Hives plus the district's own starting population mix. */
   private seedDistrict(d: DistrictState): void {
+    const T = this.tier(d.def.id);
     for (const site of d.def.hiveSites) {
-      const hive = new Hive({ ...site }, d.def.id, BALANCE.hive.hpByStage[0], DIFFICULTY[d.def.difficulty].firstPulseDelaySec);
+      const stage = d.def.hiveStage ?? 1;
+      const hive = new Hive({ ...site }, d.def.id, BALANCE.hive.hpByStage[stage - 1], T.firstPulseDelaySec);
+      hive.stage = stage;
       this.hives.push(hive);
       this.registerHive(hive);
     }
-    const count = Math.round(d.infestation * d.def.density * this.tier(d.def.id).density);
+    const count = Math.round(d.infestation * d.def.density * T.density);
     const kinds = Object.entries(d.def.mix);
     const r = d.def.rect;
+    const spot = () => this.grid.nearestFree({ x: this.rng.range(r.x + 12, r.x + r.w - 6), y: this.rng.range(r.y + 6, r.y + r.h - 6) });
+    // medium zombies get their own share of the starting crowd, with a minimum so they're actually met (#70, #75)
+    const mediums = Math.max(T.mediumStartMin, Math.round(count * T.mediumStart));
     for (let i = 0; i < count; i++) {
-      const p = this.grid.nearestFree({ x: this.rng.range(r.x + 12, r.x + r.w - 6), y: this.rng.range(r.y + 6, r.y + r.h - 6) });
-      let roll = this.rng.next();
-      const kind = kinds.find(([, wgt]) => (roll -= wgt) < 0)?.[0] ?? 'walker';
-      this.spawnZombie(kind, p);
+      let kind: string | null;
+      if (i < mediums) kind = pickMedium(this);
+      else {
+        let roll = this.rng.next();
+        kind = kinds.find(([, wgt]) => (roll -= wgt) < 0)?.[0] ?? 'walker';
+      }
+      this.spawnZombie(kind ?? 'walker', spot());
     }
+    // packs: a few of one kind together (region 2's Runner packs)
+    for (const pk of d.def.packs ?? [])
+      for (let n = 0; n < pk.count; n++) {
+        const c = spot();
+        for (let i = 0; i < pk.size; i++) this.spawnZombie(pk.kind, { x: c.x + this.rng.range(-2, 2), y: c.y + this.rng.range(-2, 2) });
+      }
   }
 
   private setBorder(d: DistrictDef, closed: boolean): void {
@@ -197,9 +212,11 @@ export class World {
     return z;
   }
 
-  addStructure(defId: string, tile: { x: number; y: number }, built: boolean, rotated = false): Structure {
+  addStructure(defId: string, tile: { x: number; y: number }, built: boolean, rotated = false, aim = 0): Structure {
     const def = STRUCTURES[defId];
     const s = new Structure(def, { ...tile }, built, rotated);
+    s.aim = aim;
+    s.facing = aim;
     s.districtId = this.districtAt(s.pos)?.def.id ?? null;
     this.structures.push(s);
     this.byId.set(s.id, s);
@@ -333,14 +350,14 @@ export class World {
     return null;
   }
 
-  orderBuild(engineers: Squad[], defId: string, tile: { x: number; y: number }, queue = false, rotated = false): string | null {
+  orderBuild(engineers: Squad[], defId: string, tile: { x: number; y: number }, queue = false, rotated = false, aim = 0): string | null {
     const eng = engineers.filter((s) => s.def.canBuild?.includes(defId));
     if (!eng.length) return 'Needs an Engineer Team';
     const err = this.canPlace(defId, tile, rotated);
     if (err) return err;
     const def = STRUCTURES[defId];
     this.spend(def.cost);
-    const site = this.addStructure(defId, tile, false, rotated);
+    const site = this.addStructure(defId, tile, false, rotated, aim);
     this.issueOrder(eng, { type: 'build', pos: site.pos, targetId: site.id, buildDef: defId }, queue);
     return null;
   }

@@ -27,7 +27,9 @@ export const SUPPORT: SupportDef[] = [
     delay: 4,
     smoke: 0xeeeeee,
     smokeName: 'white',
-    unlock: 'Command Post (playtest: available now; later gated by base progression)',
+    // v4.12 (#73): a later unlock, with the Artillery tier (doc §21 Tier 2)
+    requires: 'artillery',
+    unlock: 'Artillery tier (later in the campaign)',
   },
   {
     id: 'supplyDrop',

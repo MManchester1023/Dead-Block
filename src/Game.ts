@@ -11,7 +11,7 @@ import type { Targetable } from './sim/types';
 export type Mode =
   | { kind: 'normal' }
   | { kind: 'attackMove' }
-  | { kind: 'build'; defId: string; rotated: boolean }
+  | { kind: 'build'; defId: string; rotated: boolean; aim: number }
   | { kind: 'charge' }
   | { kind: 'deconstruct' }
   | { kind: 'support'; id: string }
@@ -267,8 +267,8 @@ export class Game {
 
   placeBuild(p: Vec2, queue: boolean): void {
     if (this.mode.kind !== 'build') return;
-    const { defId, rotated } = this.mode;
-    const err = this.world.orderBuild(this.selectedEngineers, defId, this.buildTile(p, defId, rotated), queue, rotated);
+    const { defId, rotated, aim } = this.mode;
+    const err = this.world.orderBuild(this.selectedEngineers, defId, this.buildTile(p, defId, rotated), queue, rotated, aim);
     if (err) this.toast(err);
     else {
       this.renderer.marker(p, 0xd0c070);
@@ -287,7 +287,7 @@ export class Game {
       this.toast(`${def.name} needs $${def.cost.money} and ${def.cost.supplies} supplies`);
       return;
     }
-    this.setMode({ kind: 'build', defId, rotated: false });
+    this.setMode({ kind: 'build', defId, rotated: false, aim: 0 });
   }
 
   produce(defId: string): void {

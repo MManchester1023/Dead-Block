@@ -213,7 +213,7 @@ export const ROADSIDE_MOTEL_TUTORIAL: TutorialStep[] = [
   {
     id: 'support',
     title: 'Call for support',
-    text: 'Click the <b>Command Post</b> (the big building in your base) for support powers: an <b>Artillery Barrage</b> marked with white smoke (it hits your own people too) and a <b>Supply Drop</b> on green smoke that a squad has to go and collect.',
+    text: 'Click the <b>Command Post</b> (the big building in your base) for support powers. Right now that’s a <b>Supply Drop</b>: mark a spot with green smoke, a cargo plane drops a crate there, and a squad has to go and collect it. Artillery and air strikes show as locked; they come later in the campaign.',
     objective: 'Select the Command Post.',
     done: (g) => g.selectedBuilding === 'commandPost',
   },

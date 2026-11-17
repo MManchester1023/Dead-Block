@@ -3,6 +3,7 @@ import { World } from '../src/sim/World';
 import { CELL } from '../src/config/world';
 import { callSupport } from '../src/sim/systems/support';
 import { SUPPORT_BY_ID } from '../src/config/support';
+import { setFeature } from '../src/config/features';
 
 const M = (x: number, y: number) => ({ x: x * CELL, y: y * CELL });
 
@@ -62,10 +63,13 @@ describe('v4.4 playtest round 2', () => {
     const crowd = Array.from({ length: 6 }, (_, i) => w.spawnZombie('walker', { x: target.x + (i % 3) * 2, y: target.y + Math.floor(i / 3) * 2 })!);
     crowd.forEach((z) => (z.def = { ...z.def, speed: 0 }));
     w.money = 1000;
+    expect(callSupport(w, 'artillery', target)).toMatch(/Locked/); // v4.12: a later unlock (#73)
+    setFeature('artillery', true);
     expect(callSupport(w, 'artillery', target)).toBeNull();
     expect(callSupport(w, 'artillery', target)).toMatch(/Ready in/); // cooldown
     for (let i = 0; i < 30 * 10; i++) w.step(1 / 30);
     expect(crowd.filter((z) => z.alive).length).toBeLessThan(3);
+    setFeature('artillery', false);
   });
 
   it('a supply drop has to be picked up by a squad', () => {
