@@ -5,6 +5,8 @@ import type { Targetable } from '../types';
 import type { World } from '../World';
 import { blockingTile, moveWithCollision } from './movement';
 
+const HQ = new Set(['commandPost', 'barracks', 'supplyDepot']);
+
 export function updateZombies(w: World, dt: number): void {
   for (const z of w.zombies) {
     if (!z.alive) continue;
@@ -76,15 +78,35 @@ export function updateZombies(w: World, dt: number): void {
     const blocked = moveWithCollision(w.grid, z.pos, dx * speed * dt, dy * speed * dt, z.radius * 0.6);
 
     if (blocked) {
-      // scratch at whatever player structure is in the way (sandbags, walls, outposts…)
       // Tier 2 hook: pile-ups let crowds climb `climbable` structures instead (doc §9).
       const occ = blockingTile(w.grid, z.pos, dx, dy, z.radius);
       const st = occ ? w.get(occ) : undefined;
-      if (st instanceof Structure && st.alive && (z.state === 'chase' || z.state === 'pulse' || z.state === 'investigate')) {
-        z.targetId = st.id;
-        continue;
+      if (st instanceof Structure && st.alive) {
+        if (target instanceof Squad && target.alive) {
+          // v4.9 (#52): prey first. Go around the sandbags; only claw through them when there's
+          // really no way round, and keep the squad as the target throughout.
+          z.wallTime += dt;
+          if (z.wallTime < 2.5) {
+            z.useField = true;
+            z.stuckFor = Math.max(z.stuckFor, 2);
+          } else if (z.attackCooldown <= 0) {
+            z.attackCooldown = z.def.attackCooldown;
+            z.state = 'attack';
+            w.damage(st, z.def.damage, 'melee', z.pos);
+          }
+          continue;
+        }
+        // v4.9 (#60): the perimeter wall isn't worth chewing on; the flow field takes them to the gate
+        if (st.def.id === 'baseWall') {
+          z.useField = true;
+          z.stuckFor = Math.max(z.stuckFor, 2);
+        } else if (z.state === 'chase' || z.state === 'pulse' || z.state === 'investigate') {
+          // scratch at whatever else is in the way (sandbags across the gate, an outpost…)
+          z.targetId = st.id;
+          continue;
+        }
       }
-    }
+    } else if (z.wallTime > 0) z.wallTime = Math.max(0, z.wallTime - dt * 0.5);
 
     // stuck (pressed against a car, a corner…): switch to the flow field for a few checks
     z.stuckTimer += dt;
@@ -159,9 +181,11 @@ function think(w: World, z: Zombie): void {
   // keep scratching at a structure only while nothing tastier is near
   if (!best && cur instanceof Structure && cur.alive && dist(z.pos, cur.pos) < cur.radius + 6) return;
   if (!best) {
+    // v4.9 (#60): HQ buildings draw them from much further than sandbags and nests
     for (const st of w.structures) {
       if (!st.alive || st.def.id === 'baseWall') continue;
-      const d = dist(z.pos, st.pos) - st.radius;
+      const hq = HQ.has(st.def.id);
+      const d = dist(z.pos, st.pos) - st.radius - (hq ? 30 : 0);
       if (d < bestD * 0.6) {
         best = st;
         bestD = d;

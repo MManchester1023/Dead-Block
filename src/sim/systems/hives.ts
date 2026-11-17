@@ -99,7 +99,7 @@ function spawnAt(w: World, h: Hive, allowSpecial: boolean): Zombie | null {
   return z;
 }
 
-/** Pulse target: nearest player outpost, else the base gate. */
+/** Pulse target: nearest player outpost, else the base itself (through the gate, at the Command Post; v4.9 #60). */
 export function pulseTarget(w: World, from: Vec2): Vec2 {
   let best: Vec2 | null = null;
   let bestD = Infinity;
@@ -111,8 +111,10 @@ export function pulseTarget(w: World, from: Vec2): Vec2 {
       best = s.pos;
     }
   }
+  if (best) return best;
+  const hq = w.structures.find((s) => s.alive && s.def.id === 'commandPost') ?? w.structures.find((s) => s.alive && s.def.id === 'barracks');
   const g = w.map.baseGate;
-  return best ?? { x: g.x + g.w + 4, y: g.y + g.h / 2 };
+  return hq ? w.grid.nearestFree(hq.pos) : { x: g.x + g.w + 4, y: g.y + g.h / 2 };
 }
 
 export function pulse(w: World, h: Hive, bonus = 0): void {

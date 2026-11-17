@@ -126,6 +126,8 @@ export class Zombie implements Targetable {
   useField = false;
   losTimer = 0;
   stuckFor = 0;
+  /** Seconds spent pressed against a player structure while chasing a squad (v4.9). */
+  wallTime = 0;
 
   maxHp: number;
 
