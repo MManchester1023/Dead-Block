@@ -14,7 +14,7 @@ export class Radio {
   lines: RadioLine[] = [];
   private lastMemberLine = 0;
 
-  constructor(private world: World, private onLine: () => void) {
+  constructor(private world: World, private onLine: (line: RadioLine) => void) {
     const ev = world.events;
     ev.on('radio', (e) => this.say(e.speaker, e.text, e.tone ?? 'info'));
     ev.on('memberKilled', (e) => {
@@ -47,8 +47,9 @@ export class Radio {
   }
 
   say(speaker: string, text: string, tone: RadioLine['tone'] = 'info'): void {
-    this.lines.push({ speaker, text, tone, t: this.world.time });
+    const line = { speaker, text, tone, t: this.world.time };
+    this.lines.push(line);
     if (this.lines.length > 40) this.lines.shift();
-    this.onLine();
+    this.onLine(line);
   }
 }

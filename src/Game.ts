@@ -14,12 +14,15 @@ export type Mode =
   | { kind: 'build'; defId: string; rotated: boolean }
   | { kind: 'charge' }
   | { kind: 'deconstruct' }
-  | { kind: 'support'; id: string };
+  | { kind: 'support'; id: string }
+  | { kind: 'rally' };
 
 /**
  * Owns the fixed-step loop, pause/speed (doc §2), the current selection and the
  * input mode. Input and HUD talk to the world only through here.
  */
+const SELECTABLE = new Set(['commandPost', 'barracks']);
+
 export class Game {
   readonly world: World;
   readonly renderer: Renderer;
@@ -53,6 +56,12 @@ export class Game {
     return this.world.squads.filter((s) => this.selected.has(s.id) && s.alive);
   }
 
+  /** True when the selection is engineers and nothing else (only they can build; v4.9 #61). */
+  get engineersOnly(): boolean {
+    const sq = this.selectedSquads;
+    return sq.length > 0 && sq.every((s) => s.def.id === 'engineer');
+  }
+
   get selectedEngineers(): Squad[] {
     return this.selectedSquads.filter((s) => s.def.canBuild?.length);
   }
@@ -61,7 +70,7 @@ export class Game {
     if (!add) this.selected.clear();
     if (ids.length || !add) this.selectedStructure = null;
     for (const id of ids) this.selected.add(id);
-    if (this.mode.kind !== 'normal' && !this.selectedEngineers.length && this.mode.kind !== 'attackMove') this.mode = { kind: 'normal' };
+    if (this.mode.kind !== 'normal' && !this.selectedEngineers.length && this.mode.kind !== 'attackMove' && this.mode.kind !== 'rally' && this.mode.kind !== 'support') this.mode = { kind: 'normal' };
     this.changed();
   }
 
@@ -162,12 +171,37 @@ export class Game {
 
   /** Click on the map without hitting a squad: select a building if there is one. */
   selectStructureAt(p: Vec2): boolean {
-    const st = this.world.structures.find((s) => s.alive && s.def.id === 'commandPost' && dist(s.pos, p) < s.radius + 2);
+    const st = this.world.structures.find((s) => s.alive && SELECTABLE.has(s.def.id) && dist(s.pos, p) < s.radius + 2);
     if (!st) return false;
+    this.selectStructure(st.id);
+    return true;
+  }
+
+  /** Select a base building (Command Post → support powers, Barracks → recruiting; v4.9 #47). */
+  selectStructure(id: number): void {
+    const st = this.world.structures.find((s) => s.id === id && s.alive);
+    if (!st) return;
+    this.mode = { kind: 'normal' };
     this.selected.clear();
     this.selectedStructure = st.id;
     this.changed();
-    return true;
+  }
+
+  /** The selected base building's type, if a building is selected. */
+  get selectedBuilding(): string | null {
+    if (this.selectedStructure == null) return null;
+    return this.world.structures.find((s) => s.id === this.selectedStructure && s.alive)?.def.id ?? null;
+  }
+
+  /** Move the Barracks rally point (round 4 #36). */
+  setRallyAt(p: Vec2): void {
+    if (this.mode.kind !== 'rally') return;
+    const r = this.world.grid.nearestFree(p);
+    this.world.map.rally.x = r.x;
+    this.world.map.rally.y = r.y;
+    this.renderer.marker(r, 0x7ab0e0);
+    this.toast('Rally point set');
+    this.setMode({ kind: 'normal' });
   }
 
   callSupportAt(p: Vec2): void {
@@ -226,8 +260,8 @@ export class Game {
   }
 
   startBuild(defId: string): void {
-    if (!this.selectedEngineers.length) {
-      this.toast('Select an Engineer Team first');
+    if (!this.engineersOnly) {
+      this.toast(this.selectedEngineers.length ? 'Only engineers can build: select just your Engineer Teams' : 'Select an Engineer Team first');
       return;
     }
     const def = STRUCTURES[defId];

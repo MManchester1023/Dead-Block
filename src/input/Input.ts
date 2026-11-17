@@ -65,6 +65,10 @@ export class Input {
       g.callSupportAt(p);
       return;
     }
+    if (g.mode.kind === 'rally') {
+      g.setRallyAt(p);
+      return;
+    }
     if (g.mode.kind === 'deconstruct') {
       g.deconstructAt(p, e.shiftKey);
       if (!e.shiftKey) g.setMode({ kind: 'normal' });
@@ -224,6 +228,12 @@ export class Input {
       case 'r':
         if (g.mode.kind === 'build') g.setMode({ ...g.mode, rotated: !g.mode.rotated });
         break;
+      case 'b': {
+        // jump to the Barracks (recruiting + rally point)
+        const b = g.world.structures.find((s) => s.alive && s.def.id === 'barracks');
+        if (b) g.selectStructure(b.id);
+        break;
+      }
       case 'x':
         if (g.selectedEngineers.length) g.setMode({ kind: 'deconstruct' });
         else g.toast('Select an Engineer Team to deconstruct');

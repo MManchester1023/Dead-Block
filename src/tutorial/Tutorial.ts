@@ -26,6 +26,7 @@ export class Tutorial {
   private el: HTMLElement;
   private lastHtml = '';
   private highlighted: Element[] = [];
+  private confirmSkip = false;
 
   constructor(private game: Game, private steps: TutorialStep[], root: HTMLElement) {
     this.el = document.createElement('div');
@@ -36,7 +37,16 @@ export class Tutorial {
       if (!act) return;
       e.stopPropagation();
       if (act.dataset.tut === 'ok') this.dismiss();
-      if (act.dataset.tut === 'skip') this.finish();
+      if (act.dataset.tut === 'step') this.skipStep();
+      if (act.dataset.tut === 'skip') {
+        // ending the whole tutorial takes a second click, so it can't happen by accident
+        if (this.confirmSkip) this.finish();
+        else {
+          this.confirmSkip = true;
+          this.lastHtml = '';
+          this.render();
+        }
+      }
     });
   }
 
@@ -73,7 +83,14 @@ export class Tutorial {
     this.game.changed();
   }
 
+  /** v4.9 (#45): skip just this step and move on. */
+  private skipStep(): void {
+    this.next();
+    this.game.changed();
+  }
+
   private next(): void {
+    this.confirmSkip = false;
     this.index++;
     if (this.index >= this.steps.length) return this.finish();
     this.enter();
@@ -112,14 +129,16 @@ export class Tutorial {
     const s = this.step;
     if (!s) return;
     const n = `${this.index + 1}/${this.steps.length}`;
+    const skipAll = `<button class="tut-skip ${this.confirmSkip ? 'confirm' : ''}" data-tut="skip">${this.confirmSkip ? 'Click again to end training' : 'Skip tutorial'}</button>`;
+    const skipStep = s.objective ? '<button data-tut="step">Skip step</button>' : '';
     const html =
       this.phase === 'prompt'
-        ? `<div class="tut-card"><div class="tut-head"><span>TRAINING · ${n}</span><button data-tut="skip">Skip tutorial</button></div>
+        ? `<div class="tut-card"><div class="tut-head"><span>TRAINING · ${n}</span><span class="tut-btns">${skipStep}${skipAll}</span></div>
            <h2>${s.title}</h2><p>${s.text}</p>
            ${s.objective ? `<p class="tut-obj">▶ ${s.objective}</p>` : ''}
            <button class="big" data-tut="ok">${s.objective ? 'Got it' : 'Continue'}</button>
            <div class="tut-paused">Game paused while you read</div></div>`
-        : `<div class="tut-banner"><span class="tut-n">TRAINING ${n}</span><b>${s.title}</b><span>${s.objective ?? ''}</span><button data-tut="skip">Skip</button></div>`;
+        : `<div class="tut-banner"><span class="tut-n">TRAINING ${n}</span><b>${s.title}</b><span>${s.objective ?? ''}</span><span class="tut-btns"><button data-tut="step">Skip step</button>${skipAll}</span></div>`;
     if (html !== this.lastHtml) {
       this.el.innerHTML = html;
       this.lastHtml = html;
@@ -186,17 +205,17 @@ export const ROADSIDE_MOTEL_TUTORIAL: TutorialStep[] = [
   {
     id: 'recruit',
     title: 'Reinforce',
-    text: 'The <b>Barracks</b> trains new squads. Money (<b>$</b>) is scarce; supplies (<b>▣</b>) trickle in and also come from kills. Each squad costs <b>upkeep</b> once per in-game day, and the <b>★ command cap</b> limits your force size.',
-    objective: 'Recruit a Rifle Squad.',
+    text: '<b>Click the Barracks</b> in your base (or press <b>B</b>) to recruit new squads and set where they gather (<b>Set rally point</b>). Money (<b>$</b>) is scarce; supplies (<b>▣</b>) trickle in and also come from kills. Each squad costs <b>upkeep</b> once per in-game day, and the <b>★ command cap</b> limits your force size; securing districts raises it.',
+    objective: 'Open the Barracks and recruit a Rifle Squad.',
     done: (g) => g.world.structures.some((s) => s.def.id === 'barracks' && s.queue.length > 0) || g.world.squads.length > 3,
-    highlight: '.hud-production, .hud-top .top-res',
+    highlight: '.hud-top .top-res',
   },
   {
     id: 'support',
     title: 'Call for support',
     text: 'Click the <b>Command Post</b> (the big building in your base) for support powers: an <b>Artillery Barrage</b> marked with white smoke (it hits your own people too) and a <b>Supply Drop</b> on green smoke that a squad has to go and collect.',
     objective: 'Select the Command Post.',
-    done: (g) => g.selectedStructure != null,
+    done: (g) => g.selectedBuilding === 'commandPost',
   },
   {
     id: 'hive',

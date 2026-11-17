@@ -64,6 +64,7 @@ export class Renderer {
   private prevPos = new Map<number, { x: number; y: number }>();
   private corpses: { key: string; x: number; z: number; facing: number; t0: number; sx: number; sy: number; tint?: number }[] = [];
   private animClock = 0;
+  private rallyFlag: THREE.Group;
 
   constructor(container: HTMLElement, private overlay: HTMLElement, private world: World, cast: Record<string, Flipbook> | null = null) {
     // full-resolution, anti-aliased isometric 3D (v4.3: the pixel-art filter was dropped)
@@ -114,6 +115,15 @@ export class Renderer {
     this.ghost = new THREE.Mesh(new THREE.BoxGeometry(1, 1.5, 1), new THREE.MeshBasicMaterial({ color: 0x77dd77, transparent: true, opacity: 0.45, depthWrite: false }));
     this.ghost.visible = false;
     this.scene.add(this.ghost);
+
+    // Barracks rally flag (round 4 #36): pole + blue pennant, follows world.map.rally
+    this.rallyFlag = new THREE.Group();
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 3, 6), new THREE.MeshLambertMaterial({ color: 0x3a3a3a }));
+    pole.position.y = 1.5;
+    const cloth = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.7), new THREE.MeshLambertMaterial({ color: 0x4a7ab8, side: THREE.DoubleSide }));
+    cloth.position.set(0.6, 2.6, 0);
+    this.rallyFlag.add(pole, cloth);
+    this.scene.add(this.rallyFlag);
 
     this.hookEvents();
     window.addEventListener('resize', () => this.resize());
@@ -585,6 +595,8 @@ export class Renderer {
     this.animClock += simDt;
     const w = this.world;
     this.rig.apply(realDt);
+    this.rallyFlag.position.set(w.map.rally.x, 0, w.map.rally.y);
+    this.rallyFlag.rotation.y = Math.sin(this.time * 1.3) * 0.15;
     if (this.crowds) this.renderCrowds(simDt);
     this.fadeOccluders(realDt);
 

@@ -29,7 +29,7 @@ async function boot(): Promise<void> {
   });
 
   // handy in the browser console while playtesting
-  (window as unknown as { game: Game }).game = game;
+  Object.assign(window as unknown as Record<string, unknown>, { game, hud });
 }
 
 void boot();

@@ -11,6 +11,7 @@ import { SUPPORT } from '../config/support';
 import { supportBlocked } from '../sim/systems/support';
 
 const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!);
+const ALERT_SPEAKERS = new Set(['Command', 'Overwatch', 'Intel', 'Quartermaster', 'Engineers']);
 const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 /** DOM HUD. Rebuilt at ~8 Hz, or immediately on selection/mode changes. */
@@ -22,8 +23,6 @@ export class Hud {
   private districts!: HTMLElement;
   private objectives!: HTMLElement;
   private selection!: HTMLElement;
-  private production!: HTMLElement;
-  private radioEl!: HTMLElement;
   private toastEl!: HTMLElement;
   private modal!: HTMLElement;
   private radio: Radio;
@@ -40,8 +39,6 @@ export class Hud {
       <div class="hud-districts panel"></div>
       <div class="hud-bottom">
         <div class="hud-selection panel"></div>
-        <div class="hud-production panel"></div>
-        <div class="hud-radio panel"></div>
       </div>
       <div class="toast"></div>
       <div class="modal"></div>`;
@@ -51,13 +48,15 @@ export class Hud {
     this.objectives = q('.hud-objectives');
     this.districts = q('.hud-districts');
     this.selection = q('.hud-selection');
-    this.production = q('.hud-production');
-    this.radioEl = q('.hud-radio');
     this.toastEl = q('.toast');
     this.modal = q('.modal');
 
     this.root = root;
-    this.radio = new Radio(game.world, () => (this.dirty = true));
+    // v4.9 (#62): the radio log is hidden until voice audio lands. Every line is still generated
+    // (Radio keeps them), and the important ones surface as a brief alert.
+    this.radio = new Radio(game.world, (line) => {
+      if ((line.tone === 'warn' || line.tone === 'bad') && ALERT_SPEAKERS.has(line.speaker)) this.alert(line.text, line.tone);
+    });
     game.onChange(() => (this.dirty = true));
     game.toast = (m) => this.toast(m);
 
@@ -81,8 +80,15 @@ export class Hud {
 
   toast(msg: string): void {
     this.toastEl.textContent = msg;
-    this.toastEl.classList.add('show');
+    this.toastEl.className = 'toast show';
     this.toastTimer = 2.2;
+  }
+
+  /** Important radio traffic, shown briefly instead of a chat log. */
+  private alert(msg: string, tone: string): void {
+    this.toastEl.textContent = msg;
+    this.toastEl.className = `toast show alert ${tone}`;
+    this.toastTimer = 4;
   }
 
   private click(e: PointerEvent): void {
@@ -92,6 +98,7 @@ export class Hud {
     const [act, arg] = btn.dataset.act!.split(':');
     switch (act) {
       case 'produce': g.produce(arg); break;
+      case 'rally': g.setMode({ kind: 'rally' }); break;
       case 'build': g.startBuild(arg); break;
       case 'charge': g.setMode({ kind: 'charge' }); break;
       case 'deconstruct': g.setMode({ kind: 'deconstruct' }); break;
@@ -147,8 +154,6 @@ export class Hud {
     this.renderDistricts();
     this.renderObjectives();
     this.renderSelection();
-    this.renderProduction();
-    this.renderRadio();
   }
 
   private renderTop(): void {
@@ -206,6 +211,10 @@ export class Hud {
     const g = this.game;
     const sq = g.selectedSquads;
     const st = g.selectedStructure != null ? g.world.structures.find((s) => s.id === g.selectedStructure && s.alive) : undefined;
+    if (!sq.length && st?.def.id === 'barracks') {
+      this.set(this.selection, this.barracksPanel());
+      return;
+    }
     if (!sq.length && st?.def.id === 'commandPost') {
       const w = g.world;
       const rows = SUPPORT.map((d) => {
@@ -224,7 +233,7 @@ export class Hud {
     }
     if (!sq.length) {
       const all = g.world.squads.map((s) => `<button class="chip" data-act="focus:${s.id}">${esc(s.name)} <small>${s.aliveCount}/${s.members.length}</small></button>`).join('');
-      this.set(this.selection, `<h3>Forces</h3><div class="chips">${all || '<i>No squads left.</i>'}</div><p class="hint">Click or drag to select · click the Command Post for support powers · right-click a car for cover</p>`);
+      this.set(this.selection, `<h3>Forces</h3><div class="chips">${all || '<i>No squads left.</i>'}</div><p class="hint">Click or drag to select · click the <b>Barracks</b> (B) to recruit · click the <b>Command Post</b> for support · right-click a car for cover</p>`);
       return;
     }
     const cards = sq
@@ -241,7 +250,7 @@ export class Hud {
           <div class="row small"><span>Kills ${s.kills}</span><span>Upkeep ${s.def.upkeep}/day</span></div></div>`;
       })
       .join('');
-    const eng = g.selectedEngineers.length > 0;
+    const eng = g.engineersOnly; // v4.9 #61: build tools only for an engineers-only selection
     const btn = (act: string, label: string, key: string, cost?: { money: number; supplies: number }, active = false) => {
       const afford = !cost || g.world.canAfford(cost);
       const c = cost ? `<small>$${cost.money} · ${cost.supplies}▣</small>` : '';
@@ -270,8 +279,9 @@ export class Hud {
     this.set(this.selection.querySelector('.hint') as HTMLElement, modeHint);
   }
 
-  private renderProduction(): void {
-    const w = this.game.world;
+  private barracksPanel(): string {
+    const g = this.game;
+    const w = g.world;
     const barracks = w.structures.find((s) => s.def.id === 'barracks');
     const queue = barracks?.queue ?? [];
     const avail = Object.values(UNITS).filter((u) => !u.requires || isEnabled(u.requires as never));
@@ -285,14 +295,11 @@ export class Hud {
       .join('');
     const q = queue.map((j, i) => `<div class="qitem">${UNITS[j.defId].name}${i === 0 ? ` <small>${Math.ceil(j.remaining)}s</small>` : ''}</div>`).join('');
     const lockedHtml = locked.map((u) => `<div class="locked" title="${esc(u.unlock)}">🔒 ${u.name}<small>${esc(u.unlock)}</small></div>`).join('');
-    this.set(this.production, `<h3>Barracks</h3>${rows}${q ? `<div class="queue">${q}</div>` : ''}
-      <details><summary>Roster roadmap (${locked.length} locked)</summary>${lockedHtml}</details>`);
-  }
-
-  private renderRadio(): void {
-    const lines = this.radio.lines.slice(-7);
-    this.set(this.radioEl, `<h3>Radio</h3>${lines.map((l) => `<div class="line ${l.tone}"><b>${esc(l.speaker)}:</b> ${esc(l.text)}</div>`).join('')}`);
-    this.radioEl.scrollTop = this.radioEl.scrollHeight;
+    const rallyOn = g.mode.kind === 'rally';
+    return `<h3>Barracks · Recruit</h3><div class="prod-list">${rows}</div>${q ? `<div class="queue">${q}</div>` : ''}
+      <div class="cmds"><button class="cmd ${rallyOn ? 'on' : ''}" data-act="rally">⚑ Set rally point</button></div>
+      <p class="hint">${rallyOn ? 'Click the map where new squads should gather · right-click to cancel' : `★ ${w.commandUsed}/${w.commandCap} command used. New squads walk to the rally flag.`}</p>
+      <details><summary>Roster roadmap (${locked.length} locked)</summary>${lockedHtml}</details>`;
   }
 
   private showIntro(): void {
@@ -313,6 +320,7 @@ export class Hud {
             <li><kbd>Shift</kbd>+<kbd>RMB</kbd> queue waypoints · <kbd>Ctrl</kbd>+<kbd>1-9</kbd> groups</li>
             <li>Engineers: <kbd>F</kbd> sandbags · <kbd>G</kbd> wire · <kbd>T</kbd> MG nest · <kbd>O</kbd> outpost · <kbd>C</kbd> demo charge · <kbd>X</kbd> deconstruct · <kbd>R</kbd> rotate</li>
             <li><kbd>Arrows</kbd>/edge/<kbd>Shift</kbd>+<kbd>MMB</kbd> pan · wheel zoom · <kbd>MMB</kbd> drag or <kbd>Q</kbd>/<kbd>E</kbd> rotate · <kbd>M</kbd> ops map</li>
+            <li>Click the <b>Barracks</b> (<kbd>B</kbd>) to recruit and set the rally point · click the <b>Command Post</b> for support</li>
             <li><kbd>Space</kbd> pause · <kbd>+</kbd>/<kbd>-</kbd> speed</li>
           </ul></div>
         <div><h3>Field notes</h3>
