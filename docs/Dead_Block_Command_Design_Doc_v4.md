@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.12** | Playtest round 6 logged (§22, #66–74). Roadmap re-ranked: round 6 fixes first; region 2 gets a real difficulty step and a new feature (guard towers); region 3 introduces the power system, which unlocks the Med Bay; artillery becomes a later unlock; Last Stand tabled; replacing the cartoon character models moves up the visual track. No code changes. |
 | **v4.11** | Tutorial region 2 built: Gas Station Strip (§17). Roadmap Tier 1 #10 done; next up is region 3. |
 | **v4.10** | Playtest rounds 4–5 implemented except #54, #58, #64. §21 roadmap re-ranked: every open item (including parked playtest notes) is now in one ordered list, with done items marked. Uploaded models catalogued (§21 visual track). |
 | **v4.9** | Round 5 design decisions recorded: one shared squad health pool (§5), three tutorial regions instead of seven (§17), medics keep their place in the roadmap, "Shriekers" in #59 meant Bloaters. |
@@ -508,7 +509,7 @@ About one district in three, and every boss, drops a one-off reward item: suppre
 - **Squad wipe:** a squad that loses every member is permanently gone, including its experience.
 - Losing outposts costs income and territory and can let hives back in (§19), but does not end the campaign by itself.
 
-### Last Stand defeat mode [v4]
+### Last Stand defeat mode [v4] (tabled v4.12)
 
 *(Replaces v3's "future endgame base-breach challenge" and "main base cannot be destroyed".)*
 
@@ -659,8 +660,8 @@ These are left open on purpose so they don't block the core design or the protot
 **Three tutorial regions** (replaces the earlier seven-mission plan). Two small regions, then one big one, each harder than the last:
 
 1. **Region 1 (small):** Roadside Motel, the current 192 × 192 m zone. Basics: camera, selection, movement, cover, noise, fortifying, recruiting, support, killing a hive, securing.
-2. **Region 2 (small): Gas Station Strip** ✔ v4.11. 192 × 192 m east of the motel, on the same main road. Two gas stations (pump islands are low cover, canopies are walkable), a strip mall facing a big parking lot, a truck-stop diner, a car wash, houses and a small apartment block; the hive sits in the far south-east lot. Easy difficulty tier (tougher, more numerous dead than the motel, more Runners, a busier hive). Until the motel is secured it's behind a chain-link fence with jersey barriers across the road, dimmed on screen, and empty: no zombies, hive or noise. Securing the motel cuts the wire, seeds the district and wakes its hive. Scripted bots: careful advancing wins 6/6 (engineers usually lost at the hive); charging straight in is wiped 6/6.
-3. **Region 3 (big):** a larger map, the final exam before the open world.
+2. **Region 2 (small): Gas Station Strip** ✔ v4.11. 192 × 192 m east of the motel, on the same main road. Two gas stations (pump islands are low cover, canopies are walkable), a strip mall facing a big parking lot, a truck-stop diner, a car wash, houses and a small apartment block; the hive sits in the far south-east lot. Easy difficulty tier (tougher, more numerous dead than the motel, more Runners, a busier hive). Until the motel is secured it's behind a chain-link fence with jersey barriers across the road, dimmed on screen, and empty: no zombies, hive or noise. Securing the motel cuts the wire, seeds the district and wakes its hive. Scripted bots: careful advancing wins 6/6 (engineers usually lost at the hive); charging straight in is wiped 6/6. **[v4.12] Playtest: it didn't feel harder and taught nothing new (#74).** Planned rework: a real difficulty step, and region 2 becomes where **guard towers** are introduced.
+3. **Region 3 (big):** a larger map, the final exam before the open world. **[v4.12]** It introduces the **power system**: the player restores the region's power station (hold it, then engineers bring it online), and that power is what unlocks the **Med Bay** at the main base.
 
 **Regions attach as you go.** Clearing a region opens the road from HQ to the next one; the new region is added next to the existing map, not loaded as a separate level, so the city stays one continuous world (§2). Until a region is attached, its edge is closed.
 
@@ -720,26 +721,28 @@ Every feature, ranked by importance to the game being fun and shippable. **Work 
 
 ### Tier 1: The campaign loop (next)
 10. ✔ **Tutorial region 2: Gas Station Strip** (v4.11). Fenced off east of the motel until the motel is secured, then the wire is cut, the region is seeded and its hive wakes (#58, §17)
-11. **Tutorial region 3** (big): the final tutorial map, attached after region 2; then the open-world unlock (#58, §17). *Next thing to build.*
-12. **Healing: Medic Team and Med Bay.** No passive healing (#48), so a long campaign needs a way to recover. Kept at its §6 unlock point, but needed by region 3 at the latest
-13. **Guard towers**: engineer-built, one squad garrisons it for extra range and sight over cars and walls; zombies have to tear it down (#54). Uses the existing `garrisonedIn` hook
-14. ✔ Region takeover → hive (§19)
-15. Save / load (a persistent city needs it before the open world)
-16. Fog of war and recon
-17. Power stations and base building unlocks
-18. Outpost resupply via Supply Truck
-19. ✔ XP and leveling (Recruit → Elite); Elite paths (Grenadier/Cinder) still open
-20. ✔ Explosion knockback
+11. **Playtest round 6 fixes** (§22, #66–74). *Next thing to build.* In order: animation twitch (#67), noise decay (#72), Bloaters in region 1 (#70), artillery locked for later (#73), MG field of fire + ghost arrow (#71)
+12. **Region 2 rework: a real difficulty step and a new feature** (#74). The new feature is **guard towers** (#54): region 2 is where they're introduced and taught. Engineer-built, one squad garrisons it for extra range and sight over cars and walls; zombies have to tear it down. Uses the existing `garrisonedIn` hook
+13. **Tutorial region 3** (big): the final tutorial map, attached after region 2; then the open-world unlock (#58, §17). **It introduces the power system** (#68): restoring a power station in region 3 is how the player unlocks the Med Bay
+14. **Power stations** (first one, in region 3) and the base unlocks they drive; the full network grows with the open world (§12)
+15. **Healing: Med Bay** (unlocked by region 3's power, #68) and the Medic Team. No passive healing (#48)
+16. ✔ Region takeover → hive (§19)
+17. Save / load (a persistent city needs it before the open world)
+18. Fog of war and recon
+19. Outpost resupply via Supply Truck
+20. ✔ XP and leveling (Recruit → Elite); Elite paths (Grenadier/Cinder) still open
+21. ✔ Explosion knockback
 
 ### Tier 2: Escalation and spectacle
-21. Vehicles: Gun Jeep, Supply Truck, LAV, Battle Tank; sheet-metal armour. **Includes overrun and re-crewing** (#64): zombie pile-ups kill the crew, the empty hull stays, any infantry squad can board it, it starts at 50% HP and engineers repair it
-22. Special zombies: Screamer, Brute, Dragger, Puker; reanimation
-23. Day/night cycle and flares
-24. Building destruction, permanent rubble, tank crushing of cars
-25. Artillery: Mortar Team, strike patterns (base barrage ✔)
-26. Elite rooftop access and pile-ups onto roofs
-27. Tall concrete walls, loudspeaker
-28. Last Stand defeat mode
+22. Vehicles: Gun Jeep, Supply Truck, LAV, Battle Tank; sheet-metal armour. **Includes overrun and re-crewing** (#64): zombie pile-ups kill the crew, the empty hull stays, any infantry squad can board it, it starts at 50% HP and engineers repair it
+23. Special zombies: Screamer, Brute, Dragger, Puker; reanimation
+24. Day/night cycle and flares
+25. Building destruction, permanent rubble, tank crushing of cars
+26. **Artillery** (v4.12, #73: a later unlock, not available from the start): the Command Post barrage unlocks here, alongside the Mortar Team and strike patterns. The barrage itself is already built and just gets locked until then
+27. Elite rooftop access and pile-ups onto roofs
+28. Tall concrete walls, loudspeaker
+
+*Tabled (v4.12, #69): **Last Stand defeat mode** (was Tier 2 #28). Kept in the doc (§13) for later; not scheduled.*
 
 ### Tier 3: Air power and late game
 29. Air-support call-ins with coloured smoke: gun run, bombing run, AC-130, drone (supply-drop flyover ✔ is the template)
@@ -753,8 +756,7 @@ Every feature, ranked by importance to the game being fun and shippable. **Work 
 - V2. ✔ Instanced, animated crowds + flow-field pathing; ✔ smoother flipbooks (more poses, stable simplification), ✔ corpses fall. Web Worker deferred until real-hardware testing shows the sim is the limit
 - V3. Real assets, in this order:
   1. ✔ Main zombie: "Zombie" by pxltiger (Idle/Walk/Run/Attack/FallingBack)
-  2. A second zombie body to replace the cartoon Quaternius female, so the crowd has one consistent style (candidates in `assets-src/models/`; most need animations from another rig)
-  3. Soldiers: try the uploaded RTS soldier/mercenary models. They have **no animations**, so this only works if Mixamo-style clips can be retargeted onto them; otherwise keep Quaternius
+  2. **Replace all three cartoon Quaternius models (v4.12, #66): the big-headed female zombie, the rifleman and the engineer.** This is now the top visual item. Every replacement needs, at minimum, idle, walk, a shooting or attack loop, and a death that ends on the ground (plus a work/build loop for the engineer). None of the uploaded soldier models have animations, so the practical route is **Mixamo** (free, Adobe account, licence allows use in games): upload the chosen model or pick a Mixamo character, download each clip as FBX "with skin", and drop them in. The loader already handles multi-part glTF/FBX and texture colours. If an uploaded model won't rig cleanly, use a Mixamo stock soldier instead
   4. Aircraft for call-ins and flyovers (A-10, Huey, Chinook, Tiger, Reaper drone, fighter jet), compressed when wired in
   5. Ground vehicles for Tier 2 (Bradley, tank, Ural truck)
 - V4. Lighting pass: dusk grade, night lights/flares, smoke columns, fire
@@ -897,4 +899,18 @@ First hands-on playtest of the browser MVP (November 2026). Every note, and what
 **Open, on the roadmap (§21):** #58 tutorial regions 2 and 3 → Tier 1 #10–11 · #54 guard towers → Tier 1 #13 · #64 vehicle overrun → Tier 2 #21 · parked #22, #23, #25 → visual track
 
 **Balance after v4.10** (scripted bots, 6 seeds, tutorial tier): careful advancing wins 5–6/6 with no losses; charging straight in wins 1–2/6 with heavy losses.
+
+### Round 6 [v4.12] (logged, not started)
+
+| # | Note | Likely cause (from the code) | Proposed fix |
+|---|---|---|---|
+| 66 | Replace the big-headed zombie, the rifleman and the engineer with new models | They're the cartoon Quaternius models; only the main zombie was swapped (v4.10). | Top of the visual track (§21 V3.2). Needs animated replacements: Mixamo is the practical source, since none of the uploaded soldier models have animations. See §21 for the clips each one needs. |
+| 67 | Zombie and infantry arms still jump up and down rapidly, about every second | Two causes. **(a) Soldiers:** a rifleman fires every 0.9 s, but the shooting pose is only shown for 0.7 s after each shot, so the arms flip between the aim pose and idle about once a second. **(b) Everyone:** the walk/run speed multiplies a *global* animation clock that keeps counting up for the whole session, so any small change in speed (every frame, from noisy velocity) jumps the animation to a completely different frame. | (a) Stay in the aim/shoot pose while the squad has a target, with the recoil as a small part of the loop, not the whole pose. (b) Give each character its own animation phase that advances by `dt × speed factor`, so changing speed changes the tempo smoothly and never jumps. Also blend between neighbouring poses. |
+| 68 | The final, large tutorial map should introduce the power system, which is how the player unlocks the Med Bay | Power stations are Tier 1 #17 and not built; the Med Bay doesn't exist. | **Design decision, recorded in §17 and §21.** Region 3 introduces power: restore its power station and the Med Bay unlocks at the base. |
+| 69 | Table Last Stand mode (§21 #28) for now | — | **Done in the doc:** taken off the roadmap and marked tabled; §13 keeps the design for later. |
+| 70 | Haven't seen any Bloaters in region 1 recently | The motel's starting mix is only 3% Bloaters (about 1 in a starting crowd of ~39), the stage-1 hive rolls a Bloater 2% of the time, and the tutorial cap on Runners + Bloaters (about 5 at once) is mostly used up by Runners. Bloaters are also now drawn as a scaled-up version of the new zombie model, which may not read as a Bloater at a glance. | Guarantee a few in region 1 (e.g. 2–3 placed in the starting crowd), give Bloaters their own share of the cap so Runners can't crowd them out, and make them unmistakable visually (much fatter, sickly colour, maybe a dedicated model). |
+| 71 | The MG still has no arrow showing its front on the placement ghost | The MG nest is square, and the turret currently turns a full 360°, so it has no front; the v4.10 ghost arrow only appears on long walls. | **Design change:** give the MG emplacement a **field of fire** (e.g. a 120° arc) that you aim with R while placing, shown on the ghost as an arrow plus the arc (instead of a full circle). The nest only engages inside its arc, so placement matters and flanks matter. |
+| 72 | Noise should start to go down slowly after about 3 seconds; it stays up for a long time | v4.9 set the hold to 12 s (for #43, "it falls too quickly"). | Hold **3 s**, then drain **slowly** (≈1–1.5 per second instead of 2.5). Together that keeps sustained fights filling the meter, but quiet comes back sooner. |
+| 73 | Artillery should be a later unlock | The Command Post barrage has been available from the start since v4.4 (playtest convenience). | Lock it until the Artillery tier (§21 Tier 2 #26). During the tutorial the Command Post shows it as locked with its unlock condition; the Supply Drop stays available. |
+| 74 | No real difficulty step in region 2, and it didn't introduce anything new | The Easy tier only nudges the numbers (zombie HP 70% → 85%, a busier hive), while the player arrives stronger: more squads, the +4 command cap from securing the motel, motel income and veteran squads. Nothing new is taught there. | **Difficulty:** a bigger step than the numbers alone. Larger starting crowd, the hive starts at stage 2, early Runner packs (doc §2 has Runner packs as the next threat), and pulses that target the player's new motel outpost so holding ground matters. **New feature:** region 2 introduces **guard towers** (#54, §21 Tier 1 #12), with a short tutorial prompt when the region opens. Re-run the bot balance test with the player's realistic post-motel force. |
 
