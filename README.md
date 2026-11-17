@@ -64,6 +64,10 @@ Rules that keep later features cheap to add:
 - **Damage types** (`bullet | explosive | fire | melee | toxic | crush`) drive the rules: hives ignore bullets, cover ignores explosives and toxic, and `crush` is reserved for collapsing buildings and tanks.
 - **Deterministic**: a seeded RNG everywhere in the sim (cosmetic radio lines are the only exception).
 
+## Characters
+
+Riflemen, engineers and zombies are animated CC0 models from Quaternius (see `CREDITS.md`) in `public/models/characters/`. At load, every animation is sampled into a few frozen poses and drawn with GPU instancing, so crowds of thousands cost a handful of draw calls. Zombie meshes are simplified at load; zombie shadows switch off above 300 on screen. If the models fail to load, the game falls back to simple box figures.
+
 ## Swapping in real 3D models
 
 The city is generated in code, but any of `car`, `palm`, `tree`, `shrub`, `streetlight` or `hydrant` can be replaced by a glTF model: put the `.glb` in `public/models/` and add it to `public/models/manifest.json`, for example `"palm": { "url": "palm.glb", "scale": 1, "rotY": 0 }`. Models should be in metres, +Y up, facing +Z. Only use models whose licence allows it (CC0 is easiest). Missing or broken files quietly fall back to the procedural version.

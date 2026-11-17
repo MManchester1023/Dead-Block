@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.4** | Playtest round 2 (§22): fixed hand-authored world layout confirmed (§2), engine/porting notes (§23), repair and resume building, Command Post support powers, shooter aggro, kill salvage, wider gunfire hearing, calmer hives, crowds of hundreds to thousands. Animated CC0 characters (Quaternius) with flipbook crowd rendering. |
 | **v4.3** | Art direction: isometric first, pixel art dropped (only a loose influence). First procedural city pass: houses, apartments, motel, shops, warehouse, trees, streetlights, vehicles, painted roads. Optional glTF model overrides. |
 | **v4.2** | Playtest feedback round 1 (§22): force-attack, middle-mouse camera rotation, rifle range, time-then-distance zombie aggro, HUD click fix, looser squads, weaker basic zombies, engineer deconstruction, car wheels, 12-minute days. Plus hive alarm and 3 s charge planting. |
 | **v4.1** | §14 "Target look for the finished game" (art direction from reference images, scale, crowd tech, camera rotation). §16 adds the open production questions. MVP: gunfire is now heard well beyond sight. |
@@ -43,6 +44,7 @@ Dead Block Command is a top-down/isometric RTS-lite. The player commands modern 
 The city is built as one connected world. Districts are named regions of that world, not separate missions or maps. The player starts at a safe zone on the city's edge and must physically move forces out to the districts and back. The strategic map and the detailed battlefield are two views of the same simulation.
 
 - **Seamless zoom.** Zooming into a street on the operations map shows the live battlefield. Zooming back out returns to the strategic overview while the simulation keeps running.
+- **Fixed, hand-authored world [v4.4].** The city layout (roads, buildings, districts, hive sites, abandoned cars) is designed by hand and is **identical every time**, so the open world stays the same place you learn and reclaim. Nothing about the map layout is randomly generated. "Procedural" in this project only means the *look* of a building is built by code instead of loaded from a model file, and even that is seeded per building, so the same house always looks the same. Future districts are authored the same way (as map data), not generated.
 - **Persistent consequences.** Soldiers lost, zombies killed, structures destroyed, vehicles damaged, hives cleared, fortifications built and **rubble created [v4]** all stay in the world.
 - **No hidden auto-resolve.** Battles are simulated in the world. Progress comes from actual unit movement and combat.
 - **Travel matters.** Units travel between base, outposts and districts. Outposts are forward positions, not teleporters.
@@ -193,6 +195,16 @@ The main base is the player's safe zone and main production center. It starts wi
 - Units travel to outposts through the world; no teleporting.
 - An outpost taken by zombies becomes a hive (§19).
 
+### Command Post support powers [v4.4]
+
+Click the Command Post to open its support panel. Each power costs money, has a cooldown, and is marked on the ground with its own smoke colour before it arrives (§8).
+
+| Power | Smoke | Effect | Availability |
+|---|---|---|---|
+| Artillery Barrage | White | 8 shells over ~4 s across a 10 m radius; knockback; hurts friendlies too | Command Post (playtest: from the start; later gated by base progression) |
+| Supply Drop | Green | Crate parachutes in (+45 supplies); a squad must reach it to collect | Command Post |
+| Gun Run / Bombing Run / AC-130 | Red / Orange / Purple | See §8 | Airfield |
+
 ### Outpost resupply [v4]
 
 Outposts **hold their own local supply stock**. Building defenses at an outpost, and rearming or servicing units there, draws from that stock rather than from the global pool directly. When the stock runs out, the outpost cannot build or rearm until it is resupplied.
@@ -214,6 +226,8 @@ Engineers can build predefined defensive structures **anywhere on the map**, not
 | Lure **[v4]** | Craftable loudspeaker (see below) |
 | Base defenses | Sniper towers, mounted HMGs, mounted grenade launchers, mounted flamethrowers |
 | Strategic support | Artillery strikes on districts, unlocked through base progression |
+
+**Repair and resume [v4.4].** Right-click your own structure with engineers selected: an unfinished site is picked back up where it was left (a new order no longer throws the work away), and a damaged structure is repaired over roughly its build time, paying supplies as the crew works (about half the structure's supply cost for a full bar). Unfinished and damaged structures show a progress/health bar.
 
 **Deconstruction [v4.2].** Engineers can take down anything the player built (not base facilities). An unstarted construction site refunds in full; a finished structure refunds half its cost and takes half its build time to dismantle. Dismantling your own outpost gives up the district quietly. Only a zombie takeover turns it into a hive.
 
@@ -333,6 +347,7 @@ The Airfield is unlocked by securing the Airport and restoring its power. It pro
 | Heavy attack plane gun run | Red |
 | Fast fighter bombing run | Orange |
 | AC-130 orbit | Purple |
+| Artillery barrage (Command Post) **[v4.4]** | White |
 | Supply / upgrade airdrop | Green |
 | Helicopter LZ / extraction | Yellow |
 
@@ -373,6 +388,7 @@ For performance, each hive has a spawn budget and counts toward a global active-
 - Horde pulses grow with the difficulty of the region sending them.
 - **Noise** is a core mechanic. Weapons, engines and loud actions raise a noise level that attracts hordes. Quiet weapons and Sneak lower detection. **Loudspeakers [v4]** use this on purpose.
 - **Aggro [v4.2]: time first, then distance.** A zombie that has seen a squad hunts it for ~20 s even after losing sight (it keeps pathing toward the squad), then keeps coming while the squad is within ~60 m. Simply running away no longer shakes them; breaking contact takes distance *and* time.
+- **Getting shot makes them angry [v4.4].** A zombie that's hit turns on whoever shot it (unless it's already biting someone), even from beyond its sight. Fixes Bloaters sometimes ignoring fire.
 - **Hive alarm [v4.2].** A squad within ~20 m of a hive draws every zombie around the hive (~45 m) onto it. Charges are planted over 3 s and getting hit restarts the plant, so engineers need covering fire. (Playtest bots found that a lone engineer could sprint past walkers and one-shot a stage-1 hive.)
 - **Pile-ups.** Zombies can pile up and climb over each other to get over barricades, vehicles, small buildings **and onto rooftops [v4]**. Height and barriers don't guarantee safety. **Exception [v4]:** tall concrete walls (§6) are too high to pile over.
 - Walkers and Runners can cling to helicopters hovering low or landed, which makes low hovering, landing **and rappelling [v4]** risky in infested areas.
@@ -430,6 +446,7 @@ Two resources: **money** and **supplies**. Money is harder to get and is the mai
 | Money ($) | Secured-district income, one-time clear rewards, civilian evacuations, searched buildings | Recruiting units and vehicles, construction, air-support calls |
 | Supplies | Base/outpost income, supply crates, cleared buildings, district rewards | Unit production, daily upkeep, repairs, restoring lost members, **outpost stock [v4]** |
 
+- **Kill salvage [v4.4].** Every kill pays a little: Walkers and Runners $1 + 0.5 supplies, Bloaters $4 + 2, Screamers $3 + 1, Brutes $10 + 4. Fighting pays for itself a bit; holding a secured district still pays far better.
 - Each active unit costs supplies once per in-game day. This is a predictable upkeep payment, not a constant drain during combat.
 - Supplies are not spent on ammo or fuel.
 - Vehicles still RTB for servicing and rearming where relevant. RTB is a behavior, not a fuel minigame.
@@ -518,7 +535,7 @@ The current MVP visuals (code-built boxes) are placeholders for testing. The fin
 - **Real scale.** Soldiers are small next to the world: a two-storey house is several times a soldier's height, and streets are wide multi-lane roads with sidewalks, crosswalks, streetlights and parked cars. The city should feel big and the squads should feel vulnerable in it.
 - **Detailed, readable buildings.** Suburban houses with pitched tile or shingle roofs, porches, balconies, garages and fences; flat-roofed apartments and commercial blocks with rooftop clutter (AC units, solar panels); warehouses, an airfield and a desert outskirts biome. Palm and leafy trees, hedges, scrub, lawns.
 - **Lighting carries the mood.** One strong sun with long, crisp shadows; a warm/neutral midday and an orange-brown dusk grade; at night, floodlights, searchlights, flares, muzzle flashes and fires do the lighting (ties into §14 day/night and the flare launcher).
-- **Massive crowds.** Hordes are dense carpets of individual zombies: hundreds on screen routinely, **thousands** at a Last Stand. Blood spatter on asphalt, bodies and debris persist.
+- **Massive crowds.** Hordes are dense carpets of individual zombies: hundreds on screen routinely, **thousands** at a Last Stand and around neglected hives. Blood spatter on asphalt, bodies and debris persist. **[v4.4]** Implemented first pass: animated CC0 characters drawn with flipbook instancing (a few draw calls for any crowd size), corpses that lie where they fell, a 1,500-zombie cap, and Overrun hives that grow toward 300 locals.
 - **Spectacle that stays readable.** Tank muzzle blasts, red tracer streams, explosion fireballs with sparks, rising black smoke columns from wrecks, dust clouds, helicopter rotor wash and fast-ropes, jets with afterburners on strike runs, artillery pieces with visible crews.
 - **Fortified bases look built.** Tall modular walls with walkways and turret blocks, sandbag rings, gun pits, floodlight towers, vehicle gates.
 - **Labels on units.** Small callsign tags with health pips over squads, vehicles and aircraft (e.g. `SQ-14`, `TK-1`, `UH-3`), and distance markers for off-screen SOS/objectives.
@@ -749,4 +766,34 @@ First hands-on playtest of the browser MVP (November 2026). Every note, and what
 | 11 | Day/night cycle is really fast | **Done.** 12 real minutes per in-game day; daily supply income raised to match. |
 
 **Balance after this round** (scripted bots, 6 seeds): a careful "advance, let the wave come, clear, advance" push wins 6/6 with no losses, so careful play is now on the easy side for a starter zone. Blob-rushing the hive and the lone-sapper sprint both fail 6/6. Watch whether human play feels too safe; the knobs are walker HP, hive spawn rate and the alarm radius in `config/balance.ts`.
+
+### Round 2 [v4.4]
+
+| # | Note | Status |
+|---|---|---|
+| 12 | Map regions should be the same every time (no procedurally generated layouts) | **Confirmed and written down (§2).** The layout was already fixed; only building *visuals* are code-generated, seeded per building. |
+| 13 | Similar games use C# in Unity; will this be easy to move over? | **Answered in §23.** |
+| 14 | Engineers stop building if given an order mid-build | **Done.** The site keeps its progress; right-click it to resume; progress bar shows. (A new order still takes priority, as in most RTS games; Shift-queue to add orders after a build.) |
+| 15 | Gunshots should be heard further still | **Done.** Rifle ~110 m (was ~73), MG ~160 m; cap 260 m. |
+| 16 | Zombies should eventually reach overwhelming numbers: hundreds to thousands in places | **First pass done.** Crowd renderer handles thousands; cap 1,500; Overrun hives grow to 300; bigger late-stage pulses. Next: move the sim to a Web Worker and test on real hardware. |
+| 17 | Engineers should repair built structures | **Done** (§6). |
+| 18 | Boomers (Bloaters) don't aggro when shot, sometimes | **Fixed.** Zombies now turn on whoever shoots them. |
+| 19 | Command structure clickable with power-ups | **Done.** Artillery Barrage and Supply Drop; air call-ins shown locked (§6). |
+| 20 | Hives spawn zombies far too often | **Done.** Spawn interval roughly doubled at every stage, smaller groups; big hordes come from pulses instead. |
+| 21 | A little money and supplies per kill | **Done** (§11). |
+
+---
+
+## 23. Engine, platform and porting [v4.4]
+
+**Question:** similar games are built in C# with Unity (or similar engines). Will this be easy to move over?
+
+**Honest answer: the game's logic will move over fairly easily; the visuals and UI will be rebuilt, not moved.**
+
+- **Simulation (easy to port).** All the rules (combat, targeting, zombies, hives, noise, economy, orders, districts) live in `src/sim/` and `src/config/`. They're plain TypeScript with no browser or graphics code in them, deterministic, and covered by tests. TypeScript and C# are close cousins; this code translates almost line by line, and the tests translate with it (they become the proof the port behaves the same). Config tables become JSON or ScriptableObjects. Roughly ~3,000 lines today.
+- **Assets (port as-is).** Characters are standard FBX; Unity imports them directly. The procedural buildings and props would either be re-implemented as an editor script or exported once to models.
+- **Rendering, input and UI (rebuild).** Three.js and the HTML HUD don't exist in Unity. These get rebuilt with Unity's renderer, its input system and its UI toolkit. This is the bulk of a port, and it's also where Unity would *help*: lighting, shadows, particles, animation blending and big crowds (ECS/DOTS, GPU instancing) are its strengths.
+- **What keeps it portable:** the strict rule that the sim never touches rendering, all numbers in config, the event bus between sim and presentation, and tests on the sim. Keep following these.
+
+**When to decide.** Stay in the browser while the core is being found (fast iteration, nothing to install, easy to share). The real trigger is the crowd target: if thousands of zombies plus lighting and effects can't hold a steady frame rate on mid-range hardware after moving the sim to a Web Worker, that's the point to port. A middle option, if the only goal is "a desktop app", is wrapping the browser build (Electron/Tauri) with no port at all.
 

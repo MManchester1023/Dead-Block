@@ -16,6 +16,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink); font: 12px/1.35 var(--mono); user-select: none; }
 #view, #labels, #hud { position: fixed; inset: 0; }
+#loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font: 600 22px var(--display); letter-spacing: 2px; color: var(--tan); background: var(--bg); z-index: 20; }
 #view canvas { display: block; width: 100% !important; height: 100% !important; }
 #labels { pointer-events: none; overflow: hidden; }
 #hud { pointer-events: none; }

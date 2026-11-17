@@ -49,8 +49,8 @@ export const BALANCE = {
     stageDurationSec: [600, 420, 480], // time to advance stage 1→2, 2→3, 3→4
     spawnIntervalSec: [18, 11, 7, 4], // v4.4: was far too frequent; big hordes come from pulses instead
     spawnGroup: [1, 2, 3, 4],
-    localCap: [12, 28, 40, 60],
-    globalZombieCap: 260,
+    localCap: [12, 40, 120, 300], // a neglected Overrun hive becomes a sea of dead (v4.4)
+    globalZombieCap: 1500, // sim handles ~2.5k at ~6 ms/tick; renderer crowds are sized for 2k
   },
 
   infestation: {

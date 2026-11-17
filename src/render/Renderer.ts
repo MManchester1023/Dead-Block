@@ -13,6 +13,7 @@ import { buildCity } from './procgen/buildings';
 import { drawDecor, makeCar, scatterDecor } from './procgen/props';
 import { Batch } from './procgen/batch';
 import { models } from './ModelLibrary';
+import { Crowd, type Clip, type Flipbook } from './characters';
 
 interface SquadView {
   group: THREE.Group;
@@ -56,7 +57,13 @@ export class Renderer {
   private hemi: THREE.HemisphereLight;
   private time = 0;
 
-  constructor(container: HTMLElement, private overlay: HTMLElement, private world: World) {
+  /** Animated character crowds (null → box placeholders, e.g. if the models failed to load). */
+  private crowds: Record<string, Crowd> | null = null;
+  private prevPos = new Map<number, { x: number; y: number }>();
+  private corpses: { key: string; x: number; z: number; facing: number; t0: number; sx: number; sy: number; tint?: number }[] = [];
+  private animClock = 0;
+
+  constructor(container: HTMLElement, private overlay: HTMLElement, private world: World, cast: Record<string, Flipbook> | null = null) {
     // full-resolution, anti-aliased isometric 3D (v4.3: the pixel-art filter was dropped)
     this.gl = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     this.gl.setPixelRatio(Math.min(2, window.devicePixelRatio));
@@ -86,7 +93,16 @@ export class Renderer {
     this.scene.add(this.sun, this.sun.target);
 
     this.buildStatic();
-    this.buildZombieMeshes();
+    if (cast) {
+      this.crowds = {
+        soldier: new Crowd(cast.soldier, 96),
+        engineer: new Crowd(cast.engineer, 48),
+        zombieM: new Crowd(cast.zombieM, 2000),
+        zombieF: new Crowd(cast.zombieF, 2000),
+      };
+      for (const c of Object.values(this.crowds)) this.scene.add(c.group);
+      this.crowds.zombieM.shadowLimit = this.crowds.zombieF.shadowLimit = 300;
+    } else this.buildZombieMeshes();
 
     this.tracerGeo.setAttribute('position', new THREE.BufferAttribute(this.tracerPos, 3));
     const tracerLines = new THREE.LineSegments(this.tracerGeo, new THREE.LineBasicMaterial({ color: PAL.tracer, transparent: true, opacity: 0.9 }));
@@ -216,7 +232,7 @@ export class Renderer {
     ring.position.y = 0.08;
     group.add(ring);
     const color = s.def.id === 'engineer' ? PAL.engineer : PAL.olive;
-    const members = s.members.map(() => {
+    const members = (this.crowds ? [] : s.members).map(() => {
       const m = this.makeSoldier(color);
       this.scene.add(m);
       return m;
@@ -340,7 +356,17 @@ export class Renderer {
       if (this.tracers.length < 1000) this.tracers.push({ a: e.from, b: e.to, life: e.heavy ? 0.12 : 0.06, heavy: !!e.heavy });
     });
     ev.on('explosion', (e) => this.spawnExplosion(e.pos, e.radius, e.type === 'toxic' ? 0x8fbf3a : 0xffa040));
-    ev.on('zombieKilled', (e) => this.spawnSplat(e.pos));
+    ev.on('zombieKilled', (e) => {
+      this.spawnSplat(e.pos);
+      if (this.crowds) {
+        const look = zombieLook(e.id, e.defId);
+        this.corpses.push({ key: look.key, x: e.pos.x, z: e.pos.y, facing: e.facing, t0: this.animClock, sx: look.sx, sy: look.sy, tint: look.tint });
+        if (this.corpses.length > 600) this.corpses.shift();
+      }
+    });
+    ev.on('memberKilled', (e) => {
+      if (this.crowds) this.corpses.push({ key: e.unitId === 'engineer' ? 'engineer' : 'soldier', x: e.pos.x, z: e.pos.y, facing: e.facing, t0: this.animClock, sx: 1, sy: 1 });
+    });
     ev.on('toxicCloud', (e) => this.spawnCloud(e.pos, e.radius, e.duration));
     ev.on('smoke', (e) => this.spawnSmoke(e.pos, e.color, e.duration));
   }
@@ -467,8 +493,10 @@ export class Renderer {
 
   render(realDt: number, simDt: number, selected: Set<number>): void {
     this.time += realDt;
+    this.animClock += simDt;
     const w = this.world;
     this.rig.apply(realDt);
+    if (this.crowds) this.renderCrowds(simDt);
 
     // squads
     const seen = new Set<number>();
@@ -478,7 +506,7 @@ export class Renderer {
       const v = this.squadView(s);
       v.group.position.set(s.pos.x, 0, s.pos.y);
       v.ring.visible = selected.has(s.id);
-      s.members.forEach((m, i) => {
+      if (!this.crowds) s.members.forEach((m, i) => {
         const g = v.members[i];
         g.visible = m.alive;
         if (!m.alive) return;
@@ -497,9 +525,9 @@ export class Renderer {
         this.squadViews.delete(id);
       }
 
-    // zombies
+    // zombies (placeholder boxes, only when the character models aren't loaded)
     const counts: Record<string, number> = { walker: 0, runner: 0, bloater: 0 };
-    for (const z of w.zombies) {
+    if (!this.crowds) for (const z of w.zombies) {
       if (!z.alive) continue;
       const type = this.zombieMeshes.has(z.def.id) ? z.def.id : 'walker';
       const mesh = this.zombieMeshes.get(type)!;
@@ -627,6 +655,67 @@ export class Renderer {
     this.gl.render(this.scene, this.rig.camera);
   }
 
+  /** Animated soldiers, engineers, zombies and corpses via flipbook crowds. */
+  private renderCrowds(simDt: number): void {
+    const w = this.world;
+    const C = this.crowds!;
+    for (const c of Object.values(C)) c.begin();
+    const t = this.animClock;
+    const speedOf = (id: number, x: number, y: number) => {
+      const p = this.prevPos.get(id);
+      this.prevPos.set(id, { x, y });
+      return p && simDt > 0 ? Math.hypot(x - p.x, y - p.y) / simDt : 0;
+    };
+
+    for (const s of w.squads) {
+      if (!s.alive) continue;
+      const crowd = s.def.id === 'engineer' ? C.engineer : C.soldier;
+      const order = s.currentOrder?.type;
+      const working = !s.moving && (order === 'build' || order === 'repair' || order === 'deconstruct' || order === 'charge');
+      s.members.forEach((m, i) => {
+        if (!m.alive) return;
+        const key = s.id * 8 + i + 1e7;
+        const v = speedOf(key, m.pos.x, m.pos.y);
+        const phase = (s.id * 0.37 + i * 0.61) % 1;
+        let clip: Clip = 'idle';
+        let ct = t + phase * 4;
+        if (working && crowd.has('work')) clip = 'work';
+        else if (w.time - m.lastShot < 0.7) clip = 'shoot';
+        else if (v > 0.4) {
+          clip = 'walk';
+          ct = t * Math.min(3, Math.max(0.7, v / 2.2)) + phase;
+        }
+        crowd.add(clip, ct, m.pos.x, m.pos.y, m.facing);
+      });
+    }
+
+    for (const z of w.zombies) {
+      if (!z.alive) continue;
+      const look = zombieLook(z.id, z.def.id);
+      const crowd = C[look.key];
+      const v = speedOf(z.id, z.pos.x, z.pos.y);
+      const phase = ((z.id * 0.618) % 1) * 3;
+      let clip: Clip = 'idle';
+      let ct = t + phase;
+      if (z.state === 'attack') clip = 'punch';
+      else if (v > 0.3) {
+        clip = 'walk';
+        ct = t * Math.min(3.2, Math.max(0.6, v / 1.8)) + phase;
+      }
+      crowd.add(clip, ct, z.pos.x, z.pos.y, z.facing, look.sx, look.tint, 0, look.sy);
+    }
+    if (this.prevPos.size > 8000) this.prevPos.clear();
+
+    // corpses: play the death once, lie there a while, then sink into the ground
+    this.corpses = this.corpses.filter((c) => t - c.t0 < 50);
+    for (const c of this.corpses) {
+      const age = t - c.t0;
+      const sink = age > 42 ? (age - 42) * 0.15 : 0;
+      C[c.key].add('death', age, c.x, c.z, c.facing, c.sx, c.tint, sink, c.sy);
+    }
+    for (const c of Object.values(C)) c.end();
+  }
+
   /** Tier 2 hook (doc §14): day/night lighting from the in-game day fraction. */
   private applyTimeOfDay(f: number): void {
     const daylight = Math.max(0.12, Math.sin(f * Math.PI));
@@ -684,4 +773,15 @@ export class Renderer {
     this.gl.setSize(window.innerWidth, window.innerHeight);
     this.rig.resize(window.innerWidth, window.innerHeight);
   }
+}
+
+/** Which body and tint a zombie gets: varied by id, Bloaters swollen and sickly, Runners lean. */
+function zombieLook(id: number, defId: string): { key: string; sx: number; sy: number; tint: number } {
+  const h = ((id * 2654435761) >>> 0) / 4294967296;
+  const shade = 0.82 + h * 0.3;
+  const grey = Math.round(Math.min(1, shade) * 255);
+  const tint = (grey << 16) | (grey << 8) | grey;
+  if (defId === 'bloater') return { key: 'zombieM', sx: 1.7, sy: 1.12, tint: 0xd8f0a0 };
+  if (defId === 'runner') return { key: 'zombieF', sx: 0.92, sy: 1.02, tint };
+  return { key: h < 0.3 ? 'zombieF' : 'zombieM', sx: 1, sy: 0.96 + h * 0.1, tint };
 }

@@ -4,6 +4,7 @@ import { dist, type Vec2 } from './core/math';
 import { World } from './sim/World';
 import { Squad } from './sim/entities';
 import { Renderer } from './render/Renderer';
+import type { Flipbook } from './render/characters';
 import { callSupport } from './sim/systems/support';
 import type { Targetable } from './sim/types';
 
@@ -34,9 +35,9 @@ export class Game {
   private listeners: (() => void)[] = [];
   toast: (msg: string) => void = () => {};
 
-  constructor(container: HTMLElement, overlay: HTMLElement) {
+  constructor(container: HTMLElement, overlay: HTMLElement, cast: Record<string, Flipbook> | null = null) {
     this.world = new World({ seed: 1337 });
-    this.renderer = new Renderer(container, overlay, this.world);
+    this.renderer = new Renderer(container, overlay, this.world, cast);
     this.renderer.rig.focus({ x: 102, y: 108 });
     this.world.events.on('squadWiped', (e) => this.selected.delete(e.squadId));
   }
