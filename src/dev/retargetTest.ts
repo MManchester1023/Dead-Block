@@ -19,8 +19,9 @@ cam.position.set(0.8, 1.3, 5.2);
 cam.lookAt(0.8, 0.9, 0);
 
 const fbx = new FBXLoader();
-const src = await fbx.loadAsync('/assets-src/models/mixamo/shooter-pack/X Bot.fbx');
+// every Mixamo animation file carries the skeleton (X Bot.fbx itself is FBX 6100, too old for FBXLoader)
 const anim = await fbx.loadAsync(`/assets-src/models/mixamo/shooter-pack/${clipFile}`);
+const src = anim;
 src.scale.setScalar(0.01); // Mixamo FBX is in cm
 scene.add(src);
 
