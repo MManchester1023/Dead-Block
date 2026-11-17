@@ -43,6 +43,7 @@ export class Renderer {
 
   private squadViews = new Map<number, SquadView>();
   private structViews = new Map<number, THREE.Object3D>();
+  private buildings: { mesh: THREE.Mesh; mat: THREE.MeshLambertMaterial; box: THREE.Box3; opacity: number }[] = [];
   private structLabels = new Map<number, HTMLDivElement>();
   private hiveViews = new Map<number, { group: THREE.Group; core: THREE.Mesh; label: HTMLDivElement }>();
   private zombieMeshes = new Map<string, THREE.InstancedMesh>();
@@ -135,9 +136,16 @@ export class Renderer {
     apron.receiveShadow = true;
     this.scene.add(apron);
 
-    // procedural city (doc §14 v4.1): every building and street prop merged into one mesh
+    // procedural city (doc §14 v4.1): one mesh per building (so it can fade when it hides units),
+    // all street props merged into a single mesh
+    buildCity(m, (b, batch) => {
+      const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+      const mesh = batch.build(mat);
+      this.scene.add(mesh);
+      const top = b.height + (b.kind === 'houses' ? 4 : b.kind === 'apartment' ? 4 : 2.5); // roofs, tanks, signs
+      this.buildings.push({ mesh, mat, box: new THREE.Box3(new THREE.Vector3(b.rect.x, 0, b.rect.y), new THREE.Vector3(b.rect.x + b.rect.w, top, b.rect.y + b.rect.h)), opacity: 1 });
+    });
     const city = new Batch();
-    buildCity(m, city);
     for (const d of scatterDecor(m, this.world.grid)) {
       const model = models.instance(d.kind);
       if (model) {
@@ -578,6 +586,7 @@ export class Renderer {
     const w = this.world;
     this.rig.apply(realDt);
     if (this.crowds) this.renderCrowds(simDt);
+    this.fadeOccluders(realDt);
 
     // squads
     const seen = new Set<number>();
@@ -734,6 +743,44 @@ export class Renderer {
     if (isEnabled('dayNight')) this.applyTimeOfDay(w.dayTimer / BALANCE.economy.dayLengthSec);
 
     this.gl.render(this.scene, this.rig.camera);
+  }
+
+  /**
+   * See-through buildings (v4.5 next-step 1): any building between the camera and one of your
+   * squads (or a hive / a structure under construction) fades to a ghost so you never lose units
+   * behind a block. Analytic ray-vs-box per building, so it costs nothing.
+   */
+  private fadeOccluders(dt: number): void {
+    const w = this.world;
+    const toCam = new THREE.Vector3();
+    this.rig.camera.getWorldDirection(toCam).negate();
+    const points: THREE.Vector3[] = [];
+    for (const s of w.squads) if (s.alive) points.push(new THREE.Vector3(s.pos.x, 1, s.pos.y));
+    for (const st of w.structures) if (st.alive && !st.built) points.push(new THREE.Vector3(st.pos.x, 0.8, st.pos.y));
+    for (const h of w.hives) if (h.alive) points.push(new THREE.Vector3(h.pos.x, 1.5, h.pos.y));
+    const ray = new THREE.Ray();
+    const k = 1 - Math.exp(-10 * dt);
+    for (const b of this.buildings) {
+      let hides = false;
+      for (const p of points) {
+        // skip units standing inside the footprint's margin (e.g. on the sidewalk right next to it)
+        ray.set(p, toCam);
+        if (ray.intersectsBox(b.box) && !b.box.containsPoint(p)) {
+          hides = true;
+          break;
+        }
+      }
+      const target = hides ? 0.18 : 1;
+      b.opacity += (target - b.opacity) * k;
+      if (Math.abs(b.opacity - target) < 0.01) b.opacity = target;
+      const see = b.opacity < 0.99;
+      if (see !== b.mat.transparent) {
+        b.mat.transparent = see;
+        b.mat.depthWrite = !see;
+        b.mat.needsUpdate = true;
+      }
+      b.mat.opacity = b.opacity;
+    }
   }
 
   /** Animated soldiers, engineers, zombies and corpses via flipbook crowds. */

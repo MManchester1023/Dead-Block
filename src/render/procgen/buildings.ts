@@ -49,8 +49,8 @@ export function frontOf(map: CityMap, b: BuildingDef): Side {
   return (Object.entries(sides) as [Side, number][]).sort((a, b) => b[1] - a[1])[0][0];
 }
 
-/** Build every building into one batch. */
-export function buildCity(map: CityMap, out: Batch): void {
+/** Build every building; `sink` receives each one (its own batch, already in world space). */
+export function buildCity(map: CityMap, sink: (b: BuildingDef, batch: Batch) => void): void {
   for (const b of map.buildings) {
     const side = frontOf(map, b);
     const rot = { s: 0, n: Math.PI, e: Math.PI / 2, w: -Math.PI / 2 }[side];
@@ -81,7 +81,9 @@ export function buildCity(map: CityMap, out: Batch): void {
       new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rot),
       new THREE.Vector3(1, 1, 1),
     );
+    const out = new Batch();
     local.transferTo(out, m);
+    sink(b, out);
   }
 }
 
