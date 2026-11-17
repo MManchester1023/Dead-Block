@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.15** | Playtest round 7 logged (§22, #76–84): both regions cleared first try. Round 7 fixes ranked next on the roadmap, ahead of region 3. No code changes. |
 | **v4.14** | Round 6 fixes and the region 2 rework built: animation twitch, noise decay, zombie classes and pools, guaranteed Bloaters, MG field of fire, artillery locked, guard towers (introduced by region 2), region 2 difficulty step. Next up: tutorial region 3 with the power system. |
 | **v4.13** | Zombie classes decided (§9): **normal** (Walker, Runner), **medium** (every other zombie type except bosses), **boss**. Normal and medium have separate spawn pools that together make up a district's total. MG field of fire (#71) and the region 2 difficulty plan (#74) approved. |
 | **v4.12** | Playtest round 6 logged (§22, #66–74). Roadmap re-ranked: round 6 fixes first; region 2 gets a real difficulty step and a new feature (guard towers); region 3 introduces the power system, which unlocks the Med Bay; artillery becomes a later unlock; Last Stand tabled; replacing the cartoon character models moves up the visual track. No code changes. |
@@ -735,33 +736,34 @@ Every feature, ranked by importance to the game being fun and shippable. **Work 
 10. ✔ **Tutorial region 2: Gas Station Strip** (v4.11). Fenced off east of the motel until the motel is secured, then the wire is cut, the region is seeded and its hive wakes (#58, §17)
 11. ✔ **Playtest round 6 fixes** (v4.14): animation twitch (#67), noise decay (#72), zombie classes and pools + Bloaters in region 1 (#70, #75), artillery locked for later (#73), MG field of fire + ghost arrow (#71)
 12. ✔ **Region 2 rework** (v4.14, #74): a real difficulty step, and **guard towers** (#54) as region 2's new feature: unlocked when the region opens, explained in a briefing card. Engineer-built (V, $120 · 40▣); one squad mans it for +40% range, sight over cars and walls, and half damage from ranged threats; melee goes to the tower, which the dead must tear down; any other order brings the squad down
-13. **Tutorial region 3** (big): the final tutorial map, attached after region 2; then the open-world unlock (#58, §17). **It introduces the power system** (#68): restoring a power station in region 3 is how the player unlocks the Med Bay. *Next thing to build.*
-14. **Power stations** (first one, in region 3) and the base unlocks they drive; the full network grows with the open world (§12)
-15. **Healing: Med Bay** (unlocked by region 3's power, #68) and the Medic Team. No passive healing (#48)
-16. ✔ Region takeover → hive (§19)
-17. Save / load (a persistent city needs it before the open world)
-18. Fog of war and recon
-19. Outpost resupply via Supply Truck
-20. ✔ XP and leveling (Recruit → Elite); Elite paths (Grenadier/Cinder) still open
-21. ✔ Explosion knockback
+13. **Playtest round 7 fixes** (§22, #76–84). *Next thing to build.* In order: walking/arm spasms (#78–80, one root cause), group cover (#81), region 2 opening aggro (#77), gunfire heard at 60 m (#76), clickable status (#84), pathing around Bloater clouds (#83), supply-drop parachute shadow (#82)
+14. **Tutorial region 3** (big): the final tutorial map, attached after region 2; then the open-world unlock (#58, §17). **It introduces the power system** (#68): restoring a power station in region 3 is how the player unlocks the Med Bay
+15. **Power stations** (first one, in region 3) and the base unlocks they drive; the full network grows with the open world (§12)
+16. **Healing: Med Bay** (unlocked by region 3's power, #68) and the Medic Team. No passive healing (#48)
+17. ✔ Region takeover → hive (§19)
+18. Save / load (a persistent city needs it before the open world)
+19. Fog of war and recon
+20. Outpost resupply via Supply Truck
+21. ✔ XP and leveling (Recruit → Elite); Elite paths (Grenadier/Cinder) still open
+22. ✔ Explosion knockback
 
 ### Tier 2: Escalation and spectacle
-22. Vehicles: Gun Jeep, Supply Truck, LAV, Battle Tank; sheet-metal armour. **Includes overrun and re-crewing** (#64): zombie pile-ups kill the crew, the empty hull stays, any infantry squad can board it, it starts at 50% HP and engineers repair it
-23. Special zombies: Screamer, Brute, Dragger, Puker; reanimation
-24. Day/night cycle and flares
-25. Building destruction, permanent rubble, tank crushing of cars
-26. **Artillery** (v4.12, #73: a later unlock, not available from the start): the Command Post barrage unlocks here, alongside the Mortar Team and strike patterns. The barrage itself is already built and just gets locked until then
-27. Elite rooftop access and pile-ups onto roofs
-28. Tall concrete walls, loudspeaker
+23. Vehicles: Gun Jeep, Supply Truck, LAV, Battle Tank; sheet-metal armour. **Includes overrun and re-crewing** (#64): zombie pile-ups kill the crew, the empty hull stays, any infantry squad can board it, it starts at 50% HP and engineers repair it
+24. Special zombies: Screamer, Brute, Dragger, Puker; reanimation
+25. Day/night cycle and flares
+26. Building destruction, permanent rubble, tank crushing of cars
+27. **Artillery** (v4.12, #73: a later unlock, not available from the start): the Command Post barrage unlocks here, alongside the Mortar Team and strike patterns. The barrage itself is already built and just gets locked until then
+28. Elite rooftop access and pile-ups onto roofs
+29. Tall concrete walls, loudspeaker
 
 *Tabled (v4.12, #69): **Last Stand defeat mode** (was Tier 2 #28). Kept in the doc (§13) for later; not scheduled.*
 
 ### Tier 3: Air power and late game
-29. Air-support call-ins with coloured smoke: gun run, bombing run, AC-130, drone (supply-drop flyover ✔ is the template)
-30. Airfield: Hawk (with rappelling), Sparrow, Hauler, Hornet, Anvil
-31. Bosses (the uploaded "muscular zombie" is the first candidate model)
-32. Human enemy faction (Airport, Downtown Core)
-33. Howitzer / HIMARS-style artillery vehicles (if kept)
+30. Air-support call-ins with coloured smoke: gun run, bombing run, AC-130, drone (supply-drop flyover ✔ is the template)
+31. Airfield: Hawk (with rappelling), Sparrow, Hauler, Hornet, Anvil
+32. Bosses (the uploaded "muscular zombie" is the first candidate model)
+33. Human enemy faction (Airport, Downtown Core)
+34. Howitzer / HIMARS-style artillery vehicles (if kept)
 
 ### Visual production track (runs alongside the tiers) [v4.1, updated v4.10]
 - V1. ✔ World scale; ✔ camera rotation; ✔ glTF model loading
@@ -776,11 +778,11 @@ Every feature, ranked by importance to the game being fun and shippable. **Work 
 - **Parked until better-animated soldier models:** idle realism (#22), engineer build animation (#23), leaning against cover (#25)
 
 ### Tier 4: Polish and attachment
-34. Armory weapon customization and Elite cosmetics
-35. Civilians, evacuation and Guerrillas
-36. Vehicle leveling paths
-37. Airdrop upgrades
-38. Reward items catalogue, full campaign balancing
+35. Armory weapon customization and Elite cosmetics
+36. Civilians, evacuation and Guerrillas
+37. Vehicle leveling paths
+38. Airdrop upgrades
+39. Reward items catalogue, full campaign balancing
 
 *Design status: v3 decisions remain confirmed. v4 additions are confirmed direction except where marked "candidate", "proposed" or "open question". All numbers are subject to playtesting.*
 
@@ -923,7 +925,7 @@ First hands-on playtest of the browser MVP (November 2026). Every note, and what
 | 70 | Haven't seen any Bloaters in region 1 recently | The motel's starting mix is only 3% Bloaters (about 1 in a starting crowd of ~39), the stage-1 hive rolls a Bloater 2% of the time, and the tutorial cap on Runners + Bloaters (about 5 at once) is mostly used up by Runners. Bloaters are also now drawn as a scaled-up version of the new zombie model, which may not read as a Bloater at a glance. | Guarantee a few in region 1 (e.g. 2–3 placed in the starting crowd), give Bloaters their own share of the cap so Runners can't crowd them out, and make them unmistakable visually (much fatter, sickly colour, maybe a dedicated model). |
 | 71 | The MG still has no arrow showing its front on the placement ghost | The MG nest is square, and the turret currently turns a full 360°, so it has no front; the v4.10 ghost arrow only appears on long walls. | **Design change:** give the MG emplacement a **field of fire** (e.g. a 120° arc) that you aim with R while placing, shown on the ghost as an arrow plus the arc (instead of a full circle). The nest only engages inside its arc, so placement matters and flanks matter. |
 | 72 | Noise should start to go down slowly after about 3 seconds; it stays up for a long time | v4.9 set the hold to 12 s (for #43, "it falls too quickly"). | Hold **3 s**, then drain **slowly** (≈1–1.5 per second instead of 2.5). Together that keeps sustained fights filling the meter, but quiet comes back sooner. |
-| 73 | Artillery should be a later unlock | The Command Post barrage has been available from the start since v4.4 (playtest convenience). | Lock it until the Artillery tier (§21 Tier 2 #26). During the tutorial the Command Post shows it as locked with its unlock condition; the Supply Drop stays available. |
+| 73 | Artillery should be a later unlock | The Command Post barrage has been available from the start since v4.4 (playtest convenience). | Lock it until the Artillery tier (§21 Tier 2 #27). During the tutorial the Command Post shows it as locked with its unlock condition; the Supply Drop stays available. |
 | 74 | No real difficulty step in region 2, and it didn't introduce anything new | The Easy tier only nudges the numbers (zombie HP 70% → 85%, a busier hive), while the player arrives stronger: more squads, the +4 command cap from securing the motel, motel income and veteran squads. Nothing new is taught there. | **Difficulty:** a bigger step than the numbers alone. Larger starting crowd, the hive starts at stage 2, early Runner packs (doc §2 has Runner packs as the next threat), and pulses that target the player's new motel outpost so holding ground matters. **New feature:** region 2 introduces **guard towers** (#54, §21 Tier 1 #12), with a short tutorial prompt when the region opens. Re-run the bot balance test with the player's realistic post-motel force. |
 
 **Decisions after round 6 [v4.13]:**
@@ -934,5 +936,21 @@ First hands-on playtest of the browser MVP (November 2026). Every note, and what
 | 71 | MG field of fire with a ghost arrow | **Approved** as proposed: a 120° arc aimed with R while placing. |
 | 74 | Region 2 difficulty plan | **Approved** as proposed: bigger starting crowd, hive starts at stage 2, early Runner packs, pulses at the motel outpost, and guard towers as region 2's new feature. |
 
-**Status after v4.14 (round 6):** done: #67 animation twitch (per-character animation clocks; soldiers hold the firing pose while engaged) · #70 Bloaters (at least 3 in region 1's starting crowd, own spawn pool, drawn wider and sickly green) · #71 MG 120° field of fire, aimed with R, arrow + arc on the ghost · #72 noise holds 3 s then drains at 1.25/s · #73 artillery locked until the Artillery tier · #74 region 2 rework + guard towers · #75 normal/medium spawn pools. **Open:** #66 new character models (needs Mixamo-animated replacements, §21 V3.2) · #68 power system in region 3 (§21 Tier 1 #13–15).
+**Status after v4.14 (round 6):** done: #67 animation twitch (per-character animation clocks; soldiers hold the firing pose while engaged) · #70 Bloaters (at least 3 in region 1's starting crowd, own spawn pool, drawn wider and sickly green) · #71 MG 120° field of fire, aimed with R, arrow + arc on the ghost · #72 noise holds 3 s then drains at 1.25/s · #73 artillery locked until the Artillery tier · #74 region 2 rework + guard towers · #75 normal/medium spawn pools. **Open:** #66 new character models (needs Mixamo-animated replacements, §21 V3.2) · #68 power system in region 3 (§21 Tier 1 #14–16).
+
+### Round 7 [v4.15] (logged, not started)
+
+Both tutorial regions cleared on the first try.
+
+| # | Note | Likely cause (from the code) | Proposed fix |
+|---|---|---|---|
+| 76 | Gunfire should only be heard about 60 m away | Hearing is 50 m per loudness point: a rifle (2.2) carries ~110 m, an MG (3.2) ~160 m (set in v4.4 when shots weren't drawing enough). | Rifle → ~60 m: about 27 m per loudness point, so carbine ~50 m, MG ~85 m, explosions further. Re-check the bot balance runs, since fights will draw smaller crowds. |
+| 77 | Unlocking the second region shouldn't aggro the zombies | When the region opens, its crowd is placed anywhere from 12 m inside the fence, which is exactly where the player's squads wait, so some start within sight and charge. Rifle fire heard ~110 m away (#76) then pulls in the rest. | Seed the new region's crowd away from the opened border (nothing within ~50 m of it, none in sight of a squad), start them idle, and give the region a short grace period before noise counts. The 60 m hearing (#76) helps too. |
+| 78 | The arm fix applies to some members of a squad but not all | Same root cause as #79–80 (below): soldiers shuffling around their spot in the squad keep crossing the "walking" speed threshold, so they flip between walk and aim/idle. | Fixed by #79–80; plus hysteresis (start walking above ~0.6 m/s, stop below ~0.3 m/s) so idle shuffling never counts as walking. |
+| 79 | The newer zombie model still has arm spasms when walking | **Bug (v4.13):** the game draws ~60 frames a second but the simulation steps 30 times a second. On frames with no sim step, the speed check sees zero movement and switches the character to idle, then back to walking on the next frame, and each switch restarts the animation. So every walker flips walk ↔ idle about 30 times a second. | Keep each character's last measured speed on frames without a sim step and smooth it; never restart the animation clock on a brief switch (only on a real change of action, e.g. walk → attack); hysteresis as in #78. |
+| 80 | All arms spasm when walking | Same as #79. | Same as #79. |
+| 81 | With a group selected, ordering them into cover only gets one squad into cover | Several squads ordered behind one car are spread 4 m apart along it, but "in cover" requires being within 4.5 m of the car's centre, so only the middle squad qualifies. | Give each squad its own cover: the first gets the clicked car, the others the next-nearest cars/sandbags on the same side (within ~15 m); if there isn't enough cover, the rest line up as close as possible and the toast says so. |
+| 82 | No parachute shadow during the supply drop | The crate casts a shadow but the parachute doesn't; at height, the crate's small shadow lands far off to the side. | Let the parachute cast a shadow, and add a soft shadow disc on the ground under the crate that sharpens as it comes down. |
+| 83 | Infantry should pathfind around Bloater (boomer) gas clouds | Clouds only damage; squad pathfinding doesn't know they exist. | Clouds make their cells expensive for squad pathfinding while they last (route around if possible), and squads standing in a fresh cloud with no orders step out of it. |
+| 84 | Clicking a squad's status (under its name) should select it too | Only the name text is a click target (v4.9 #39). | Make the whole label (name, status and bar) the click target. |
 
