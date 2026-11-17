@@ -277,6 +277,9 @@ export class Input {
         if (b) g.selectStructure(b.id);
         break;
       }
+      case 'v':
+        g.startBuild('guardTower');
+        break;
       case 'x':
         if (g.selectedEngineers.length) g.setMode({ kind: 'deconstruct' });
         else g.toast('Select an Engineer Team to deconstruct');

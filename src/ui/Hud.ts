@@ -94,6 +94,7 @@ export class Hud {
     root.addEventListener('pointerdown', (e) => {
       if (e.button === 0) this.click(e);
     });
+    game.world.events.on('districtUnlocked', (e) => this.showBriefing(e.name, e.unlocks));
     game.world.events.on('victory', (e) => this.showEnd(true, e.reason));
     game.world.events.on('defeat', (e) => this.showEnd(false, e.reason));
     this.showIntro();
@@ -318,7 +319,7 @@ export class Hud {
     let cmds = btn('attackMove', 'Attack-move', 'Ctrl+A', undefined, mode.kind === 'attackMove') + btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'Ctrl+S') + `<button class="cmd" data-act="disband" title="Walk back to the Barracks and stand down: frees command and upkeep, refunds ${BALANCE.economy.disbandRefund * 100}% of the cost">Disband</button>`;
     if (eng) {
       const b = (id: string, key: string) => btn(`build:${id}`, STRUCTURES[id].name, key, STRUCTURES[id].cost, mode.kind === 'build' && mode.defId === id);
-      cmds += '<div class="sep"></div>' + b('sandbags', 'F') + b('wire', 'G') + b('mgNest', 'T') + b('outpost', 'O') + btn('charge', 'Demo Charge', 'C', ABILITIES.demoCharge.cost, mode.kind === 'charge') + btn('deconstruct', 'Deconstruct', 'X', undefined, mode.kind === 'deconstruct');
+      cmds += '<div class="sep"></div>' + b('sandbags', 'F') + b('wire', 'G') + b('mgNest', 'T') + (g.world.unlocked.has('guardTower') ? b('guardTower', 'V') : '') + b('outpost', 'O') + btn('charge', 'Demo Charge', 'C', ABILITIES.demoCharge.cost, mode.kind === 'charge') + btn('deconstruct', 'Deconstruct', 'X', undefined, mode.kind === 'deconstruct');
     }
     const modeHint =
       mode.kind === 'build' ? `Placing ${STRUCTURES[mode.defId].name} — click to place · R ${STRUCTURES[mode.defId].arc ? `turns its ${STRUCTURES[mode.defId].arc}° field of fire` : 'rotate'} · Shift to keep placing · right-click cancel`
@@ -376,7 +377,7 @@ export class Hud {
             <li><kbd>RMB</kbd> move · on a zombie = attack it · on a car/sandbags = take cover · on hive = charge it · on a building = search it (5 s, sometimes supplies, sometimes company)</li>
             <li><kbd>Ctrl</kbd>+<kbd>A</kbd> attack-move · <kbd>H</kbd> hold · <kbd>Ctrl</kbd>+<kbd>S</kbd> stop</li>
             <li><kbd>Shift</kbd>+<kbd>RMB</kbd> queue waypoints · <kbd>Ctrl</kbd>+<kbd>1-9</kbd> groups</li>
-            <li>Engineers: <kbd>F</kbd> sandbags · <kbd>G</kbd> wire · <kbd>T</kbd> MG nest · <kbd>O</kbd> outpost · <kbd>C</kbd> demo charge · <kbd>X</kbd> deconstruct · <kbd>R</kbd> rotate</li>
+            <li>Engineers: <kbd>F</kbd> sandbags · <kbd>G</kbd> wire · <kbd>T</kbd> MG nest · <kbd>V</kbd> guard tower (region 2) · <kbd>O</kbd> outpost · <kbd>C</kbd> demo charge · <kbd>X</kbd> deconstruct · <kbd>R</kbd> rotate</li>
             <li><kbd>WASD</kbd>/arrows/edge/<kbd>Shift</kbd>+<kbd>MMB</kbd> pan · wheel zoom · <kbd>MMB</kbd> drag or <kbd>Q</kbd>/<kbd>E</kbd> rotate · <kbd>M</kbd> ops map</li>
             <li>Click the <b>Barracks</b> (<kbd>B</kbd>) to recruit and set the rally point · click the <b>Command Post</b> for support</li>
             <li><kbd>Space</kbd> pause · <kbd>+</kbd>/<kbd>-</kbd> speed</li>
@@ -393,6 +394,22 @@ export class Hud {
       <details class="roadmap"><summary>Build roadmap: what's in this MVP vs. coming next</summary>${tiers}</details>
       <button class="big" data-act="start:training">DEPLOY WITH TRAINING</button>
       <button class="big ghost" data-act="start">DEPLOY (skip training)</button>
+    </div>`;
+    this.modal.classList.add('open');
+  }
+
+  /** A tutorial region just opened (doc §17): what's new there, game paused while you read. */
+  private showBriefing(name: string, unlocks: string[]): void {
+    const tower = unlocks.includes('guardTower');
+    const T = STRUCTURES.guardTower;
+    this.game.paused = true;
+    this.modal.innerHTML = `<div class="dialog small">
+      <p class="tag">NEW REGION OPEN</p>
+      <h1>${esc(name)}</h1>
+      <p>The wire on the east road is cut. Expect a step up: a bigger crowd, <b>Runner packs</b> that hunt together, and a hive that's already at <b>stage 2</b>. Its hordes will go for your newest outpost, so leave it defended.</p>
+      ${tower ? `<h3>New: Guard Tower</h3>
+      <p>Engineers can now build a <b>Guard Tower</b> (<kbd>V</kbd>, $${T.cost.money} · ${T.cost.supplies}▣). <b>Right-click it</b> with a squad to man it: they shoot <b>${Math.round(((T.garrison?.rangeMult ?? 1) - 1) * 100)}% further</b>, see over cars and walls, and the dead can't claw at them. They have to tear the tower down first. Any other order brings the squad back down.</p>` : ''}
+      <button class="big" data-act="continue">GOT IT</button>
     </div>`;
     this.modal.classList.add('open');
   }

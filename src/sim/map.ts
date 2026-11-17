@@ -69,6 +69,8 @@ export interface DistrictDef {
   packs?: { kind: string; count: number; size: number }[];
   /** Hive stage at the start (default 1). */
   hiveStage?: number;
+  /** Campaign unlocks granted when this region opens (v4.13: region 2 → guard towers). */
+  unlocksOnOpen?: string[];
   /**
    * Tutorial regions (§17, v4.10): closed off by a fence line (`border`, metres) until the district
    * `unlockAfter` is secured. Locked districts have no zombies, hive or noise until then.
@@ -249,7 +251,7 @@ export function buildStarterMap(seed = 7): CityMap {
     // tutorial region 2 (doc §17): a little harder (Easy tier), opens when the motel is secured
     { id: 'gasStrip', name: 'Gas Station Strip', rect: { x: 104, y: 4, w: 64, h: 64 }, starter: true, hiveSites: [{ x: 159, y: 61 }], initialInfestation: 70, difficulty: 1,
       // v4.13 (#74): a real step up: bigger crowd (tier density), Runner packs, hive already at stage 2
-      density: 0.75, mix: { walker: 0.82, runner: 0.18 }, packs: [{ kind: 'runner', count: 4, size: 4 }], hiveStage: 2, locked: true, unlockAfter: 'motel', border: { x: 103, y: 0, w: 1, h: height } },
+      density: 0.75, mix: { walker: 0.82, runner: 0.18 }, packs: [{ kind: 'runner', count: 3, size: 4 }], hiveStage: 2, unlocksOnOpen: ['guardTower'], locked: true, unlockAfter: 'motel', border: { x: 103, y: 0, w: 1, h: height } },
   ];
 
   // ---- cells → metres ----

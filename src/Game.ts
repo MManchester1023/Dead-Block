@@ -123,6 +123,15 @@ export class Game {
       sq = rest; // everyone else falls through to the normal command (e.g. take cover)
     }
 
+    // right-click a guard tower: the first infantry squad climbs up (v4.13)
+    const tower = w.structures.find((s) => s.alive && s.def.garrison && dist(s.pos, p) < s.radius + 1);
+    if (tower) {
+      const err = w.orderGarrison(sq, tower, queue);
+      if (err) this.toast(err);
+      else this.renderer.marker(tower.pos, 0x7ab0e0);
+      return;
+    }
+
     // right-click a zombie: everyone selected focuses it (v4.2)
     let zed: Targetable | null = null;
     let zd = 2.2;
@@ -283,6 +292,10 @@ export class Game {
       return;
     }
     const def = STRUCTURES[defId];
+    if (def.unlock && !this.world.unlocked.has(def.unlock)) {
+      this.toast(`${def.name}: not unlocked yet`);
+      return;
+    }
     if (!this.world.canAfford(def.cost)) {
       this.toast(`${def.name} needs $${def.cost.money} and ${def.cost.supplies} supplies`);
       return;

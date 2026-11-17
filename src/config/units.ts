@@ -51,7 +51,7 @@ export const UNITS: Record<string, UnitDef> = {
     id: 'engineer', name: 'Engineer Team', category: 'infantry', members: 2, memberHp: 48, speed: 6,
     weapon: carbine, cost: { money: 50, supplies: 15 }, upkeep: 3, command: 2, buildTime: 10,
     producedAt: 'barracks', unlock: 'Starting unit', tags: ['canCover'],
-    canBuild: ['outpost', 'sandbags', 'wire', 'mgNest'],
+    canBuild: ['outpost', 'sandbags', 'wire', 'mgNest', 'guardTower'],
     abilities: ['demoCharge'],
   },
   medic: { id: 'medic', name: 'Medic Team', category: 'infantry', members: 2, memberHp: 36, speed: 6.4, weapon: carbine, cost: { money: 70, supplies: 20 }, upkeep: 3, command: 2, buildTime: 12, producedAt: 'barracks', requires: 'powerStations', unlock: 'Suburbs power / Barracks Lv2' },
@@ -115,6 +115,10 @@ export interface StructureDef {
   hotkey?: string;
   /** Field of fire in degrees (v4.13, #71): the weapon only engages inside this arc around its aim. */
   arc?: number;
+  /** One squad can man it (guard tower, v4.13): range multiplier, cover, platform height (m). */
+  garrison?: { rangeMult: number; cover: number; height: number };
+  /** Campaign unlock key; buildable once `World.unlocked` has it (e.g. opened by a tutorial region). */
+  unlock?: string;
 }
 
 export const STRUCTURES: Record<string, StructureDef> = {
@@ -122,6 +126,8 @@ export const STRUCTURES: Record<string, StructureDef> = {
   barracks: { id: 'barracks', name: 'Barracks', hp: 1500, cost: { money: 0, supplies: 0 }, buildTime: 0, size: { w: 5, h: 3 }, blocksMovement: true },
   supplyDepot: { id: 'supplyDepot', name: 'Supply Depot', hp: 1200, cost: { money: 0, supplies: 0 }, buildTime: 0, size: { w: 4, h: 3 }, blocksMovement: true },
   baseWall: { id: 'baseWall', name: 'Base Wall', hp: 15000, cost: { money: 0, supplies: 0 }, buildTime: 0, size: { w: 1, h: 1 }, blocksMovement: true, climbable: false },
+  // v4.13: introduced by tutorial region 2 (#54, #74)
+  guardTower: { id: 'guardTower', name: 'Guard Tower', hp: 900, cost: { money: 120, supplies: 40 }, buildTime: 18, size: { w: 2, h: 2 }, blocksMovement: true, hotkey: 'V', garrison: { rangeMult: 1.4, cover: 0.5, height: 5 }, unlock: 'guardTower' },
   outpost: { id: 'outpost', name: 'Outpost', hp: 600, cost: { money: 100, supplies: 30 }, buildTime: 30, size: { w: 3, h: 3 }, blocksMovement: true, requiresSecured: true, hotkey: 'O' },
   sandbags: { id: 'sandbags', name: 'Sandbag Wall', hp: 260, cost: { money: 15, supplies: 10 }, buildTime: 6, size: { w: 3, h: 1 }, blocksMovement: true, cover: 0.55, climbable: true, hotkey: 'Q' },
   wire: { id: 'wire', name: 'Barbed Wire', hp: 120, cost: { money: 10, supplies: 5 }, buildTime: 4, size: { w: 3, h: 1 }, blocksMovement: false, slow: 0.35, hotkey: 'W' },

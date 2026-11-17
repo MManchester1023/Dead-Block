@@ -2,7 +2,7 @@ import { dist, type Vec2 } from '../../core/math';
 import { BALANCE } from '../../config/balance';
 import { isEnabled } from '../../config/features';
 import { ABILITIES, type WeaponDef } from '../../config/units';
-import { Hive, Squad, Zombie } from '../entities';
+import { Hive, Squad, Zombie, Structure } from '../entities';
 import { pickTarget } from '../targeting';
 import { areHostile, type Faction, type Targetable } from '../types';
 import type { World } from '../World';
@@ -30,7 +30,7 @@ export function inArc(from: Vec2, aim: number, arcDeg: number, t: Vec2): boolean
   return Math.abs(d) <= (arcDeg * Math.PI) / 360;
 }
 
-function acquire(w: World, shooter: { pos: Vec2; targetId: number | null }, faction: Faction, weapon: WeaponDef, arc?: { aim: number; deg: number }): Targetable | null {
+function acquire(w: World, shooter: { pos: Vec2; targetId: number | null }, faction: Faction, weapon: WeaponDef, arc?: { aim: number; deg: number }, elevated = false): Targetable | null {
   if (!isEnabled('threatTargeting')) {
     // fallback: nearest, no lock (useful for A/B playtesting the v4 rule)
     shooter.targetId = null;
@@ -41,7 +41,7 @@ function acquire(w: World, shooter: { pos: Vec2; targetId: number | null }, fact
     dangerClose: BALANCE.combat.dangerCloseRadius,
     current: w.get(shooter.targetId) ?? null,
     candidates: candidatesFor(w, faction, shooter.pos, weapon.range),
-    canEngage: (t) => canHurt(weapon, t) && (!arc || inArc(shooter.pos, arc.aim, arc.deg, t.pos)) && w.grid.lineClear(shooter.pos, t.pos),
+    canEngage: (t) => canHurt(weapon, t) && (!arc || inArc(shooter.pos, arc.aim, arc.deg, t.pos)) && (elevated || w.grid.lineClear(shooter.pos, t.pos)),
   });
   shooter.targetId = t?.id ?? null;
   return t;
@@ -66,11 +66,15 @@ export function updateCombat(w: World, dt: number): void {
     const order = s.currentOrder;
     const busy = order?.type === 'build' || order?.type === 'charge' || order?.type === 'deconstruct' || order?.type === 'repair';
     // forced target (right-clicked zombie) overrides threat priority once it's in range and visible
+    // up a guard tower: longer reach, and they see over cars and walls (v4.13)
+    const tower = s.garrisonedIn != null ? w.get(s.garrisonedIn) : undefined;
+    const g = tower instanceof Structure ? tower.def.garrison : undefined;
+    const weapon = g ? { ...s.def.weapon, range: s.def.weapon.range * g.rangeMult } : s.def.weapon;
     const forced = order?.type === 'attack' ? w.get(order.targetId ?? null) : undefined;
     const forcedOk =
-      forced && forced.alive && dist(s.pos, forced.pos) - forced.radius <= s.def.weapon.range && canHurt(s.def.weapon, forced) && w.grid.lineClear(s.pos, forced.pos);
+      forced && forced.alive && dist(s.pos, forced.pos) - forced.radius <= weapon.range && canHurt(weapon, forced) && (!!g || w.grid.lineClear(s.pos, forced.pos));
     if (forcedOk) s.targetId = forced.id;
-    const t = forcedOk ? forced : acquire(w, s, s.faction, s.def.weapon);
+    const t = forcedOk ? forced : acquire(w, s, s.faction, weapon, undefined, !!g);
     if (!t) continue;
     if (!s.moving) s.facing = Math.atan2(t.pos.y - s.pos.y, t.pos.x - s.pos.x);
     // builders only defend themselves against danger-close threats
@@ -83,7 +87,7 @@ export function updateCombat(w: World, dt: number): void {
       m.cooldown = s.def.weapon.cooldown * w.rng.range(0.85, 1.15);
       if (!t.alive) break;
       m.lastShot = w.time;
-      if (fire(w, m.pos, t, s.def.weapon, s.dmgMult, accMult, s)) {
+      if (fire(w, m.pos, t, weapon, s.dmgMult, accMult, s)) {
         s.kills++;
         gainXp(w, s, t instanceof Zombie && t.def.threat >= 2 ? 3 : BALANCE.combat.xpPerKill);
       }

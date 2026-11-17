@@ -132,9 +132,9 @@ export const DIFFICULTY: readonly DifficultyTier[] = [
     normalPool: [14, 28, 42, 56], mediumPool: [2, 4, 5, 7], mediumChance: [0.15, 0.18, 0.2, 0.22], runnerShare: [0.08, 0.14, 0.2, 0.25],
     mediumStart: 0.06, mediumStartMin: 3, firstPulseDelaySec: 600, pulseIntervalSec: [420, 330, 270, 240], pulseSize: 0.7 },
   // Easy (tutorial region 2, v4.13 #74): a real step up: more and tougher dead, Runner-heavy
-  { name: 'Easy', zombieHp: 0.9, density: 1.35, spawnIntervalSec: [12, 9, 8, 6], spawnGroup: [1, 2, 3, 3],
-    normalPool: [16, 36, 72, 140], mediumPool: [3, 6, 9, 14], mediumChance: [0.15, 0.2, 0.22, 0.25], runnerShare: [0.15, 0.25, 0.3, 0.35],
-    mediumStart: 0.07, mediumStartMin: 4, firstPulseDelaySec: 300, pulseIntervalSec: [330, 260, 210, 180], pulseSize: 1 },
+  { name: 'Easy', zombieHp: 0.85, density: 1.15, spawnIntervalSec: [13, 12, 9, 7], spawnGroup: [1, 1, 2, 3],
+    normalPool: [14, 24, 60, 120], mediumPool: [3, 4, 8, 12], mediumChance: [0.15, 0.2, 0.22, 0.25], runnerShare: [0.15, 0.25, 0.3, 0.35],
+    mediumStart: 0.07, mediumStartMin: 4, firstPulseDelaySec: 420, pulseIntervalSec: [330, 260, 210, 180], pulseSize: 1 },
   { name: 'Standard', zombieHp: 1, density: 1, spawnIntervalSec: [18, 11, 7, 4], spawnGroup: [1, 2, 3, 4],
     normalPool: [10, 34, 105, 270], mediumPool: [2, 6, 15, 30], mediumChance: [0.12, 0.18, 0.22, 0.25], runnerShare: [0.08, 0.15, 0.22, 0.3],
     mediumStart: 0.06, mediumStartMin: 2, firstPulseDelaySec: 480, pulseIntervalSec: [300, 240, 200, 180], pulseSize: 1 },

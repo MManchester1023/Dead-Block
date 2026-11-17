@@ -20,6 +20,27 @@ export function updateOrders(w: World, dt: number): void {
       continue;
     }
     s.moving = false;
+    // up a guard tower (v4.13): stay put until given another order, or the tower falls
+    if (s.garrisonedIn != null) {
+      const tower = w.get(s.garrisonedIn);
+      const alive = tower instanceof Structure && tower.alive;
+      const next = s.currentOrder;
+      if (!alive) {
+        w.leaveTower(s);
+        s.stunned = 1.2; // dropped off a collapsing tower
+        w.events.emit('radio', { speaker: s.name, text: "Tower's coming down! We're on the ground!", tone: 'bad' });
+      } else if (next && next.type !== 'hold' && next.type !== 'garrison') {
+        w.leaveTower(s);
+      } else {
+        if (next) s.orders.shift();
+        s.pos.x = tower.pos.x;
+        s.pos.y = tower.pos.y;
+        s.holding = true;
+        s.inCover = tower.def.garrison!.cover;
+        manTower(w, s, tower);
+        continue;
+      }
+    }
     const o = s.currentOrder;
     if (o) {
       switch (o.type) {
@@ -55,6 +76,22 @@ export function updateOrders(w: World, dt: number): void {
         case 'repair':
           doRepair(w, s, dt);
           break;
+        case 'garrison': {
+          const tower = w.get(o.targetId ?? null);
+          if (!(tower instanceof Structure) || !tower.alive || !tower.built) {
+            s.orders.shift();
+            break;
+          }
+          const st = approach(w, s, tower.pos, tower.radius, tower.radius + 3.5, dt);
+          if (st === 'moving') break;
+          s.orders.shift();
+          s.path = [];
+          if (st === 'inReach' && !w.squads.some((x) => x !== s && x.garrisonedIn === tower.id)) {
+            s.garrisonedIn = tower.id;
+            w.events.emit('radio', { speaker: s.name, text: 'In the tower. Good view from up here.', tone: 'info' });
+          }
+          break;
+        }
         case 'search':
           doSearch(w, s, dt);
           break;
@@ -287,6 +324,19 @@ function doSearch(w: World, s: Squad, dt: number): void {
   s.buildProgress = 0;
   s.orders.shift();
   w.finishSearch(s, b);
+}
+
+/** Soldiers on the platform: one at each corner, facing the target (or the way the squad faces). */
+function manTower(w: World, s: Squad, tower: Structure): void {
+  const half = (tower.size.w * w.grid.cell) / 2 - 0.9;
+  const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  const t = w.get(s.targetId);
+  s.members.forEach((m, i) => {
+    const [cx, cy] = corners[i % 4];
+    m.pos.x = tower.pos.x + cx * half;
+    m.pos.y = tower.pos.y + cy * half;
+    m.facing = t && t.alive ? Math.atan2(t.pos.y - m.pos.y, t.pos.x - m.pos.x) : Math.atan2(cy, cx);
+  });
 }
 
 function approach(w: World, s: Squad, target: Vec2, radius: number, reach: number, dt: number): 'moving' | 'inReach' | 'blocked' {

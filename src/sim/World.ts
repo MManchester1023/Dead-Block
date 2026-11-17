@@ -98,6 +98,8 @@ export class World {
 
   /** Per-building state for searching and nests (v4.9 #46, #65). */
   buildingState = new Map<number, { searched: boolean; nest: number }>();
+  /** Campaign unlocks earned so far (v4.13): structure `unlock` keys etc. */
+  unlocked = new Set<string>();
   nestTimer = 0;
 
   private populate(): void {
@@ -181,7 +183,9 @@ export class World {
     d.locked = false;
     if (d.def.border) this.setBorder(d.def, false);
     this.seedDistrict(d);
-    this.events.emit('districtUnlocked', { districtId: id, name: d.def.name });
+    const unlocks = d.def.unlocksOnOpen ?? [];
+    for (const u of unlocks) this.unlocked.add(u);
+    this.events.emit('districtUnlocked', { districtId: id, name: d.def.name, unlocks });
     this.events.emit('radio', { speaker: 'Command', text: `Engineers have cut the wire on the east road. ${d.def.name} is open. Same drill: find the hive, kill it, plant an outpost.`, tone: 'warn' });
   }
 
@@ -336,6 +340,7 @@ export class World {
     const def = STRUCTURES[defId];
     if (!def) return 'Unknown structure';
     if (def.requires && !isEnabled(def.requires as never)) return 'Locked';
+    if (def.unlock && !this.unlocked.has(def.unlock)) return 'Not unlocked yet';
     const fp = this.footprint(defId, rotated);
     if (!this.grid.rectFree(tile.x, tile.y, fp.w, fp.h)) return 'Blocked';
     if (def.requiresSecured) {
@@ -387,6 +392,11 @@ export class World {
 
   damage(target: Targetable, amount: number, type: DamageType, source?: Vec2, attacker?: Targetable): void {
     if (!target.alive) return;
+    // a squad up a guard tower can't be clawed at: the dead have to tear the tower down (v4.13)
+    if (target instanceof Squad && target.garrisonedIn != null && type === 'melee') {
+      const tower = this.get(target.garrisonedIn);
+      if (tower instanceof Structure && tower.alive) return this.damageStructure(tower, amount);
+    }
     if (target instanceof Squad) this.damageSquad(target, amount, type, source);
     else if (target instanceof Zombie) this.damageZombie(target, amount, type, attacker);
     else if (target instanceof Hive) this.damageHive(target, amount, type);
@@ -564,6 +574,31 @@ export class World {
     }
     this.events.emit('nestBurst', { buildingId: b.id, pos: door, count });
     this.events.emit('radio', { speaker: prey?.name ?? 'Overwatch', text: count > 2 ? 'Contact! They were holed up inside!' : "One of them was inside! Contact front!", tone: 'warn' });
+  }
+
+  /** Man a guard tower (v4.13). One squad per tower. */
+  orderGarrison(squads: Squad[], tower: Structure, queue = false): string | null {
+    if (!tower.def.garrison) return 'Only guard towers can be manned';
+    if (!tower.built) return 'Finish building it first';
+    const occupant = this.squads.find((s) => s.alive && s.garrisonedIn === tower.id);
+    if (occupant) return `${occupant.name} is already up there`;
+    const sq = squads.filter((s) => s.def.category === 'infantry').slice(0, 1);
+    if (!sq.length) return 'Needs an infantry squad';
+    this.issueOrder(sq, { type: 'garrison', pos: tower.pos, targetId: tower.id }, queue);
+    return null;
+  }
+
+  /** Climb down from a tower to the nearest free spot. */
+  leaveTower(s: Squad): void {
+    if (s.garrisonedIn == null) return;
+    const tower = this.get(s.garrisonedIn);
+    s.garrisonedIn = null;
+    const at = tower ? tower.pos : s.pos;
+    const out = this.grid.nearestFree({ x: at.x + 4, y: at.y + 1 });
+    s.pos.x = out.x;
+    s.pos.y = out.y;
+    for (const m of s.members) (m.pos.x = out.x), (m.pos.y = out.y);
+    s.path = [];
   }
 
   /** Send squads back to the Barracks to stand down (v4.9 #55). Frees command and upkeep, refunds a little. */

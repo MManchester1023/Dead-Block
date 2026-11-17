@@ -407,6 +407,26 @@ export class Renderer {
         g.add(gun);
         break;
       }
+      case 'guardTower': {
+        // timber watchtower: four legs with cross-bracing, plank platform, sandbag parapet, ladder
+        const H = s.def.garrison?.height ?? 5;
+        const hw = w / 2 - 0.4;
+        const hd = h / 2 - 0.4;
+        for (const [x, z] of [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]]) add(new THREE.BoxGeometry(0.35, H + 1.2, 0.35), 0x6a5238, (H + 1.2) / 2, x, z);
+        for (const z of [-hd, hd]) {
+          const b = add(new THREE.BoxGeometry(w * 1.05, 0.15, 0.12), 0x5a4430, H / 2, 0, z);
+          b.rotation.z = Math.atan2(H * 0.8, w);
+        }
+        for (const x of [-hw, hw]) {
+          const b = add(new THREE.BoxGeometry(0.12, 0.15, h * 1.05), 0x5a4430, H / 2, x, 0);
+          b.rotation.x = -Math.atan2(H * 0.8, h);
+        }
+        add(new THREE.BoxGeometry(w, 0.3, h), 0x7a6046, H, 0, 0); // platform
+        for (const [x, z, sw, sd] of [[0, -hd, w, 0.6], [0, hd, w, 0.6], [-hw, 0, 0.6, h], [hw, 0, 0.6, h]]) add(new THREE.BoxGeometry(sw, 0.9, sd), PAL.sandbag, H + 0.6, x, z); // parapet
+        // open-topped, so the squad on it stays visible from the iso camera
+        add(new THREE.BoxGeometry(0.12, H, 0.5), 0x4a3a28, H / 2, hw + 0.25, 0); // ladder
+        break;
+      }
       case 'outpost': {
         add(new THREE.BoxGeometry(w - 3, 2.6, h - 4), 0x5d6b3a, 1.3); // command tent
         add(new THREE.BoxGeometry(0.12, 7, 0.12), 0x333333, 3.5, w / 2 - 1, -h / 2 + 1); // radio mast
@@ -797,7 +817,7 @@ export class Renderer {
         g.rotation.y = -m.facing;
         g.scale.y = SOLDIER_SCALE * (s.inCover && !s.moving ? 0.82 : 1); // crouch behind cover
       });
-      this.placeLabel(v.label, s.pos, 3.4, () => this.squadLabelHtml(s, selected.has(s.id), this.hovered === s.id));
+      this.placeLabel(v.label, s.pos, s.garrisonedIn != null ? 9.5 : 3.4, () => this.squadLabelHtml(s, selected.has(s.id), this.hovered === s.id));
     }
     for (const [id, v] of this.squadViews)
       if (!seen.has(id)) {
@@ -1005,6 +1025,9 @@ export class Renderer {
       // round 6 #67: stay in the firing pose while engaged; dropping it between shots (fire every 0.9 s,
       // pose shown for 0.7 s) is what made the arms jump up and down once a second
       const engaged = !!tgt && tgt.alive;
+      // up a guard tower: stand on the platform (v4.13)
+      const tower = s.garrisonedIn != null ? w.structures.find((x) => x.id === s.garrisonedIn) : undefined;
+      const lift = tower?.def.garrison ? tower.def.garrison.height + 0.15 : 0;
       s.members.forEach((m, i) => {
         if (!m.alive) return;
         const key = s.id * 8 + i + 1e7;
@@ -1016,7 +1039,7 @@ export class Renderer {
           clip = 'walk';
           rate = Math.min(3, Math.max(0.7, v / 2.2));
         } else if (engaged && w.time - m.lastShot < s.def.weapon.cooldown * 2.5) clip = 'shoot';
-        crowd.add(clip, this.animTime(key, clip, rate, simDt), m.pos.x, m.pos.y, m.facing);
+        crowd.add(clip, this.animTime(key, clip, rate, simDt), m.pos.x, m.pos.y, m.facing, 1, undefined, -lift);
       });
     }
 

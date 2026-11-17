@@ -8,6 +8,7 @@ export function squadStatus(s: Squad, w: World): { text: string; tone: StatusTon
   const t = w.get(s.targetId);
   const firing = !!t && t.alive;
   if (s.stunned > 0) return { text: 'STAGGERED', tone: 'bad' };
+  if (s.garrisonedIn != null) return { text: 'IN TOWER', tone: 'fight' };
   const o = s.currentOrder?.type;
   switch (o) {
     case 'move':
@@ -26,6 +27,8 @@ export function squadStatus(s: Squad, w: World): { text: string; tone: StatusTon
       return { text: s.moving ? 'TO DISMANTLE' : 'DISMANTLING', tone: 'work' };
     case 'charge':
       return { text: s.moving ? 'TO THE HIVE' : 'PLANTING CHARGE', tone: 'work' };
+    case 'garrison':
+      return { text: 'TO THE TOWER', tone: 'move' };
     case 'search':
       return { text: s.moving ? 'TO SEARCH' : 'SEARCHING', tone: 'work' };
     case 'disband':
