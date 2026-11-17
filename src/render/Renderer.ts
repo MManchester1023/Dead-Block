@@ -36,6 +36,22 @@ const SOLDIER_SCALE = 1.6;
 const MAX_ZOMBIES = 320;
 
 /** World (x, y) → scene (x, h, y). The renderer only reads the simulation; it never mutates it. */
+const CRATE_FALL_SEC = 6;
+const FLYOVER_SPEED = 55; // m/s across the ground: slower than a real C-130 so you can watch it pass
+
+/** Flat top-down silhouette of a four-engine cargo plane (~40 m span), nose along +x. */
+function cargoPlaneShadow(): THREE.ShapeGeometry {
+  const s = new THREE.Shape();
+  const pts: [number, number][] = [
+    [15, 0], [13, 1.8], [4, 2.1], [2.5, 20], [-1.5, 20], [-2.5, 2.1], [-11, 1.8], [-13, 6.5], [-15.5, 6.5],
+    [-15, 0], [-15.5, -6.5], [-13, -6.5], [-11, -1.8], [-2.5, -2.1], [-1.5, -20], [2.5, -20], [4, -2.1], [13, -1.8],
+  ];
+  s.moveTo(...pts[0]);
+  for (const p of pts.slice(1)) s.lineTo(...p);
+  s.closePath();
+  return new THREE.ShapeGeometry(s);
+}
+
 export class Renderer {
   readonly gl: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
@@ -65,6 +81,7 @@ export class Renderer {
   private corpses: { key: string; x: number; z: number; facing: number; t0: number; sx: number; sy: number; tint?: number }[] = [];
   private animClock = 0;
   private rallyFlag: THREE.Group;
+  private flyovers = new Map<number, { mesh: THREE.Mesh; dir: Vec2; done: boolean }>();
   private ghostArrow: THREE.Mesh;
   private ghostRange: THREE.Mesh;
   /** Entity under the mouse (squad, structure or hive id): health bars only show on hover or selection (#35). */
@@ -587,7 +604,12 @@ export class Renderer {
         this.scene.add(v);
         this.crateViews.set(c.id, v);
       }
-      const height = c.landed ? 0 : Math.min(60, (c.landsAt - w.time) * 7);
+      // round 4 #37: a cargo plane's shadow sweeps over first; the crate leaves the ramp as it passes
+      const untilLand = c.landsAt - w.time;
+      const released = c.landed || untilLand <= CRATE_FALL_SEC;
+      v.visible = released;
+      this.flyover(c.id, c.pos, untilLand - CRATE_FALL_SEC);
+      const height = c.landed ? 0 : Math.max(0, untilLand) * 7;
       v.position.set(c.pos.x, height, c.pos.y);
       v.getObjectByName('chute')!.visible = !c.landed;
       v.getObjectByName('lines')!.visible = !c.landed;
@@ -597,6 +619,36 @@ export class Renderer {
         this.scene.remove(v);
         this.crateViews.delete(id);
       }
+    for (const [id, f] of this.flyovers)
+      if (!seen.has(id) && f.done) {
+        this.scene.remove(f.mesh);
+        this.flyovers.delete(id);
+      }
+  }
+
+  /**
+   * Aircraft shadow sweeping over `pos` (reused later for gun runs, bombing runs, AC-130 orbits).
+   * `tOverhead` = seconds until it's directly above. Approaches from the base side.
+   */
+  private flyover(id: number, pos: Vec2, tOverhead: number): void {
+    let f = this.flyovers.get(id);
+    if (!f) {
+      const mesh = new THREE.Mesh(cargoPlaneShadow(), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false }));
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.renderOrder = 2;
+      this.scene.add(mesh);
+      const gate = this.world.map.baseGate;
+      const dx = pos.x - (gate.x + gate.w);
+      const dy = pos.y - (gate.y + gate.h / 2);
+      const l = Math.hypot(dx, dy) || 1;
+      f = { mesh, dir: { x: dx / l, y: dy / l }, done: false };
+      this.flyovers.set(id, f);
+    }
+    const along = -tOverhead * FLYOVER_SPEED; // metres past the drop point
+    f.done = along > 400;
+    f.mesh.visible = !f.done && along > -400;
+    f.mesh.position.set(pos.x + f.dir.x * along, 0.15, pos.y + f.dir.y * along);
+    f.mesh.rotation.z = -Math.atan2(f.dir.y, f.dir.x);
   }
 
   marker(p: Vec2, color: number): void {

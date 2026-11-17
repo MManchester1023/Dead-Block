@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { World } from '../src/sim/World';
 import { CELL } from '../src/config/world';
 import { callSupport } from '../src/sim/systems/support';
+import { SUPPORT_BY_ID } from '../src/config/support';
 
 const M = (x: number, y: number) => ({ x: x * CELL, y: y * CELL });
 
@@ -74,8 +75,9 @@ describe('v4.4 playtest round 2', () => {
     w.supplies = 30; // enough that an empty test world doesn't count as defeat
     const spot = M(20, 36);
     expect(callSupport(w, 'supplyDrop', spot)).toBeNull();
-    for (let i = 0; i < 30 * 12; i++) w.step(1 / 30);
+    for (let i = 0; i < 30 * (SUPPORT_BY_ID.supplyDrop.delay + 1); i++) w.step(1 / 30);
     expect(w.crates.length).toBe(1); // landed, nobody there yet
+    expect(w.crates[0].landed).toBe(true);
     const before = w.supplies;
     w.spawnSquad('rifle', spot);
     w.step(1 / 30);

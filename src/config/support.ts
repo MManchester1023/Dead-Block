@@ -32,10 +32,10 @@ export const SUPPORT: SupportDef[] = [
   {
     id: 'supplyDrop',
     name: 'Supply Drop',
-    desc: 'A crate (+45 supplies) parachutes in. A squad has to reach it to collect.',
+    desc: 'A cargo plane passes over the green smoke and drops a crate (+45 supplies). A squad has to reach it to collect.',
     cost: { money: 60, supplies: 0 },
     cooldown: 120,
-    delay: 8,
+    delay: 14, // v4.9 (#37): ~8 s of flyover, then ~6 s under the chute
     smoke: 0x5ad06a,
     smokeName: 'green',
     unlock: 'Command Post',
