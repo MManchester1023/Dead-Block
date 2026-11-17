@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.13** | Zombie classes decided (§9): **normal** (Walker, Runner), **medium** (every other zombie type except bosses), **boss**. Normal and medium have separate spawn pools that together make up a district's total. MG field of fire (#71) and the region 2 difficulty plan (#74) approved. |
 | **v4.12** | Playtest round 6 logged (§22, #66–74). Roadmap re-ranked: round 6 fixes first; region 2 gets a real difficulty step and a new feature (guard towers); region 3 introduces the power system, which unlocks the Med Bay; artillery becomes a later unlock; Last Stand tabled; replacing the cartoon character models moves up the visual track. No code changes. |
 | **v4.11** | Tutorial region 2 built: Gas Station Strip (§17). Roadmap Tier 1 #10 done; next up is region 3. |
 | **v4.10** | Playtest rounds 4–5 implemented except #54, #58, #64. §21 roadmap re-ranked: every open item (including parked playtest notes) is now in one ordered list, with done items marked. Uploaded models catalogued (§21 visual track). |
@@ -364,6 +365,16 @@ At night, smoke is replaced by or paired with matching **flares/strobes** so mar
 ---
 
 ## 9. Zombie roster and behavior
+
+**Zombie classes [v4.13].** Every zombie type belongs to one class:
+
+| Class | Types | Spawning |
+|---|---|---|
+| **Normal** | Walker, Runner | Normal pool |
+| **Medium** | Bloater, and every other non-boss type (Screamer, Brute, Dragger, Puker…) | Medium pool |
+| **Boss** | Planned bosses (§21 Tier 3) | Placed or event-spawned; outside both pools |
+
+Each district's population limit is the **normal pool + medium pool**. Hives and pulses fill the two pools separately, so common Runners can't crowd out the rarer medium types, and the medium share stays capped however big the horde gets. Difficulty tiers set both pool sizes.
 
 The roster mixes basic crowd threats, tougher special types, persistent hives and bosses. Specials have more health than Walkers and Runners, but not so much that they feel like bosses. Bosses are a separate tier and appear after the opening sequence.
 
@@ -913,4 +924,12 @@ First hands-on playtest of the browser MVP (November 2026). Every note, and what
 | 72 | Noise should start to go down slowly after about 3 seconds; it stays up for a long time | v4.9 set the hold to 12 s (for #43, "it falls too quickly"). | Hold **3 s**, then drain **slowly** (≈1–1.5 per second instead of 2.5). Together that keeps sustained fights filling the meter, but quiet comes back sooner. |
 | 73 | Artillery should be a later unlock | The Command Post barrage has been available from the start since v4.4 (playtest convenience). | Lock it until the Artillery tier (§21 Tier 2 #26). During the tutorial the Command Post shows it as locked with its unlock condition; the Supply Drop stays available. |
 | 74 | No real difficulty step in region 2, and it didn't introduce anything new | The Easy tier only nudges the numbers (zombie HP 70% → 85%, a busier hive), while the player arrives stronger: more squads, the +4 command cap from securing the motel, motel income and veteran squads. Nothing new is taught there. | **Difficulty:** a bigger step than the numbers alone. Larger starting crowd, the hive starts at stage 2, early Runner packs (doc §2 has Runner packs as the next threat), and pulses that target the player's new motel outpost so holding ground matters. **New feature:** region 2 introduces **guard towers** (#54, §21 Tier 1 #12), with a short tutorial prompt when the region opens. Re-run the bot balance test with the player's realistic post-motel force. |
+
+**Decisions after round 6 [v4.13]:**
+
+| # | Note | Decision |
+|---|---|---|
+| 75 | Walkers and Runners are **normal** zombies; every other zombie type except the planned bosses is a **medium** zombie. Normal and medium zombies have **separate spawn pools** that both contribute to the total pool | **Decided (§9).** Each district's population cap is split into a normal pool and a medium pool; a hive fills each pool on its own, and the two together are the district's total. Runners no longer compete with Bloaters for room. Bosses stay outside both pools. |
+| 71 | MG field of fire with a ghost arrow | **Approved** as proposed: a 120° arc aimed with R while placing. |
+| 74 | Region 2 difficulty plan | **Approved** as proposed: bigger starting crowd, hive starts at stage 2, early Runner packs, pulses at the motel outpost, and guard towers as region 2's new feature. |
 
