@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { HUMAN_HEIGHT } from '../config/world';
 
 /**
@@ -14,15 +15,17 @@ import { HUMAN_HEIGHT } from '../config/world';
  * baked into vertex colours so each pose is a single draw call (the source meshes have ~120 groups).
  */
 
-export type Clip = 'idle' | 'walk' | 'shoot' | 'punch' | 'death' | 'work';
+export type Clip = 'idle' | 'walk' | 'run' | 'shoot' | 'punch' | 'death' | 'work';
 
+// v4.9 (round 4 #33): roughly twice the poses per clip, so limbs no longer snap between few frames
 const CLIP_SOURCES: Record<Clip, { name: string; frames: number; loop: boolean }> = {
-  idle: { name: 'Idle', frames: 6, loop: true },
-  walk: { name: 'Walk', frames: 10, loop: true },
-  shoot: { name: 'Shoot_OneHanded', frames: 4, loop: true },
-  punch: { name: 'Punch', frames: 6, loop: true },
-  death: { name: 'Defeat', frames: 8, loop: false },
-  work: { name: 'PickUp', frames: 6, loop: true },
+  idle: { name: 'Idle', frames: 12, loop: true },
+  walk: { name: 'Walk', frames: 20, loop: true },
+  run: { name: 'Run', frames: 14, loop: true },
+  shoot: { name: 'Shoot_OneHanded', frames: 8, loop: true },
+  punch: { name: 'Punch', frames: 10, loop: true },
+  death: { name: 'Defeat', frames: 14, loop: false },
+  work: { name: 'PickUp', frames: 10, loop: true },
 };
 
 export interface CharacterSpec {
@@ -37,10 +40,15 @@ export interface CharacterSpec {
   height?: number;
   /** Vertex-clustering cell size in metres (crowd LOD); omit to keep full detail. */
   simplify?: number;
+  /** Animation names in this file, where they differ from the Quaternius names above. */
+  clipNames?: Partial<Record<Clip, string>>;
+  /** True if the death clip ends lying on the ground; otherwise the corpse is tipped over (#34). */
+  deathFalls?: boolean;
 }
 
 export interface Flipbook {
   key: string;
+  deathFalls: boolean;
   frames: Record<string, THREE.BufferGeometry[]>;
   durations: Record<string, number>;
   loops: Record<string, boolean>;
@@ -48,37 +56,85 @@ export interface Flipbook {
 
 /** Load, normalise to metres facing +X, and bake every requested clip into frames. */
 export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
-  const obj = await new FBXLoader().loadAsync(spec.url);
+  let obj: THREE.Object3D;
+  if (/\.glb$|\.gltf$/i.test(spec.url)) {
+    const gltf = await new GLTFLoader().loadAsync(spec.url);
+    obj = gltf.scene;
+    obj.animations = gltf.animations;
+  } else obj = await new FBXLoader().loadAsync(spec.url);
   obj.updateMatrixWorld(true);
-  let skinned: THREE.SkinnedMesh | undefined;
+  // every skinned part (Quaternius files are one mesh; Sketchfab exports are often split per limb)
+  const parts: THREE.SkinnedMesh[] = [];
   obj.traverse((o) => {
-    if ((o as THREE.SkinnedMesh).isSkinnedMesh && !skinned) skinned = o as THREE.SkinnedMesh;
+    if ((o as THREE.SkinnedMesh).isSkinnedMesh) parts.push(o as THREE.SkinnedMesh);
   });
-  if (!skinned) throw new Error(`${spec.key}: no skinned mesh`);
-  const sk = skinned;
-  const base = sk.geometry;
-  const mats = (Array.isArray(sk.material) ? sk.material : [sk.material]) as THREE.MeshPhongMaterial[];
-
-  // per-vertex colour from the material groups
-  const n = base.attributes.position.count;
-  const colors = new Float32Array(n * 3);
-  const c = new THREE.Color();
-  for (const g of base.groups.length ? base.groups : [{ start: 0, count: n, materialIndex: 0 }]) {
-    const m = mats[g.materialIndex ?? 0];
-    const over = spec.recolor?.[m.name];
-    if (over !== undefined) c.set(over);
-    else c.copy(m.color);
-    const idx = base.index;
-    for (let i = g.start; i < g.start + g.count; i++) {
-      const v = idx ? idx.getX(i) : i;
-      colors[v * 3] = c.r;
-      colors[v * 3 + 1] = c.g;
-      colors[v * 3 + 2] = c.b;
-    }
+  if (!parts.length) throw new Error(`${spec.key}: no skinned mesh`);
+  const offsets: number[] = [];
+  let n = 0;
+  for (const sk of parts) {
+    offsets.push(n);
+    n += sk.geometry.attributes.position.count;
   }
 
-  // normalisation: feet on y=0, 1.8 m tall, facing +X (models face +Z)
-  const bbox = new THREE.Box3().setFromObject(obj);
+  // per-vertex colour from the material groups, and one merged index for all parts
+  const colors = new Float32Array(n * 3);
+  const merged: number[] = [];
+  const c = new THREE.Color();
+  parts.forEach((sk, pi) => {
+    const base = sk.geometry;
+    const off = offsets[pi];
+    const pn = base.attributes.position.count;
+    const mats = (Array.isArray(sk.material) ? sk.material : [sk.material]) as (THREE.MeshPhongMaterial | THREE.MeshStandardMaterial)[];
+    const uv = base.attributes.uv as THREE.BufferAttribute | undefined;
+    const idx = base.index;
+    for (const g of base.groups.length ? base.groups : [{ start: 0, count: idx ? idx.count : pn, materialIndex: 0 }]) {
+      const m = mats[g.materialIndex ?? 0];
+      const over = spec.recolor?.[m.name];
+      if (over !== undefined) c.set(over);
+      else c.copy(m.color);
+      // textured models (the Sketchfab glTFs): bake the texture colour at each vertex's UV
+      const tex = over === undefined && m.map && uv ? texSampler(m.map) : null;
+      for (let i = g.start; i < g.start + g.count; i++) {
+        const v = idx ? idx.getX(i) : i;
+        merged.push(v + off);
+        if (tex) {
+          tex(uv!.getX(v), uv!.getY(v), c);
+          c.multiply(m.color);
+        }
+        colors[(v + off) * 3] = c.r;
+        colors[(v + off) * 3 + 1] = c.g;
+        colors[(v + off) * 3 + 2] = c.b;
+      }
+    }
+  });
+  const mergedIndex = new THREE.BufferAttribute(n > 65535 ? new Uint32Array(merged) : new Uint16Array(merged), 1);
+
+  /** Current skinned pose of every vertex, in world space, into `out` (optionally normalised). */
+  const v = new THREE.Vector3();
+  const pose = (out: Float32Array | null, onPoint?: (p: THREE.Vector3) => void, m?: THREE.Matrix4) => {
+    parts.forEach((sk, pi) => {
+      sk.skeleton.update();
+      const P = sk.geometry.attributes.position as THREE.BufferAttribute;
+      const off = offsets[pi];
+      for (let i = 0; i < P.count; i++) {
+        v.fromBufferAttribute(P, i);
+        sk.applyBoneTransform(i, v);
+        v.applyMatrix4(sk.matrixWorld);
+        if (m) v.applyMatrix4(m);
+        if (onPoint) onPoint(v);
+        if (out) {
+          out[(off + i) * 3] = v.x;
+          out[(off + i) * 3 + 1] = v.y;
+          out[(off + i) * 3 + 2] = v.z;
+        }
+      }
+    });
+  };
+
+  // normalisation: feet on y=0, 1.8 m tall, facing +X (models face +Z). Measured on the skinned
+  // vertices themselves: Sketchfab exports carry unit-scale / axis-flip nodes that fool Box3.setFromObject.
+  const bbox = new THREE.Box3();
+  pose(null, (p) => bbox.expandByPoint(p));
   const srcH = bbox.max.y - bbox.min.y;
   const s = (HUMAN_HEIGHT * (spec.height ?? 1)) / srcH;
   const norm = new THREE.Matrix4()
@@ -90,10 +146,12 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
   const fist = spec.rifle ? obj.getObjectByName('FistR') : undefined;
   const rifle = spec.rifle ? rifleGeometry(1) : undefined; // built in metres
 
-  const book: Flipbook = { key: spec.key, frames: {}, durations: {}, loops: {} };
-  const v = new THREE.Vector3();
+  const book: Flipbook = { key: spec.key, deathFalls: !!spec.deathFalls, frames: {}, durations: {}, loops: {} };
+  // round 4 #33: one simplification plan (made from the first pose) is reused for every frame, so the
+  // decimated mesh is identical frame to frame instead of shimmering
+  let plan: ClusterPlan | null = null;
   for (const clip of spec.clips) {
-    const src = CLIP_SOURCES[clip];
+    const src = { ...CLIP_SOURCES[clip], name: spec.clipNames?.[clip] ?? CLIP_SOURCES[clip].name };
     const anim = obj.animations.find((a) => a.name.endsWith('|' + src.name) || a.name === src.name);
     if (!anim) continue;
     mixer.stopAllAction();
@@ -104,20 +162,12 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
       const t = src.loop ? (f / src.frames) * anim.duration : (f / (src.frames - 1)) * anim.duration * 0.999;
       mixer.setTime(t);
       obj.updateMatrixWorld(true);
-      sk.skeleton.update();
       const pos = new Float32Array(n * 3);
-      for (let i = 0; i < n; i++) {
-        v.fromBufferAttribute(base.attributes.position as THREE.BufferAttribute, i);
-        sk.applyBoneTransform(i, v);
-        v.applyMatrix4(sk.matrixWorld).applyMatrix4(norm);
-        pos[i * 3] = v.x;
-        pos[i * 3 + 1] = v.y;
-        pos[i * 3 + 2] = v.z;
-      }
+      pose(pos, undefined, norm);
       let g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
       g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      if (base.index) g.setIndex(base.index);
+      g.setIndex(mergedIndex);
       if (rifle && fist) {
         // place the rifle by the hand's position + orientation only (the bone matrix also carries the
         // FBX unit scale, which would make the gun ~100x too big)
@@ -129,7 +179,10 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
         const r = rifle.clone().applyMatrix4(new THREE.Matrix4().compose(hp, q, new THREE.Vector3(1, 1, 1)));
         g = mergeSimple(g, r);
       }
-      if (spec.simplify) g = clusterSimplify(g, spec.simplify);
+      if (spec.simplify) {
+        plan ??= makeClusterPlan(g, spec.simplify);
+        g = applyClusterPlan(plan, g);
+      }
       g.computeVertexNormals();
       g.computeBoundingSphere();
       frames.push(g);
@@ -165,18 +218,51 @@ function rifleGeometry(unitsPerMetre: number): THREE.BufferGeometry {
   return geos.reduce((a, b) => mergeSimple(a, b));
 }
 
+/** Reads a texture's pixels once; returns a sampler (u, v) → colour (sRGB → linear). */
+function texSampler(tex: THREE.Texture): ((u: number, v: number, out: THREE.Color) => void) | null {
+  const img = tex.image as (CanvasImageSource & { width: number; height: number }) | undefined;
+  if (!img || !img.width) return null;
+  const w = Math.min(512, img.width);
+  const h = Math.min(512, img.height);
+  const cv = document.createElement('canvas');
+  cv.width = w;
+  cv.height = h;
+  const ctx = cv.getContext('2d', { willReadFrequently: true })!;
+  ctx.drawImage(img, 0, 0, w, h);
+  const px = ctx.getImageData(0, 0, w, h).data;
+  return (u, v, out) => {
+    u = u - Math.floor(u);
+    v = v - Math.floor(v);
+    const x = Math.min(w - 1, Math.floor(u * w));
+    const y = Math.min(h - 1, Math.floor((tex.flipY ? 1 - v : v) * h));
+    const i = (y * w + x) * 4;
+    out.setRGB(px[i] / 255, px[i + 1] / 255, px[i + 2] / 255, THREE.SRGBColorSpace);
+  };
+}
+
 /**
  * Vertex-clustering decimation: snap vertices to a grid of `cell` metres, merge everything in a cell,
  * drop collapsed triangles. Crude but O(n) and invisible at crowd distance; turns ~4–10k-triangle
  * characters into ~1–2k so thousands of zombies stay affordable on the GPU.
+ *
+ * The clustering is decided once, on a reference pose (makeClusterPlan), then applied to every
+ * animation frame (applyClusterPlan): each frame then has exactly the same triangles, which is what
+ * stops the "shimmering limbs" of re-simplifying every pose independently.
  */
-function clusterSimplify(g: THREE.BufferGeometry, cell: number): THREE.BufferGeometry {
+interface ClusterPlan {
+  remap: Int32Array;
+  clusters: number;
+  counts: Float32Array;
+  index: number[];
+  colors: Float32Array;
+}
+
+function makeClusterPlan(g: THREE.BufferGeometry, cell: number): ClusterPlan {
   const pos = g.attributes.position.array as Float32Array;
   const col = g.attributes.color.array as Float32Array;
   const idx = g.index ? (g.index.array as ArrayLike<number>) : null;
   const triCount = (idx ? idx.length : pos.length / 3) / 3;
   const map = new Map<string, number>();
-  const sums: number[] = [];
   const cols: number[] = [];
   const counts: number[] = [];
   const remap = new Int32Array(pos.length / 3);
@@ -188,33 +274,41 @@ function clusterSimplify(g: THREE.BufferGeometry, cell: number): THREE.BufferGeo
     if (id === undefined) {
       id = counts.length;
       map.set(key, id);
-      sums.push(0, 0, 0);
       cols.push(col[v * 3], col[v * 3 + 1], col[v * 3 + 2]);
       counts.push(0);
     }
-    sums[id * 3] += x;
-    sums[id * 3 + 1] += y;
-    sums[id * 3 + 2] += z;
     counts[id]++;
     remap[v] = id;
   }
-  const outIdx: number[] = [];
+  const index: number[] = [];
   for (let t = 0; t < triCount; t++) {
     const a = remap[idx ? idx[t * 3] : t * 3];
     const b = remap[idx ? idx[t * 3 + 1] : t * 3 + 1];
     const c = remap[idx ? idx[t * 3 + 2] : t * 3 + 2];
-    if (a !== b && b !== c && a !== c) outIdx.push(a, b, c);
+    if (a !== b && b !== c && a !== c) index.push(a, b, c);
   }
-  const P = new Float32Array(counts.length * 3);
-  for (let i = 0; i < counts.length; i++) {
-    P[i * 3] = sums[i * 3] / counts[i];
-    P[i * 3 + 1] = sums[i * 3 + 1] / counts[i];
-    P[i * 3 + 2] = sums[i * 3 + 2] / counts[i];
+  return { remap, clusters: counts.length, counts: new Float32Array(counts), index, colors: new Float32Array(cols) };
+}
+
+function applyClusterPlan(plan: ClusterPlan, g: THREE.BufferGeometry): THREE.BufferGeometry {
+  const pos = g.attributes.position.array as Float32Array;
+  const P = new Float32Array(plan.clusters * 3);
+  for (let v = 0; v < plan.remap.length; v++) {
+    const id = plan.remap[v];
+    P[id * 3] += pos[v * 3];
+    P[id * 3 + 1] += pos[v * 3 + 1];
+    P[id * 3 + 2] += pos[v * 3 + 2];
+  }
+  for (let i = 0; i < plan.clusters; i++) {
+    const k = 1 / plan.counts[i];
+    P[i * 3] *= k;
+    P[i * 3 + 1] *= k;
+    P[i * 3 + 2] *= k;
   }
   const out = new THREE.BufferGeometry();
   out.setAttribute('position', new THREE.BufferAttribute(P, 3));
-  out.setAttribute('color', new THREE.BufferAttribute(new Float32Array(cols), 3));
-  out.setIndex(outIdx);
+  out.setAttribute('color', new THREE.BufferAttribute(plan.colors, 3));
+  out.setIndex(plan.index);
   return out.toNonIndexed(); // flat-shaded facets suit the stylised look
 }
 
@@ -273,8 +367,8 @@ export class Crowd {
     for (const k of Object.keys(this.counts)) this.counts[k].fill(0);
   }
 
-  /** `t` is seconds into the clip (looping clips wrap; one-shots hold the last frame). */
-  add(clip: Clip, t: number, x: number, z: number, facing: number, scale = 1, tint?: number, sink = 0, scaleY = scale): void {
+  /** `t` is seconds into the clip (looping clips wrap; one-shots hold the last frame). `tilt` tips the body backwards (radians). */
+  add(clip: Clip, t: number, x: number, z: number, facing: number, scale = 1, tint?: number, sink = 0, scaleY = scale, tilt = 0): void {
     const frames = this.meshes[clip] ?? this.meshes.idle ?? Object.values(this.meshes)[0];
     const key = this.meshes[clip] ? clip : this.meshes.idle ? 'idle' : Object.keys(this.meshes)[0];
     const dur = this.book.durations[key];
@@ -287,7 +381,7 @@ export class Crowd {
     this.counts[key][f] = i + 1;
     const m = frames[f];
     this.tmp.position.set(x, -sink, z);
-    this.tmp.rotation.set(0, -facing, 0);
+    this.tmp.rotation.set(0, -facing, tilt);
     this.tmp.scale.set(scale, scaleY, scale);
     this.tmp.updateMatrix();
     m.setMatrixAt(i, this.tmp.matrix);
@@ -329,16 +423,18 @@ export const CHARACTER_SPECS: CharacterSpec[] = [
     recolor: { Skin: 0xc4977a, Shirt: 0x7a6a48, Vest: 0xc88a2a, Pants: 0x4a4a3a, Hat: 0xd8b030 },
   },
   {
+    // v4.9: "Zombie" by pxltiger (CC-BY 4.0, see CREDITS.md). Real fall-back death (#34), in-place walk/run.
     key: 'zombieM',
-    url: 'models/characters/Zombie_Male.fbx',
-    clips: ['idle', 'walk', 'punch', 'death'],
-    simplify: 0.06,
-    recolor: { Skin: 0x8a9a5a, Clothes: 0x4a4a6a, Pants: 0x6a5e3a, DarkClothes: 0x2a2a3a, Guts: 0x7a2a1a, Brain: 0x86705e, Bones: 0xc8b890 },
+    url: 'models/zombieidle.glb',
+    clips: ['idle', 'walk', 'run', 'punch', 'death'],
+    clipNames: { walk: 'Walk_InPlace', run: 'Run_InPlace', punch: 'Attack', death: 'FallingBack' },
+    deathFalls: true,
+    simplify: 0.05,
   },
   {
     key: 'zombieF',
     url: 'models/characters/Zombie_Female.fbx',
-    clips: ['idle', 'walk', 'punch', 'death'],
+    clips: ['idle', 'walk', 'run', 'punch', 'death'],
     simplify: 0.09,
     recolor: { Skin: 0x8fa060, Clothes: 0x6a3a4a, Pants: 0x5a5a4a, DarkClothes: 0x2a2a2a, Guts: 0x7a2a1a, Bones: 0xc8b890, Hair: 0x3a2a1a },
   },

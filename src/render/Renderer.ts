@@ -936,7 +936,10 @@ export class Renderer {
       let clip: Clip = 'idle';
       let ct = t + phase;
       if (z.state === 'attack') clip = 'punch';
-      else if (v > 0.3) {
+      else if (v > 4 && crowd.has('run')) {
+        clip = 'run';
+        ct = t * Math.min(1.8, Math.max(0.8, v / 6)) + phase;
+      } else if (v > 0.3) {
         clip = 'walk';
         ct = t * Math.min(3.2, Math.max(0.6, v / 1.8)) + phase;
       }
@@ -944,12 +947,21 @@ export class Renderer {
     }
     if (this.prevPos.size > 8000) this.prevPos.clear();
 
-    // corpses: play the death once, lie there a while, then sink into the ground
+    // corpses: play the death once, lie there a while, then sink into the ground. Models whose death
+    // clip doesn't end on the ground get tipped over backwards as it finishes (round 4 #34).
     this.corpses = this.corpses.filter((c) => t - c.t0 < 50);
     for (const c of this.corpses) {
       const age = t - c.t0;
-      const sink = age > 42 ? (age - 42) * 0.15 : 0;
-      C[c.key].add('death', age, c.x, c.z, c.facing, c.sx, c.tint, sink, c.sy);
+      const crowd = C[c.key];
+      let sink = age > 42 ? (age - 42) * 0.15 : 0;
+      let tilt = 0;
+      if (!crowd.book.deathFalls) {
+        const start = (crowd.book.durations.death ?? 1) * 0.45;
+        const k = Math.min(1, Math.max(0, (age - start) / 0.45));
+        tilt = k * k * (Math.PI / 2) * 0.96; // accelerate into the fall
+        sink -= k * 0.14; // keep the back on the asphalt, not half under it
+      }
+      crowd.add('death', age, c.x, c.z, c.facing, c.sx, c.tint, sink, c.sy, tilt);
     }
     for (const c of Object.values(C)) c.end();
   }
