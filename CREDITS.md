@@ -29,3 +29,5 @@ Everything else in the city (buildings, vehicles, trees, street furniture, groun
 | [Military RTS Character 1](https://sketchfab.com/3d-models/military-rts-character-1-cc0-908065a7006443b29edca30276750a6d) | britdawgmasterfunk | CC-BY-4.0 (per the file metadata; the title says CC0) |
 | [MQ-9 Reaper Drone](https://sketchfab.com/3d-models/mq-9-reaper-drone-game-ready-military-asset-a02057e7401a4f4ea130cb75cc73d8cb) | The Aesthetic Modeler | CC-BY-4.0 |
 | [Polyart Zombies with Animations Free Pack](https://sketchfab.com/3d-models/polyart-zombies-with-animations-free-pack-d9bcfdd88f5348549bc947226af7c314) | Denys Almaral | Sketchfab Standard |
+| Puller (zombie) | Gowo.Stoyanov | CC-BY-4.0 |
+| RTS Mercenaries 1 & 2 | britdawgmasterfunk | CC-BY-4.0 |
