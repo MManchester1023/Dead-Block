@@ -11,7 +11,8 @@ import { HUMAN_HEIGHT } from '../config/world';
  * becomes one InstancedMesh, and every character currently in that pose is one instance of it.
  * Draw calls = number of poses in use, no matter if it's 50 zombies or 2,000.
  *
- * Models: Quaternius "Ultimate Animated Character Pack" (CC0), see CREDITS.md. Material colours are
+ * Models (CREDITS.md): soldiers/engineers = "Military RTS Character 1" rigged on Mixamo with Mixamo
+ * animations (v4.18); main zombie = pxltiger's "Zombie"; female zombie = Quaternius (CC0), for now. Material colours are
  * baked into vertex colours so each pose is a single draw call (the source meshes have ~120 groups).
  */
 
@@ -44,6 +45,20 @@ export interface CharacterSpec {
   clipNames?: Partial<Record<Clip, string>>;
   /** True if the death clip ends lying on the ground; otherwise the corpse is tipped over (#34). */
   deathFalls?: boolean;
+  /** v4.18 (Mixamo): each clip from its own animation file, applied to this model's skeleton by bone name. */
+  clipFiles?: Partial<Record<Clip, string>>;
+  /** Base-colour texture to bake into vertex colours when the model file doesn't embed one. */
+  texture?: string;
+  /** Bone the procedural rifle is held in (default: Quaternius 'FistR'). */
+  rifleBone?: string;
+  /** Rifle orientation fix-up in the hand bone's frame (Euler, radians). */
+  rifleRot?: [number, number, number];
+  /** Pin the hips' horizontal position (Mixamo clips downloaded without "In Place" walk forward). */
+  inPlace?: boolean;
+  /** Multiply every baked colour (e.g. engineers: a warmer, dustier version of the same soldier). */
+  tint?: number;
+  /** Clips baked as a single held pose at this fraction of the clip (e.g. an idle from a firing clip). */
+  clipHold?: Partial<Record<Clip, number>>;
 }
 
 export interface Flipbook {
@@ -63,6 +78,24 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
     obj.animations = gltf.animations;
   } else obj = await new FBXLoader().loadAsync(spec.url);
   obj.updateMatrixWorld(true);
+  // separate animation files (Mixamo) and an external texture, loaded alongside the model
+  const fileClips: Partial<Record<Clip, THREE.AnimationClip>> = {};
+  /** Rest height of the hips in each animation file's own skeleton (its units can differ from the model's). */
+  const fileHipsY: Partial<Record<Clip, number>> = {};
+  if (spec.clipFiles) {
+    const fbx = new FBXLoader();
+    await Promise.all(
+      Object.entries(spec.clipFiles).map(async ([clip, url]) => {
+        const a = await fbx.loadAsync(url!);
+        if (a.animations[0]) fileClips[clip as Clip] = a.animations[0];
+        a.traverse((o) => {
+          if ((o as THREE.Bone).isBone && /hips$/i.test(o.name) && fileHipsY[clip as Clip] === undefined) fileHipsY[clip as Clip] = o.position.y;
+        });
+      }),
+    );
+  }
+  const extTex = spec.texture ? await new THREE.TextureLoader().loadAsync(spec.texture) : null;
+
   // every skinned part (Quaternius files are one mesh; Sketchfab exports are often split per limb)
   const parts: THREE.SkinnedMesh[] = [];
   obj.traverse((o) => {
@@ -93,14 +126,16 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
       if (over !== undefined) c.set(over);
       else c.copy(m.color);
       // textured models (the Sketchfab glTFs): bake the texture colour at each vertex's UV
-      const tex = over === undefined && m.map && uv ? texSampler(m.map) : null;
+      const map = extTex ?? m.map;
+      const tex = over === undefined && map && uv ? texSampler(map) : null;
       for (let i = g.start; i < g.start + g.count; i++) {
         const v = idx ? idx.getX(i) : i;
         merged.push(v + off);
         if (tex) {
           tex(uv!.getX(v), uv!.getY(v), c);
-          c.multiply(m.color);
+          if (!extTex) c.multiply(m.color);
         }
+        if (spec.tint !== undefined) c.multiply(new THREE.Color(spec.tint));
         colors[(v + off) * 3] = c.r;
         colors[(v + off) * 3 + 1] = c.g;
         colors[(v + off) * 3 + 2] = c.b;
@@ -143,7 +178,13 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
     .multiply(new THREE.Matrix4().makeTranslation(-(bbox.min.x + bbox.max.x) / 2, -bbox.min.y, -(bbox.min.z + bbox.max.z) / 2));
 
   const mixer = new THREE.AnimationMixer(obj);
-  const fist = spec.rifle ? obj.getObjectByName('FistR') : undefined;
+  const fist = spec.rifle ? obj.getObjectByName(spec.rifleBone ?? 'FistR') : undefined;
+  // Mixamo hips: pin x/z to the rest position so a walk that travels forward loops in place
+  let hips: THREE.Object3D | undefined;
+  obj.traverse((o) => {
+    if (!hips && (o as THREE.Bone).isBone && /hips$/i.test(o.name)) hips = o;
+  });
+  const hipsRest = hips ? hips.position.clone() : null;
   const rifle = spec.rifle ? rifleGeometry(1) : undefined; // built in metres
 
   const book: Flipbook = { key: spec.key, deathFalls: !!spec.deathFalls, frames: {}, durations: {}, loops: {} };
@@ -152,15 +193,23 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
   let plan: ClusterPlan | null = null;
   for (const clip of spec.clips) {
     const src = { ...CLIP_SOURCES[clip], name: spec.clipNames?.[clip] ?? CLIP_SOURCES[clip].name };
-    const anim = obj.animations.find((a) => a.name.endsWith('|' + src.name) || a.name === src.name);
+    const anim = fileClips[clip] ?? obj.animations.find((a) => a.name.endsWith('|' + src.name) || a.name === src.name);
     if (!anim) continue;
     mixer.stopAllAction();
     const action = mixer.clipAction(anim);
     action.reset().play();
     const frames: THREE.BufferGeometry[] = [];
-    for (let f = 0; f < src.frames; f++) {
-      const t = src.loop ? (f / src.frames) * anim.duration : (f / (src.frames - 1)) * anim.duration * 0.999;
+    const hold = spec.clipHold?.[clip];
+    for (let f = 0; f < (hold !== undefined ? 1 : src.frames); f++) {
+      const t = hold !== undefined ? hold * anim.duration : src.loop ? (f / src.frames) * anim.duration : (f / (src.frames - 1)) * anim.duration * 0.999;
       mixer.setTime(t);
+      if (spec.inPlace && hips && hipsRest) {
+        hips.position.x = hipsRest.x;
+        hips.position.z = hipsRest.z;
+        // the clip's hip height is in its own skeleton's units: rescale to this model's
+        const fy = fileHipsY[clip];
+        if (fy) hips.position.y = hipsRest.y * (hips.position.y / fy);
+      }
       obj.updateMatrixWorld(true);
       const pos = new Float32Array(n * 3);
       pose(pos, undefined, norm);
@@ -176,6 +225,7 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
         fist.matrixWorld.decompose(hp, hq, new THREE.Vector3());
         hp.applyMatrix4(norm);
         const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2).multiply(hq);
+        if (spec.rifleRot) q.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...spec.rifleRot)));
         const r = rifle.clone().applyMatrix4(new THREE.Matrix4().compose(hp, q, new THREE.Vector3(1, 1, 1)));
         g = mergeSimple(g, r);
       }
@@ -407,20 +457,43 @@ export class Crowd {
 
 // ---------------------------------------------------------------- the cast
 
+// "Rifle Aiming Idle" from the pack won't parse in FBXLoader ("Unknown property type"), so for now the
+// idle is the rifle-ready first frame of the firing clip, held (see clipHold)
+const SOLDIER_CLIPS: Partial<Record<Clip, string>> = {
+  idle: 'models/characters/soldier/shoot.fbx',
+  walk: 'models/characters/soldier/walk.fbx',
+  shoot: 'models/characters/soldier/shoot.fbx',
+  death: 'models/characters/soldier/death.fbx',
+};
+
 export const CHARACTER_SPECS: CharacterSpec[] = [
+  // v4.18: "Military RTS Character 1" (britdawgmasterfunk, CC-BY 4.0), rigged on Mixamo, with Mixamo
+  // shooter-pack animations; replaces the cartoon Quaternius soldier and worker (#66)
   {
     key: 'soldier',
-    url: 'models/characters/Soldier_Male.fbx',
+    url: 'models/characters/soldier/soldier_rts.fbx',
+    texture: 'models/characters/soldier/soldier_rts.png',
     clips: ['idle', 'walk', 'shoot', 'death'],
+    clipFiles: SOLDIER_CLIPS,
+    clipHold: { idle: 0 },
+    inPlace: true,
+    deathFalls: true,
     rifle: true,
-    recolor: { Skin: 0xc4977a, Main: 0x4f5a34, DarkGreen: 0x39432a, Helmet: 0x3e4a2c, Black: 0x1c1c1c },
+    rifleBone: 'mixamorigRightHand',
   },
   {
+    // same soldier, dustier; no working loop yet (falls back to idle while building)
     key: 'engineer',
-    url: 'models/characters/Worker_Male.fbx',
-    clips: ['idle', 'walk', 'shoot', 'death', 'work'],
+    url: 'models/characters/soldier/soldier_rts.fbx',
+    texture: 'models/characters/soldier/soldier_rts.png',
+    clips: ['idle', 'walk', 'shoot', 'death'],
+    clipFiles: SOLDIER_CLIPS,
+    clipHold: { idle: 0 },
+    inPlace: true,
+    deathFalls: true,
     rifle: true,
-    recolor: { Skin: 0xc4977a, Shirt: 0x7a6a48, Vest: 0xc88a2a, Pants: 0x4a4a3a, Hat: 0xd8b030 },
+    rifleBone: 'mixamorigRightHand',
+    tint: 0xe8d4a0,
   },
   {
     // v4.9: "Zombie" by pxltiger (CC-BY 4.0, see CREDITS.md). Real fall-back death (#34), in-place walk/run.
@@ -446,6 +519,8 @@ export async function loadCast(): Promise<Record<string, Flipbook> | null> {
   const warn = console.warn;
   console.warn = (...a: unknown[]) => {
     if (typeof a[0] === 'string' && a[0].includes('skinning weights')) return;
+    // Mixamo clips animate finger bones that lighter rigs leave out; harmless
+    if (typeof a[0] === 'string' && a[0].includes('No target node found for track')) return;
     warn(...a);
   };
   try {
