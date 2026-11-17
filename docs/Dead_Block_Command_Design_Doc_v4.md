@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.9** | Round 5 design decisions recorded: one shared squad health pool (§5), three tutorial regions instead of seven (§17), medics keep their place in the roadmap, "Shriekers" in #59 meant Bloaters. |
 | **v4.8** | Playtest round 5 logged (§22): 20 notes from a two-person playtest, with likely causes, proposed fixes and the design conflicts they raise. No code changes in this revision. |
 | **v4.7** | Playtest round 4 logged (§22): 13 notes with likely causes and proposed fixes. No code changes in this revision. |
 | **v4.6** | See-through buildings (any building hiding a squad, hive or build site fades out). Crowd navigation via shared flow fields (zombie sim ~30% cheaper; profiling says the sim isn't the bottleneck yet, so the Web Worker move is deferred until real-hardware tests say otherwise). Tutorial system + mission 1 script. |
@@ -33,7 +34,7 @@ Dead Block Command is a top-down/isometric RTS-lite. The player commands modern 
 - **One persistent city.** The player moves between a strategic overview and detailed street-level combat without loading separate district maps. Units must travel between the main base, outposts and operational areas.
 - **Reclaim it block by block.** Infestation recedes, nests are destroyed, outposts are built, power is restored, and the map visibly changes as the city is retaken.
 - **Command a force, not a spreadsheet.** Squads act on their own under clear orders. The player can take direct control of a selected squad, vehicle or helicopter when needed.
-- **Every loss matters.** Infantry members are lost individually. A squad that is wiped out is gone for good, along with its experience.
+- **Every loss matters.** **[v4.9]** Each squad has one shared health pool; soldiers drop out as it falls. A squad that is wiped out is gone for good, along with its experience.
 - **Noise has consequences.** Gunfire, engines and heavy weapons attract attention. The player trades speed and firepower against the risk of drawing a bigger horde.
 - **Build and hold.** Engineers build outposts and defensive structures. *(See §6: field fortifications can go anywhere.)*
 - **The city fights back. [v4]** Buildings fall, rubble stays where it lands, night falls, and lost ground can be retaken by the horde.
@@ -293,7 +294,7 @@ Which units get which patterns is a balance decision. Artillery is loud.
 
 ### Squad losses and leveling
 
-- Infantry squads have two to four individual members. Squad health is split among members; losing a member costs that member's share of health and firepower.
+- Infantry squads have two to four members sharing **one squad health pool** **[v4.9]**. Damage to any member comes off the shared pool, and a soldier drops out each time the pool crosses one member's share (a 4-man squad loses one at 75%, 50% and 25%), taking their firepower with them. At 0 the squad is wiped for good.
 - A squad with no members left is permanently lost, along with its experience and level.
 - Squads gain experience from kills, boss kills and taking part in cleared districts.
 - Progression: **Recruit** (base) → **Regular** (+15% health, +10% damage) → **Veteran** (+30% health, +20% damage) → **Elite** (choose one of two class-specific paths).
@@ -651,13 +652,17 @@ These are left open on purpose so they don't block the core design or the protot
 
 ---
 
-## 17. Seven-mission starter tutorial and open-world transition
+## 17. Three-region starter tutorial and open-world transition [v4.9]
 
-**Seven introductory missions.** The opening campaign is seven tutorial missions/regions: three small 64 × 64 starter zones, then four starter regions arranged as two larger maps (two regions each). The tutorial teaches the core systems step by step before the wider campaign opens.
+**Three tutorial regions** (replaces the earlier seven-mission plan). Two small regions, then one big one, each harder than the last:
 
-**Restricted access during the tutorial.** Until all seven are done, the player can only use the main base and the starter sections the tutorial has opened. The rest of the city is closed.
+1. **Region 1 (small):** Roadside Motel, the current 192 × 192 m zone. Basics: camera, selection, movement, cover, noise, fortifying, recruiting, support, killing a hive, securing.
+2. **Region 2 (small):** a second small zone with more zombies and a stronger hive.
+3. **Region 3 (big):** a larger map, the final exam before the open world.
 
-**Open-world unlock.** After all seven missions, the seven tutorial regions become part of the open world. They stay connected parts of the same persistent city, not throwaway levels. The player can travel back through them, defend them and respond to new infestations.
+**Regions attach as you go.** Clearing a region opens the road from HQ to the next one; the new region is added next to the existing map, not loaded as a separate level, so the city stays one continuous world (§2). Until a region is attached, its edge is closed.
+
+**Open-world unlock.** After region 3, the remaining starter districts (from the old seven-mission plan) become the first part of the open world. The three tutorial regions stay connected parts of the same persistent city: the player can travel back, defend them and respond to new infestations.
 
 ## 18. Tutorial presentation and final test
 
@@ -855,7 +860,7 @@ First hands-on playtest of the browser MVP (November 2026). Every note, and what
 | 56 | Allow more than 8 squads; a level 4 hive is overwhelming | Command cap is 8. | Raise the starting cap (e.g. 12) and let it grow with secured districts (doc §11's cap mechanic). Combined with #51/#57/#61, so the starter zones are beatable without needing a huge army. |
 | 57 | Hive stage 3+ spawns far too often for beginner levels | Spawn intervals are 18/11/7/4 s for stages 1–4 on every map. | Hive output scales with the zone's difficulty tier. Tutorial zones get a much gentler stage 3–4 (e.g. 12 s / 9 s), and maybe tutorial hives only reach stage 2–3 at most. |
 | 58 | Tutorial = two small maps and then one big map, ramping up; finishing one region attaches the next to HQ so you can travel there | The doc currently says **seven** tutorial missions (§17: three 64 × 64 zones plus two larger maps). Only Roadside Motel is built. | **Design change:** three tutorial regions: small → small → big, each harder. Clearing region 1 opens a road from HQ to region 2; clearing region 2 opens the big one. The world stays one continuous city (doc §2), and each new region is added beside the existing map, not loaded as a separate level. §17–18 need rewriting from seven missions to three. |
-| 59 | Walkers, Runners and Shriekers should be easier to kill and fewer on the easy maps | Walker 36 HP, Runner 22 HP. **Shriekers aren't in the game yet** (did the testers mean Bloaters, the fat ones that pop?). | Per-zone difficulty scaling: tutorial zones get lower zombie HP (~70%) and lower spawn counts, rising map by map. One table of difficulty tiers instead of per-map tweaks. |
+| 59 | Walkers, Runners and Shriekers (**clarified: Bloaters**) should be easier to kill and fewer on the easy maps | Walker 36 HP, Runner 22 HP, Bloater 120 HP, the same on every map. | Per-zone difficulty scaling: tutorial zones get lower zombie HP (~70%) and lower spawn counts, rising map by map. One table of difficulty tiers instead of per-map tweaks. |
 | 60 | Zombies should go for HQ buildings before walls | Walls block the way, so zombies scratch at them; the base wall is excluded from target picking, but whatever's physically in the way gets attacked. | When a pulse targets the base, zombies path around walls to the gate and go for the Command Post and Barracks; they only attack walls they're stuck against for a while (or the gate). This also makes defending the gate matter. |
 | 61 | Only engineers can build | The build buttons only act on the engineers in a selection, but they still show when a mixed selection is picked. | Show build buttons and hotkeys only when the selection is engineers only, and send all build orders through engineers. |
 | 62 | Remove the radio panel but keep all the dialogue for when audio is added | The radio panel shows every line as text. | Hide the panel. Keep the `Radio` system and every line in place, firing events with nothing displayed, ready for voice audio. Important messages (hive spotted, outpost lost) move to brief toasts. |
@@ -863,12 +868,12 @@ First hands-on playtest of the browser MVP (November 2026). Every note, and what
 | 64 | Vehicles can be overrun by piled-up zombies; the crew dies, leaving an empty vehicle another squad can crew. Recovered vehicles start at half health and need repair | Vehicles aren't in the MVP (Tier 2). | Add to the vehicle design (doc §6/§21): zombie pile-ups on a vehicle (N zombies touching it for a few seconds) kill the crew, and the empty hull stays on the map. An infantry squad can board it to become the new crew; it starts at 50% HP and engineers can repair it. |
 | 65 | Zombies can sometimes come out of buildings | Buildings are solid scenery; zombies only come from hives and the starting population. | Some buildings act as small "nests": a few zombies spill out of a door when units get close or make noise nearby, once or on a timer. Pairs with house searching (#46). |
 
-**Design conflicts this round raises (need a decision before coding):**
+**Design decisions (v4.9):**
 
-- **#50 squad health pool vs doc §5** ("members die one at a time, each with their own HP"). Proposed: one pool, members drop visually at thresholds. That keeps the "squad gets weaker as it bleeds" feel.
-- **#58 three tutorial regions vs doc §17** (seven missions). Proposed: three regions (small, small, big); the other four starter districts become the first part of the open world.
-- **#48 no passive healing** makes medics and a med bay mandatory early, so they move up from "Suburbs / Barracks level 2" to tutorial region 1 or 2.
-- **#59 "Shriekers"** don't exist yet. If they're wanted, define them (doc §9's special zombies), or the note may mean Bloaters.
+- **#50 — DECIDED:** one shared squad health pool; soldiers drop out at thresholds (75/50/25% for 4 members). This was the original intent; §5 updated.
+- **#58 — DECIDED:** three tutorial regions (small, small, big), each attached to the map when the previous one is cleared; §17 rewritten.
+- **#48 — DECIDED:** medics and the Med Bay stay where they are in the roadmap. No passive healing, and promotions stop topping up HP.
+- **#59 — CLARIFIED:** "Shriekers" meant **Bloaters**. The note is about Walkers, Runners and Bloaters being easier and fewer on the easy maps.
 
 **Grouping for when coding starts:** (a) difficulty pass: #51, #53, #56, #57, #59, #63 plus round 4 #32/#43; (b) zombie targeting: #52, #60; (c) UI: #45, #47, #61, #62 plus round 4 UI items; (d) rules: #48, #49, #50, #55; (e) new content: #46, #54, #58, #64, #65.
 
