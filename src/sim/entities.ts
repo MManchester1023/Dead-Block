@@ -1,0 +1,194 @@
+import type { Vec2 } from '../core/math';
+import type { UnitDef, ZombieDef, StructureDef } from '../config/units';
+import { BALANCE } from '../config/balance';
+import { type Faction, type Order, ThreatClass, type Targetable } from './types';
+
+export interface Member {
+  index: number;
+  hp: number;
+  maxHp: number;
+  alive: boolean;
+  cooldown: number;
+  /** Formation slot relative to squad center. */
+  offset: Vec2;
+  /** Rendered position (lags the squad center a little so squads look alive). */
+  pos: Vec2;
+  /** Per-member loadout/cosmetics hook for Armory customization (doc §7, Tier 4). */
+  loadout?: { weapon?: string; attachments?: string[]; cosmetics?: Record<string, string> };
+}
+
+const FORMATION_SLOTS: Vec2[] = [
+  { x: -0.45, y: -0.45 },
+  { x: 0.45, y: -0.45 },
+  { x: -0.45, y: 0.45 },
+  { x: 0.45, y: 0.45 },
+];
+
+let nextId = 1;
+export const newId = (): number => nextId++;
+export const resetIds = (n = 1) => {
+  nextId = n;
+};
+
+export class Squad implements Targetable {
+  readonly id = newId();
+  faction: Faction = 'player';
+  threat = ThreatClass.Normal;
+  radius = 0.9;
+  members: Member[];
+  orders: Order[] = [];
+  path: Vec2[] = [];
+  pathVersion = -1;
+  targetId: number | null = null;
+  holding = false;
+  inCover = 0; // current cover damage reduction
+  coverPropId: number | null = null;
+  facing = 0;
+  xp = 0;
+  level = 0;
+  kills = 0;
+  buildProgress = 0;
+  /** Future: building id when garrisoned / on a roof (doc §5, Tier 2). */
+  garrisonedIn: number | null = null;
+  knock: Vec2 = { x: 0, y: 0 };
+  stunned = 0;
+  selected = false;
+  moving = false;
+
+  constructor(public def: UnitDef, public name: string, public pos: Vec2) {
+    this.members = Array.from({ length: def.members }, (_, i) => ({
+      index: i,
+      hp: def.memberHp,
+      maxHp: def.memberHp,
+      alive: true,
+      cooldown: (i / def.members) * def.weapon.cooldown, // staggered volleys
+      offset: FORMATION_SLOTS[i % FORMATION_SLOTS.length],
+      pos: { x: pos.x + FORMATION_SLOTS[i % 4].x, y: pos.y + FORMATION_SLOTS[i % 4].y },
+    }));
+  }
+
+  get alive(): boolean {
+    return this.members.some((m) => m.alive);
+  }
+  get aliveCount(): number {
+    return this.members.reduce((n, m) => n + (m.alive ? 1 : 0), 0);
+  }
+  get hp(): number {
+    return this.members.reduce((n, m) => n + (m.alive ? m.hp : 0), 0);
+  }
+  get maxHp(): number {
+    return this.members.reduce((n, m) => n + m.maxHp, 0);
+  }
+  get levelName(): string {
+    return BALANCE.combat.levels[this.level].name;
+  }
+  get dmgMult(): number {
+    return BALANCE.combat.levels[this.level].dmg;
+  }
+  get currentOrder(): Order | undefined {
+    return this.orders[0];
+  }
+}
+
+export type ZombieState = 'idle' | 'wander' | 'investigate' | 'chase' | 'attack' | 'pulse';
+
+export class Zombie implements Targetable {
+  readonly id = newId();
+  faction: Faction = 'zombie';
+  hp: number;
+  alive = true;
+  state: ZombieState = 'idle';
+  goal: Vec2 | null = null;
+  targetId: number | null = null;
+  attackCooldown = 0;
+  thinkTimer: number;
+  path: Vec2[] = [];
+  stuckTimer = 0;
+  lastPos: Vec2;
+  vel: Vec2 = { x: 0, y: 0 };
+  knock: Vec2 = { x: 0, y: 0 };
+  facing: number;
+  homeHiveId: number | null = null;
+  burning = 0;
+
+  constructor(public def: ZombieDef, public pos: Vec2) {
+    this.hp = def.hp;
+    // deterministic per-id jitter so zombies don't all think on the same tick
+    const j = ((this.id * 2654435761) >>> 0) / 4294967296;
+    this.thinkTimer = j;
+    this.facing = j * Math.PI * 2;
+    this.lastPos = { ...pos };
+  }
+  get threat(): ThreatClass {
+    return this.def.threat;
+  }
+  get radius(): number {
+    return this.def.radius;
+  }
+}
+
+export class Hive implements Targetable {
+  readonly id = newId();
+  faction: Faction = 'zombie';
+  threat = ThreatClass.Special;
+  radius = 1.6;
+  hp: number;
+  alive = true;
+  stage = 1; // 1 Dormant … 4 Overrun (doc §9) — never regresses
+  stageTimer = 0;
+  spawnTimer = 0;
+  pulseTimer: number;
+  spawned = new Set<number>();
+
+  constructor(public pos: Vec2, public districtId: string, hp: number, firstPulse: number) {
+    this.hp = hp;
+    this.pulseTimer = firstPulse;
+  }
+}
+
+export class Structure implements Targetable {
+  readonly id = newId();
+  faction: Faction = 'player';
+  threat = ThreatClass.Structure;
+  hp: number;
+  alive = true;
+  built: boolean;
+  buildProgress = 0;
+  cooldown = 0;
+  targetId: number | null = null;
+  facing = 0;
+  /** Outposts: local supply stock (doc §6 outpost resupply, Tier 1). */
+  stock = 0;
+  /** Production queue (barracks etc). */
+  queue: { defId: string; remaining: number }[] = [];
+  districtId: string | null = null;
+  /** Footprint; sandbags and wire can be rotated 90°. */
+  size: { w: number; h: number };
+
+  constructor(public def: StructureDef, public tile: { x: number; y: number }, built: boolean, rotated = false) {
+    this.hp = built ? def.hp : def.hp * 0.1;
+    this.built = built;
+    this.size = rotated ? { w: def.size.h, h: def.size.w } : { ...def.size };
+  }
+  get pos(): Vec2 {
+    return { x: this.tile.x + this.size.w / 2, y: this.tile.y + this.size.h / 2 };
+  }
+  get radius(): number {
+    return Math.max(this.size.w, this.size.h) / 2;
+  }
+}
+
+export interface DemoCharge {
+  id: number;
+  pos: Vec2;
+  fuse: number;
+  ownerSquadId: number;
+}
+
+export interface ToxicCloud {
+  id: number;
+  pos: Vec2;
+  radius: number;
+  remaining: number;
+  dps: number;
+}

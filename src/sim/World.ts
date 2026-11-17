@@ -1,0 +1,447 @@
+import { EventBus } from '../core/events';
+import { Rng } from '../core/rng';
+import { dist, inRect, norm, sub, type Vec2 } from '../core/math';
+import { BALANCE } from '../config/balance';
+import { isEnabled } from '../config/features';
+import { STRUCTURES, UNITS, ZOMBIES } from '../config/units';
+import { buildStarterMap, type CityMap, type DistrictDef } from './map';
+import { NavGrid } from './grid';
+import { SpatialHash } from './spatial';
+import { Hive, Squad, Structure, Zombie, newId, type DemoCharge, type ToxicCloud } from './entities';
+import type { DamageType, Order, Targetable } from './types';
+import { updateOrders } from './systems/orders';
+import { updateCombat } from './systems/combat';
+import { updateZombies } from './systems/zombies';
+import { updateHives } from './systems/hives';
+import { updateEconomy } from './systems/economy';
+import { updateDistricts } from './systems/districts';
+import { updateNoise } from './systems/noise';
+
+export interface DistrictState {
+  def: DistrictDef;
+  infestation: number;
+  noise: number;
+  secured: boolean;
+  outpostId: number | null;
+  cleared: boolean;
+}
+
+export interface NoiseEvent {
+  pos: Vec2;
+  loudness: number;
+  age: number;
+}
+
+const SQUAD_NAMES = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel', 'India', 'Juliet', 'Kilo', 'Lima', 'Mike', 'November', 'Oscar', 'Papa'];
+
+export class World {
+  readonly events = new EventBus();
+  readonly rng: Rng;
+  readonly map: CityMap;
+  readonly grid: NavGrid;
+
+  time = 0;
+  day = 1;
+  dayTimer = 0;
+  money: number = BALANCE.economy.startMoney;
+  supplies: number = BALANCE.economy.startSupplies;
+  supplyCap: number = BALANCE.economy.supplyCap;
+  commandCap: number = BALANCE.economy.commandCap;
+  over: 'victory' | 'defeat' | null = null;
+
+  squads: Squad[] = [];
+  zombies: Zombie[] = [];
+  hives: Hive[] = [];
+  structures: Structure[] = [];
+  charges: DemoCharge[] = [];
+  clouds: ToxicCloud[] = [];
+  noiseEvents: NoiseEvent[] = [];
+  districts = new Map<string, DistrictState>();
+
+  readonly zombieHash = new SpatialHash<Zombie>(4);
+  readonly squadHash = new SpatialHash<Squad>(6);
+  private byId = new Map<number, Targetable>();
+  private nameCounter = 0;
+
+  constructor(opts: { seed?: number; map?: CityMap; populate?: boolean } = {}) {
+    this.rng = new Rng(opts.seed ?? 1337);
+    this.map = opts.map ?? buildStarterMap();
+    this.grid = new NavGrid(this.map.width, this.map.height);
+    for (const b of this.map.buildings) {
+      this.grid.setRect(b.rect.x, b.rect.y, b.rect.w, b.rect.h, true);
+      for (let y = b.rect.y; y < b.rect.y + b.rect.h; y++)
+        for (let x = b.rect.x; x < b.rect.x + b.rect.w; x++) this.grid.opaque[this.grid.idx(x, y)] = 1;
+    }
+    for (const p of this.map.props) this.grid.setRect(Math.floor(p.pos.x - p.w / 2), Math.floor(p.pos.y - p.h / 2), p.w, p.h, true, p.id);
+    for (const d of this.map.districts)
+      this.districts.set(d.id, { def: d, infestation: d.initialInfestation, noise: 0, secured: d.id === 'base', outpostId: null, cleared: d.initialInfestation === 0 });
+
+    if (opts.populate !== false) this.populate();
+  }
+
+  // ---------- setup ----------
+
+  private populate(): void {
+    const m = this.map;
+    const b = m.baseRect;
+    this.addStructure('commandPost', { x: b.x + 3, y: b.y + 4 }, true);
+    this.addStructure('barracks', { x: b.x + 3, y: b.y + 26 }, true);
+    this.addStructure('supplyDepot', { x: b.x + 12, y: b.y + 4 }, true);
+    // perimeter wall with a gate on the east side
+    for (let y = b.y - 1; y <= b.y + b.h; y++) {
+      if (y >= m.baseGate.y && y < m.baseGate.y + m.baseGate.h) continue;
+      this.addStructure('baseWall', { x: b.x + b.w, y }, true);
+    }
+    for (let x = b.x - 1; x < b.x + b.w; x++) {
+      this.addStructure('baseWall', { x, y: b.y - 1 }, true);
+      this.addStructure('baseWall', { x, y: b.y + b.h }, true);
+    }
+    for (let y = b.y; y < b.y + b.h; y++) this.addStructure('baseWall', { x: b.x - 1, y }, true);
+
+    // doc §11 starting force: two Rifle Squads + one Engineer Team
+    this.spawnSquad('rifle', { x: 22, y: 34 });
+    this.spawnSquad('rifle', { x: 22, y: 38 });
+    this.spawnSquad('engineer', { x: 18, y: 36 });
+
+    for (const d of m.districts)
+      for (const site of d.hiveSites) {
+        const hive = new Hive({ ...site }, d.id, BALANCE.hive.hpByStage[0], BALANCE.horde.firstPulseDelaySec);
+        this.hives.push(hive);
+        this.registerHive(hive);
+      }
+
+    // initial infestation: zombies scattered through the starter zone
+    const motel = this.districts.get('motel')!;
+    const count = Math.round(motel.infestation * 0.9);
+    for (let i = 0; i < count; i++) {
+      const r = motel.def.rect;
+      const p = this.grid.nearestFree({ x: this.rng.range(r.x + 4, r.x + r.w - 2), y: this.rng.range(r.y + 2, r.y + r.h - 2) });
+      const roll = this.rng.next();
+      const kind = roll < 0.06 ? 'bloater' : roll < 0.3 ? 'runner' : 'walker';
+      this.spawnZombie(kind, p);
+    }
+  }
+
+  // ---------- entity management ----------
+
+  nextSquadName(defId: string): string {
+    const n = SQUAD_NAMES[this.nameCounter++ % SQUAD_NAMES.length];
+    return defId === 'engineer' ? `Sapper ${n}` : n;
+  }
+
+  spawnSquad(defId: string, pos: Vec2, name?: string): Squad {
+    const def = UNITS[defId];
+    const sq = new Squad(def, name ?? this.nextSquadName(defId), this.grid.nearestFree(pos));
+    this.squads.push(sq);
+    this.byId.set(sq.id, sq);
+    return sq;
+  }
+
+  spawnZombie(defId: string, pos: Vec2, hiveId: number | null = null): Zombie | null {
+    if (this.zombies.length >= BALANCE.hive.globalZombieCap) return null;
+    const z = new Zombie(ZOMBIES[defId], { ...this.grid.nearestFree(pos) });
+    z.homeHiveId = hiveId;
+    this.zombies.push(z);
+    this.byId.set(z.id, z);
+    return z;
+  }
+
+  addStructure(defId: string, tile: { x: number; y: number }, built: boolean, rotated = false): Structure {
+    const def = STRUCTURES[defId];
+    const s = new Structure(def, { ...tile }, built, rotated);
+    s.districtId = this.districtAt(s.pos)?.def.id ?? null;
+    this.structures.push(s);
+    this.byId.set(s.id, s);
+    if (def.blocksMovement) this.grid.setRect(tile.x, tile.y, s.size.w, s.size.h, true, s.id);
+    if (built && def.slow) this.grid.setSlow(tile.x, tile.y, s.size.w, s.size.h, def.slow, s.id);
+    return s;
+  }
+
+  registerHive(h: Hive): void {
+    this.byId.set(h.id, h);
+    this.grid.setRect(Math.floor(h.pos.x) - 1, Math.floor(h.pos.y) - 1, 2, 2, true, h.id);
+  }
+
+  get(id: number | null): Targetable | undefined {
+    return id == null ? undefined : this.byId.get(id);
+  }
+
+  districtAt(p: Vec2): DistrictState | undefined {
+    for (const d of this.districts.values()) if (inRect(p, d.def.rect)) return d;
+    return undefined;
+  }
+
+  get commandUsed(): number {
+    let n = 0;
+    for (const s of this.squads) if (s.alive) n += s.def.command;
+    for (const b of this.structures) for (const q of b.queue) n += UNITS[q.defId].command;
+    return n;
+  }
+
+  canAfford(cost: { money: number; supplies: number }): boolean {
+    return this.money >= cost.money && this.supplies >= cost.supplies;
+  }
+
+  spend(cost: { money: number; supplies: number }): boolean {
+    if (!this.canAfford(cost)) return false;
+    this.money -= cost.money;
+    this.supplies -= cost.supplies;
+    return true;
+  }
+
+  addSupplies(n: number): void {
+    this.supplies = Math.min(this.supplyCap, this.supplies + n);
+  }
+
+  // ---------- commands (called by input/UI) ----------
+
+  issueOrder(squads: Squad[], order: Order, queue = false): void {
+    // line formation for multi-squad moves (doc §4): fighters in the front rank, support one rank behind
+    const n = squads.length;
+    const center = squads.reduce((a, s) => ({ x: a.x + s.pos.x / n, y: a.y + s.pos.y / n }), { x: 0, y: 0 });
+    const dir = norm(sub(order.pos, center));
+    const perp = { x: -dir.y, y: dir.x };
+    const spacing = 2.4;
+    const isSupport = (s: Squad) => !!s.def.canBuild?.length;
+    const front = squads.filter((s) => !isSupport(s));
+    const back = squads.filter(isSupport);
+    const slot = new Map<Squad, { k: number; rank: number }>();
+    const ranks = front.length ? [front, back] : [back];
+    ranks.forEach((rank, r) => rank.forEach((s, i) => slot.set(s, { k: (i - (rank.length - 1) / 2) * spacing, rank: r })));
+    squads.forEach((s) => {
+      const o: Order = { ...order, pos: { ...order.pos } };
+      if (n > 1 && (order.type === 'move' || order.type === 'attackMove')) {
+        const { k, rank } = slot.get(s)!;
+        const back = rank * 3;
+        o.pos = this.grid.nearestFree({ x: order.pos.x + perp.x * k - dir.x * back, y: order.pos.y + perp.y * k - dir.y * back });
+      }
+      if (!queue) {
+        s.orders = [];
+        s.path = [];
+        s.holding = false;
+        s.buildProgress = 0;
+      }
+      if (order.type === 'hold') {
+        s.orders = [];
+        s.path = [];
+        s.holding = true;
+        return;
+      }
+      s.orders.push(o);
+    });
+  }
+
+  stop(squads: Squad[]): void {
+    for (const s of squads) {
+      s.orders = [];
+      s.path = [];
+      s.holding = false;
+      s.targetId = null;
+    }
+  }
+
+  queueProduction(defId: string): string | null {
+    const def = UNITS[defId];
+    if (!def) return 'Unknown unit';
+    if (def.requires && !isEnabled(def.requires as never)) return `Locked — ${def.unlock}`;
+    const producer = this.structures.find((s) => s.alive && s.def.id === def.producedAt);
+    if (!producer) return `Needs ${def.producedAt}`;
+    if (this.commandUsed + def.command > this.commandCap) return 'Command cap reached';
+    if (!this.spend(def.cost)) return 'Not enough money or supplies';
+    producer.queue.push({ defId, remaining: def.buildTime });
+    return null;
+  }
+
+  /** Validates and places a construction site (doc §6: engineers can build anywhere). */
+  footprint(defId: string, rotated = false): { w: number; h: number } {
+    const sz = STRUCTURES[defId].size;
+    return rotated ? { w: sz.h, h: sz.w } : { ...sz };
+  }
+
+  canPlace(defId: string, tile: { x: number; y: number }, rotated = false): string | null {
+    const def = STRUCTURES[defId];
+    if (!def) return 'Unknown structure';
+    if (def.requires && !isEnabled(def.requires as never)) return 'Locked';
+    const fp = this.footprint(defId, rotated);
+    if (!this.grid.rectFree(tile.x, tile.y, fp.w, fp.h)) return 'Blocked';
+    if (def.requiresSecured) {
+      const d = this.districtAt({ x: tile.x + fp.w / 2, y: tile.y + fp.h / 2 });
+      if (!d || d.def.id === 'base') return 'Outposts go in a district';
+      if (d.outpostId) return 'District already has an outpost';
+      if (d.infestation > 0) return `Infestation must be 0% (now ${Math.ceil(d.infestation)}%)`;
+    }
+    for (const z of this.zombieHash.query({ x: tile.x + fp.w / 2, y: tile.y + fp.h / 2 }, 2)) if (z.alive) return 'Zombies in the way';
+    if (!this.canAfford(def.cost)) return 'Not enough money or supplies';
+    return null;
+  }
+
+  orderBuild(engineers: Squad[], defId: string, tile: { x: number; y: number }, queue = false, rotated = false): string | null {
+    const eng = engineers.filter((s) => s.def.canBuild?.includes(defId));
+    if (!eng.length) return 'Needs an Engineer Team';
+    const err = this.canPlace(defId, tile, rotated);
+    if (err) return err;
+    const def = STRUCTURES[defId];
+    this.spend(def.cost);
+    const site = this.addStructure(defId, tile, false, rotated);
+    this.issueOrder(eng, { type: 'build', pos: site.pos, targetId: site.id, buildDef: defId }, queue);
+    return null;
+  }
+
+  orderCharge(engineers: Squad[], hive: Hive, queue = false): string | null {
+    const eng = engineers.filter((s) => s.def.abilities?.includes('demoCharge'));
+    if (!eng.length) return 'Only engineers carry demo charges';
+    this.issueOrder(eng.slice(0, 1), { type: 'charge', pos: hive.pos, targetId: hive.id }, queue);
+    return null;
+  }
+
+  // ---------- damage, noise, explosions ----------
+
+  makeNoise(pos: Vec2, loudness: number): void {
+    if (!isEnabled('noise')) return;
+    this.noiseEvents.push({ pos: { ...pos }, loudness, age: 0 });
+    const d = this.districtAt(pos);
+    if (d && d.def.id !== 'base') d.noise = Math.min(BALANCE.noise.pulseThreshold, d.noise + loudness * 0.12);
+  }
+
+  damage(target: Targetable, amount: number, type: DamageType, source?: Vec2): void {
+    if (!target.alive) return;
+    if (target instanceof Squad) this.damageSquad(target, amount, type, source);
+    else if (target instanceof Zombie) this.damageZombie(target, amount, type);
+    else if (target instanceof Hive) this.damageHive(target, amount, type);
+    else if (target instanceof Structure) this.damageStructure(target, amount);
+  }
+
+  damageSquad(sq: Squad, amount: number, type: DamageType, source?: Vec2): void {
+    const reduction = type === 'toxic' || type === 'explosive' ? 0 : sq.inCover;
+    let dmg = amount * (1 - reduction);
+    // hit the member nearest the source (the one in front)
+    const alive = sq.members.filter((m) => m.alive);
+    if (!alive.length) return;
+    const victim = source ? alive.reduce((a, b) => (dist(a.pos, source) < dist(b.pos, source) ? a : b)) : this.rng.pick(alive);
+    victim.hp -= dmg;
+    if (victim.hp <= 0) {
+      victim.alive = false;
+      victim.hp = 0;
+      this.events.emit('memberKilled', { squadId: sq.id, squadName: sq.name });
+      if (!sq.alive) {
+        this.events.emit('squadWiped', { squadId: sq.id, squadName: sq.name });
+        this.byId.delete(sq.id);
+        // Tier 2 hook: soldiers killed by the horde can rise again (specialZombies / reanimation)
+        if (isEnabled('specialZombies')) this.spawnZombie('walker', sq.pos);
+      }
+    }
+  }
+
+  damageZombie(z: Zombie, amount: number, type: DamageType): void {
+    z.hp -= amount;
+    if (type === 'fire') z.burning = Math.max(z.burning, 3);
+    if (z.hp <= 0 && z.alive) {
+      z.alive = false;
+      this.byId.delete(z.id);
+      const d = this.districtAt(z.pos);
+      this.events.emit('zombieKilled', { id: z.id, defId: z.def.id, pos: { ...z.pos }, districtId: d?.def.id ?? null });
+      if (d) d.infestation = Math.max(0, d.infestation - (BALANCE.infestation.perKill[z.def.id] ?? 0.5));
+      if (z.def.onDeath === 'toxicCloud') {
+        const cloud: ToxicCloud = { id: newId(), pos: { ...z.pos }, radius: 2.6, remaining: 8, dps: 7 };
+        this.clouds.push(cloud);
+        this.events.emit('toxicCloud', { pos: cloud.pos, radius: cloud.radius, duration: cloud.remaining });
+        this.explode(z.pos, 2.2, 6, 'toxic', 0.8);
+      }
+    }
+  }
+
+  damageHive(h: Hive, amount: number, type: DamageType): void {
+    // doc §9: only fire or explosives destroy hives
+    if (type !== 'fire' && type !== 'explosive') return;
+    h.hp -= amount;
+    if (h.hp <= 0 && h.alive) {
+      h.alive = false;
+      this.byId.delete(h.id);
+      this.grid.setRect(Math.floor(h.pos.x) - 1, Math.floor(h.pos.y) - 1, 2, 2, false);
+      const d = this.districts.get(h.districtId);
+      if (d) d.infestation = Math.max(0, d.infestation - BALANCE.infestation.hiveDestroyed);
+      this.money += BALANCE.economy.hiveBounty;
+      this.events.emit('hiveDestroyed', { hiveId: h.id, districtId: h.districtId });
+    }
+  }
+
+  damageStructure(s: Structure, amount: number): void {
+    s.hp -= amount;
+    if (s.hp <= 0 && s.alive) {
+      s.alive = false;
+      this.byId.delete(s.id);
+      const def = s.def;
+      if (def.blocksMovement) this.grid.setRect(s.tile.x, s.tile.y, s.size.w, s.size.h, false);
+      if (def.slow) this.grid.setSlow(s.tile.x, s.tile.y, s.size.w, s.size.h, 1);
+      this.events.emit('structureDestroyed', { id: s.id, defId: def.id, pos: s.pos });
+    }
+  }
+
+  /** Area damage with knockback by distance (doc §5 v4: friend and foe both get thrown). */
+  explode(pos: Vec2, radius: number, damage: number, type: DamageType, knockback = 1.5): void {
+    this.events.emit('explosion', { pos: { ...pos }, radius, type });
+    const kb = isEnabled('knockback') ? knockback : 0;
+    for (const z of this.zombieHash.query(pos, radius + 1)) {
+      if (!z.alive) continue;
+      const d = dist(pos, z.pos);
+      if (d > radius + z.radius) continue;
+      const falloff = 1 - Math.min(1, d / (radius + z.radius)) * 0.6;
+      this.damageZombie(z, damage * falloff, type);
+      if (kb) {
+        const dir = norm(sub(z.pos, pos));
+        z.knock.x += dir.x * kb * 6 * falloff;
+        z.knock.y += dir.y * kb * 6 * falloff;
+      }
+    }
+    for (const s of this.squads) {
+      if (!s.alive) continue;
+      const d = dist(pos, s.pos);
+      if (d > radius + s.radius) continue;
+      const falloff = 1 - Math.min(1, d / (radius + s.radius)) * 0.6;
+      if (type !== 'toxic') this.damageSquad(s, damage * 0.6 * falloff, type, pos);
+      if (kb && d < radius * 0.7) {
+        const dir = norm(sub(s.pos, pos));
+        s.knock.x += dir.x * kb * 3 * falloff;
+        s.knock.y += dir.y * kb * 3 * falloff;
+        s.stunned = Math.max(s.stunned, 0.6 * falloff);
+      }
+    }
+    for (const h of this.hives) if (h.alive && dist(pos, h.pos) <= radius + h.radius) this.damageHive(h, damage, type);
+    for (const st of this.structures)
+      if (st.alive && st.def.id !== 'baseWall' && dist(pos, st.pos) <= radius + st.radius) this.damageStructure(st, damage * 0.3);
+    this.makeNoise(pos, type === 'toxic' ? 4 : radius * 6);
+  }
+
+  // ---------- main loop ----------
+
+  step(dt: number): void {
+    if (this.over) return;
+    this.time += dt;
+    this.zombieHash.clear();
+    for (const z of this.zombies) if (z.alive) this.zombieHash.insert(z);
+    this.squadHash.clear();
+    for (const s of this.squads) if (s.alive) this.squadHash.insert(s);
+
+    updateOrders(this, dt);
+    updateCombat(this, dt);
+    updateZombies(this, dt);
+    updateHives(this, dt);
+    updateNoise(this, dt);
+    updateDistricts(this, dt);
+    updateEconomy(this, dt);
+
+    // compaction
+    if (this.zombies.some((z) => !z.alive)) this.zombies = this.zombies.filter((z) => z.alive);
+    this.squads = this.squads.filter((s) => s.alive);
+    this.structures = this.structures.filter((s) => s.alive);
+
+    if (!this.squads.length && this.commandUsed === 0 && !this.canAfford(UNITS.rifle.cost))
+      this.finish('defeat', 'Every squad is gone and the treasury is empty.');
+  }
+
+  finish(kind: 'victory' | 'defeat', reason: string): void {
+    if (this.over) return;
+    this.over = kind;
+    this.events.emit(kind, { reason });
+  }
+}
