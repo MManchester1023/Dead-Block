@@ -16,6 +16,7 @@ import type { Vec2 } from '../core/math';
  *   bloater_death the Bloater bursting, from the owner's recording (v4.40; replaced round 10's layered pop + gore rip)
  *   human_death_1–3  a soldier or survivor going down (v4.38)
  *   ui_click      HUD buttons (v4.38)
+ *   footsteps_loop  boots on gravel, quiet, under each moving squad near the camera (v4.44)
  *   build_loop    engineers at work: three construction recordings layered into one loop (v4.38, round 10 #111)
  *   amb_horror    a horror drone under everything, very quiet (v4.38)
  *   amb_suburb    suburban ambience bed (v4.38)
@@ -71,6 +72,11 @@ const AMBIENCE: { file: string; volume: number }[] = [
 ];
 const BUILD_LOOP = 'build_loop';
 const BUILD_VOLUME = 0.5;
+/** Footsteps (v4.44): quiet, only for squads near where you're looking, a few at a time. */
+const STEPS_LOOP = 'footsteps_loop';
+const STEPS_VOLUME = 0.14;
+const STEPS_RANGE = 70;
+const STEPS_MAX = 4;
 /** Orders that mean "engineers hammering away" once they're standing at the job. */
 /** Seconds into plane_flyby where the jet is loudest (directly overhead); crates fall for 6 s after that. */
 const FLYBY_PEAK = 11;
@@ -118,6 +124,8 @@ export class Sound {
   private ambience: GainNode[] = [];
   /** One looping work sound per crew at a job (squad id → its nodes). */
   private work = new Map<number, { src: AudioBufferSourceNode; g: GainNode; p: StereoPannerNode }>();
+  /** One quiet footsteps loop per nearby squad on the move. */
+  private steps = new Map<number, { src: AudioBufferSourceNode; g: GainNode; p: StereoPannerNode }>();
   /** Master volume, one of VOLUMES (remembered per browser). */
   volume = 1;
 
@@ -197,9 +205,10 @@ export class Sound {
         });
     }
     const load = async (n: string) => this.ctx!.decodeAudioData(await (await fetch(`audio/${n}.mp3`)).arrayBuffer());
-    load(BUILD_LOOP)
-      .then((b) => (this.loops[BUILD_LOOP] = b))
-      .catch(() => {});
+    for (const n of [BUILD_LOOP, STEPS_LOOP])
+      load(n)
+        .then((b) => (this.loops[n] = b))
+        .catch(() => {});
     // ambience: start each bed as soon as it's loaded, looping for good (a missing file stays silent)
     for (const a of AMBIENCE)
       load(a.file)
@@ -226,6 +235,46 @@ export class Sound {
     gain *= rig.strategic ? 0.35 : 1; // zoomed far out (ops map), the battlefield is quieter
     const sp = this.game.renderer.worldToScreen(pos);
     return { gain, pan: Math.max(-0.9, Math.min(0.9, (sp.x / innerWidth) * 2 - 1)) };
+  }
+
+  /** Footsteps under the squads on the move nearest the camera (a few at most), placed at each. */
+  private updateSteps(): void {
+    const ctx = this.ctx!;
+    const buf = this.loops[STEPS_LOOP];
+    if (!buf) return;
+    const now = ctx.currentTime;
+    const t = this.game.renderer.rig.target;
+    const walking = this.game.world.squads
+      .filter((s) => s.alive && s.moving && s.garrisonedIn == null && Math.hypot(s.pos.x - t.x, s.pos.y - t.z) < STEPS_RANGE)
+      .sort((a, b) => Math.hypot(a.pos.x - t.x, a.pos.y - t.z) - Math.hypot(b.pos.x - t.x, b.pos.y - t.z))
+      .slice(0, STEPS_MAX);
+    const on = new Set(walking.map((s) => s.id));
+    for (const s of walking) {
+      let v = this.steps.get(s.id);
+      if (!v) {
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.loop = true;
+        const g = ctx.createGain();
+        g.gain.value = 0;
+        const p = ctx.createStereoPanner();
+        src.connect(g).connect(p).connect(this.master!);
+        src.start(0, Math.random() * buf.duration);
+        v = { src, g, p };
+        this.steps.set(s.id, v);
+      }
+      // crouched squads creep: slower and softer
+      v.src.playbackRate.value = (s.crouched ? 0.8 : 1) * this.game.speed ** 0.15;
+      const at = this.place(s.pos);
+      v.g.gain.setTargetAtTime(this.game.paused ? 0 : STEPS_VOLUME * at.gain * (s.crouched ? 0.6 : 1), now, 0.12);
+      v.p.pan.setTargetAtTime(at.pan, now, 0.1);
+    }
+    for (const [id, v] of this.steps)
+      if (!on.has(id)) {
+        v.g.gain.setTargetAtTime(0, now, 0.1);
+        v.src.stop(now + 0.5);
+        this.steps.delete(id);
+      }
   }
 
   /** Engineers at a job get a looping construction sound, placed at them; it fades out when they stop. */
@@ -269,6 +318,7 @@ export class Sound {
   update(dt: number): void {
     if (!this.ctx) return;
     this.updateWork();
+    this.updateSteps();
     if (this.game.paused) return;
     this.updateCrates();
     // now and then, quieter chatter from somewhere on the net

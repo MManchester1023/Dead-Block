@@ -98,6 +98,7 @@ v4.39 (uploaded by the owner; authors to fill in where blank):
 | `2026-11-18 11-34-14.mp4` (owner's recording) | Bloater bursting, cut from its audio (`bloater_death`, v4.40) |
 | `2026-11-18 11-39-23.mp4` (owner's recording) | Power station starting up, cut from its audio (`power_on`, v4.41) |
 | `impact-drop-wood-crate-dropped-02.wav` | Supply crate landing (`crate_land`, v4.41) |
+| `freesound_community-boots-on-gravel-67143.mp3` (Pixabay, freesound_community) | Footsteps, a seamless 30 s loop under moving squads (`footsteps_loop`, v4.44) |
 
 ## Barbed wire model (v4.39)
 
