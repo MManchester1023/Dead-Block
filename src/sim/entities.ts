@@ -154,6 +154,8 @@ export class Zombie implements Targetable {
   thinkTimer: number;
   stuckTimer = 0;
   lastPos: Vec2;
+  /** Distance to its destination at the last stuck check (round 14 #167: headway, not just movement). */
+  lastDist?: number;
   vel: Vec2 = { x: 0, y: 0 };
   knock: Vec2 = { x: 0, y: 0 };
   facing: number;

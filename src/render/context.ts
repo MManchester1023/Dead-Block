@@ -25,6 +25,8 @@ export interface FrameState {
   simDt: number;
   selected: Set<number>;
   hovered: number | null;
+  /** Every squad under the cursor (round 14 #178: overlapping squads all show their label). */
+  hoveredSquads: number[];
   selectedStructure: number | null;
 }
 

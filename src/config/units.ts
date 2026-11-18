@@ -97,11 +97,12 @@ export interface ZombieDef {
   bounty: { money: number; supplies: number };
 }
 
+// round 14 #162: Runners 7.6 → 9.5 m/s
 // round 13 #153: Walkers attack every 2 s (was 1.2), Runners every 1 s (was 0.8), same damage per hit
 // round 11 #131: Runners 22 → 17 hp, one rifle hit fewer than before (2 in region 3, Walkers 4)
 export const ZOMBIES: Record<string, ZombieDef> = {
   walker: { id: 'walker', name: 'Walker', hp: 36, speed: 2.7, damage: 7, attackCooldown: 2, sight: 14, hearing: 1, threat: ThreatClass.Normal, class: 'normal', radius: 0.4, bounty: { money: 1, supplies: 1 } },
-  runner: { id: 'runner', name: 'Runner', hp: 17, speed: 7.6, damage: 5, attackCooldown: 1, sight: 18, hearing: 1.4, threat: ThreatClass.Normal, class: 'normal', radius: 0.38, bounty: { money: 1, supplies: 1 } },
+  runner: { id: 'runner', name: 'Runner', hp: 17, speed: 9.5, damage: 5, attackCooldown: 1, sight: 18, hearing: 1.4, threat: ThreatClass.Normal, class: 'normal', radius: 0.38, bounty: { money: 1, supplies: 1 } },
   bloater: { id: 'bloater', name: 'Bloater', hp: 120, speed: 1.8, damage: 10, attackCooldown: 1.6, sight: 12, hearing: 0.8, threat: ThreatClass.Special, class: 'medium', radius: 0.75, onDeath: 'toxicCloud', bounty: { money: 4, supplies: 3 } },
   screamer: { id: 'screamer', name: 'Screamer', hp: 40, speed: 3.2, damage: 3, attackCooldown: 1.5, sight: 24, hearing: 1.2, threat: ThreatClass.Special, class: 'medium', radius: 0.4, requires: 'specialZombies', bounty: { money: 3, supplies: 2 } },
   brute: { id: 'brute', name: 'Brute', hp: 300, speed: 2.8, damage: 25, attackCooldown: 1.8, sight: 16, hearing: 1, threat: ThreatClass.Special, class: 'medium', radius: 0.9, requires: 'specialZombies', bounty: { money: 10, supplies: 6 } },
@@ -172,5 +173,6 @@ export const STRUCTURES: Record<string, StructureDef> = {
 };
 
 export const ABILITIES = {
-  demoCharge: { name: 'Demo Charge', plantTime: 3, fuse: 5, damage: 520, radius: 7, type: 'explosive' as DamageType, cost: { money: 25, supplies: 10 }, loudness: 30 },
+  demoCharge: { name: 'Demo Charge', plantTime: 2, // round 14 #171: was 3
+     fuse: 5, damage: 520, radius: 7, type: 'explosive' as DamageType, cost: { money: 25, supplies: 10 }, loudness: 30 },
 };

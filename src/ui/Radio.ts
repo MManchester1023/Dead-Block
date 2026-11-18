@@ -25,7 +25,7 @@ export class Radio {
     ev.on('squadWiped', (e) => this.say('Command', `${e.squadName} is gone. All hands. Their record goes with them.`, 'bad'));
     ev.on('hiveStage', (e) => this.say('Intel', `Hive activity rising — stage ${e.stage} of 4. It does not go back down.`, 'warn'));
     ev.on('hiveDestroyed', () => this.say('Command', "Hive's down. Good kill. Now finish clearing the district.", 'good'));
-    ev.on('hordePulse', (e) => this.say('Overwatch', `Horde pulse moving — about ${e.size} contacts heading for our lines.`, 'warn'));
+    ev.on('hordePulse', (e) => this.say('Overwatch', `Horde wave moving — about ${e.size} contacts heading for our lines.`, 'warn'));
     ev.on('noiseAlert', () => this.say('Overwatch', "You're making too much noise. Everything in the district just heard you.", 'warn'));
     ev.on('structureBuilt', (e) => {
       const lines: Record<string, string> = {

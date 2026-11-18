@@ -61,11 +61,14 @@ export class SquadLayer {
         g.rotation.y = -m.facing;
         g.scale.y = SOLDIER_SCALE * (s.inCover && !s.moving ? 0.82 : 1); // crouch behind cover
       });
-      // round 13 #158: a squad's label (name, status, health) only shows while the mouse is over it
-      if (f.hovered !== s.id) {
+      // round 13 #158: a squad's label (name, status, health) only shows while the mouse is over it;
+      // round 14 #178: every squad under the cursor shows it, stacked upwards so they don't cover each other
+      const k = f.hoveredSquads.indexOf(s.id);
+      if (k < 0 && f.hovered !== s.id) {
         v.label.style.display = 'none';
         continue;
       }
+      v.label.style.marginTop = `${-Math.max(0, k) * 34}px`;
       labels.place(v.label, s.pos, s.garrisonedIn != null ? 9.5 : 3.4, () => this.labelHtml(s, f.selected.has(s.id), true));
     }
     for (const [id, v] of this.views)

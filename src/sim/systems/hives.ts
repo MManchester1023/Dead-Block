@@ -43,7 +43,8 @@ export function updateHives(w: World, dt: number): void {
       const cap = Math.round((T.normalPool[h.stage - 1] + T.mediumPool[h.stage - 1]) * HORDE.count);
       // a hive that's been bled dry rebuilds faster (v4.9, playtest #32)
       const thin = h.spawned.size < cap * H.reinforceBelow;
-      h.spawnTimer = T.spawnIntervalSec[h.stage - 1] * (thin ? H.reinforceRate : 1);
+      // round 14 #172: never more often than every minSpawnIntervalSec (5 s)
+      h.spawnTimer = Math.max(H.minSpawnIntervalSec, T.spawnIntervalSec[h.stage - 1] * (thin ? H.reinforceRate : 1));
       for (let i = 0; i < Math.round(T.spawnGroup[h.stage - 1] * HORDE.count); i++) {
         // separate pools (v4.13 #75): a medium if its pool has room and the roll says so, else a normal
         const medium = room.medium > 0 && (room.normal <= 0 || w.rng.chance(T.mediumChance[h.stage - 1]));

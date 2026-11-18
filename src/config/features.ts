@@ -22,7 +22,7 @@ export const FEATURES = [
   { id: 'squadMembers', name: 'Individual member losses, permanent wipes', tier: 0, enabled: true, docRef: '§7' },
   { id: 'threatTargeting', name: 'Threat-priority focus fire', tier: 0, enabled: true, docRef: '§5' },
   { id: 'hives', name: 'Hives with 4 stages', tier: 0, enabled: true, docRef: '§9' },
-  { id: 'noise', name: 'Noise & horde pulses', tier: 0, enabled: true, docRef: '§9, §11' },
+  { id: 'noise', name: 'Noise & horde waves', tier: 0, enabled: true, docRef: '§9, §11' },
   { id: 'economy', name: 'Money, supplies, daily upkeep, command cap', tier: 0, enabled: true, docRef: '§11' },
   { id: 'outposts', name: 'District infestation & engineer outposts', tier: 0, enabled: true, docRef: '§2, §6' },
   { id: 'fieldFortifications', name: 'Engineer field fortifications anywhere', tier: 0, enabled: true, docRef: '§6' },

@@ -5,11 +5,11 @@ import { ZOMBIES } from '../src/config/units';
 
 /** v4.49: "more zombies, but weaker" (moderate: twice the dead, 60% health, 75% damage per hit). */
 describe('the horde setting (v4.49)', () => {
-  it('is the moderate starting point', () => {
-    expect(HORDE).toEqual({ count: 2, toughness: 0.6, damage: 0.75 });
+  it('is the moderate starting point, a bit weaker since round 14', () => {
+    expect(HORDE).toEqual({ count: 2, toughness: 0.45, damage: 0.75 }); // round 14 #170: toughness 0.6 → 0.45
   });
 
-  it('zombies have 60% of their health (before the region tier)', () => {
+  it('zombies have 45% of their health (before the region tier)', () => {
     const w = new World({ populate: false });
     const z = w.spawnZombie('walker', { x: 5, y: 5 })!; // outside any district: no tier multiplier
     expect(z.maxHp).toBeCloseTo(ZOMBIES.walker.hp * HORDE.toughness);

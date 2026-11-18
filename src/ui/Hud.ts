@@ -417,8 +417,8 @@ export class Hud {
       html += `<div class="district">
         <div class="row"><b class="dname" data-act="goto-district:${d.def.id}" title="Show on the map">${d.def.name}</b>${status}</div>
         <label>Infestation ${Math.ceil(d.infestation)}%${!d.secured && !hive.length ? ` · ${w.deadIn(d.def.id)} dead left` : ''}</label><div class="bar red"><i style="width:${d.infestation}%"></i></div>
-        <label>Noise${w.time < (d.noiseLockUntil ?? 0) ? ` <small>· cooling down ${Math.ceil(d.noiseLockUntil - w.time)}s</small>` : ''}</label><div class="bar amber"><i style="width:${d.noise}%"></i></div>
-        ${hive.map((h) => `<div class="row small"><span>Hive stage ${h.stage}/4</span><span>next pulse ${fmtTime(Math.max(0, h.pulseTimer))}</span></div>`).join('')}
+        <label>Noise</label><div class="bar amber"><i style="width:${d.noise}%"></i></div>
+        ${hive.map((h) => `<div class="row small"><span>Hive stage ${h.stage}/4</span></div>`).join('')}
         ${(() => {
           const st = w.structures.find((x) => x.alive && x.def.restore && x.districtId === d.def.id);
           return st ? `<div class="row small"><span>Power station</span>${st.built ? '<span class="good">ONLINE</span>' : '<span class="bad">OFFLINE</span>'}</div>` : '';
@@ -607,7 +607,14 @@ export class Hud {
           <b>${u.name}</b><small>$${u.cost.money} · ${u.cost.supplies}▣ · ★${u.command} · ${u.buildTime}s</small></button>`;
       })
       .join('');
-    const q = queue.map((j, i) => `<div class="qitem">${UNITS[j.defId].name}${i === 0 ? ` <small>${Math.ceil(j.remaining)}s</small>` : ''}</div>`).join('');
+    // round 14 #173: runs of the same unit as one line, "Rifle Squad ×5" (the first one's time to go)
+    const runs: { defId: string; n: number; first: boolean; remaining: number }[] = [];
+    queue.forEach((j, i) => {
+      const last = runs[runs.length - 1];
+      if (last && last.defId === j.defId) last.n++;
+      else runs.push({ defId: j.defId, n: 1, first: i === 0, remaining: j.remaining });
+    });
+    const q = runs.map((r) => `<div class="qitem">${UNITS[r.defId].name}${r.n > 1 ? ` ×${r.n}` : ''}${r.first ? ` <small>${Math.ceil(r.remaining)}s</small>` : ''}</div>`).join('');
     const lockedHtml = locked.map((u) => `<div class="locked" title="${esc(u.unlock)}">🔒 ${u.name}<small>${esc(u.unlock)}</small></div>`).join('');
     const rallyOn = g.mode.kind === 'rally';
     return `<h3>Barracks · Recruit</h3><div class="prod-list">${rows}</div>${q ? `<div class="queue">${q}</div>` : ''}

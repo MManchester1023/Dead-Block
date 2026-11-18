@@ -98,7 +98,10 @@ export class Input {
       this.game.changed();
       return;
     }
-    if (this.mouse.inside) this.game.renderer.hovered = this.pick(e.clientX, e.clientY);
+    if (this.mouse.inside) {
+      this.game.renderer.hovered = this.pick(e.clientX, e.clientY);
+      this.game.renderer.hoveredSquads = this.squadsUnder(e.clientX, e.clientY);
+    }
     if (this.dragStart) {
       const dx = e.clientX - this.dragStart.x;
       const dy = e.clientY - this.dragStart.y;
@@ -114,6 +117,21 @@ export class Input {
   private lastClick: { id: number | null; t: number } = { id: null, t: 0 };
 
   /** Squad under a screen point: its name label first (#39), else the nearest body within 28 px. */
+  /** Every squad under the cursor, nearest first (round 14 #178). */
+  private squadsUnder(x: number, y: number): number[] {
+    const r = this.game.renderer;
+    const out: { id: number; d: number }[] = [];
+    for (const s of this.game.world.squads) {
+      if (!s.alive) continue;
+      const p = r.worldToScreen(s.pos);
+      const d = Math.hypot(p.x - x, p.y - y);
+      if (d < 28) out.push({ id: s.id, d });
+    }
+    const byName = r.squadAtLabel(x, y);
+    if (byName != null && !out.some((o) => o.id === byName)) out.push({ id: byName, d: -1 });
+    return out.sort((a, b) => a.d - b.d).map((o) => o.id);
+  }
+
   private squadAt(x: number, y: number): number | null {
     const r = this.game.renderer;
     const byName = r.squadAtLabel(x, y);

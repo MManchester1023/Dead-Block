@@ -7,7 +7,7 @@
  */
 export const HORDE = {
   count: 2,
-  toughness: 0.6,
+  toughness: 0.45, // round 14 #170: was 0.6
   damage: 0.75,
 };
 
@@ -79,6 +79,10 @@ export const BALANCE = {
     // spawn rates, caps and pulse timing live in DIFFICULTY (below), per district tier
     reinforceBelow: 0.25, // a hive whose brood is under this share of its cap spawns faster…
     reinforceRate: 0.6, // …at this multiple of its normal interval
+    /** Round 14 #172: a hive never spawns more often than this (seconds), whatever its stage or tier. */
+    minSpawnIntervalSec: 5,
+    /** Round 14 #166: idle dead wander up to this far (metres) from their hive (was 14). */
+    wanderRadius: 40,
     globalZombieCap: 1500, // sim handles ~2.5k at ~6 ms/tick; renderer crowds are sized for 2k
   },
 

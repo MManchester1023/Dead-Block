@@ -61,7 +61,9 @@ export function updateZombies(w: World, dt: number): void {
     const roaming = z.state === 'wander' || z.state === 'idle';
     if (z.losTimer <= 0) {
       z.losTimer = 0.4 + ((z.id * 0.37) % 1) * 0.3;
-      z.useField = !roaming && (z.stuckFor > 0 || (dist(z.pos, dest) > 8 && !w.grid.lineClear(z.pos, dest)));
+      // round 14 #167: any wall in the way means going round it, however close the target (it used to be
+      // only beyond 8 m, so the dead piled up on the wall right in front of a squad)
+      z.useField = !roaming && (z.stuckFor > 0 || (dist(z.pos, dest) > 1.5 && !w.grid.lineClear(z.pos, dest)));
       if (z.stuckFor > 0) z.stuckFor -= 1;
     }
     let dx = dest.x - z.pos.x;
@@ -117,7 +119,12 @@ export function updateZombies(w: World, dt: number): void {
       z.lastPos.x = z.pos.x;
       z.lastPos.y = z.pos.y;
       z.stuckTimer = 0;
-      if (moved < 1 && !roaming) {
+      // round 14 #167: stuck = not getting closer to where it's going (a jostled zombie moves about plenty
+      // while making no headway against a wall)
+      const dNow = dist(z.pos, dest);
+      const headway = (z.lastDist ?? dNow + 1) - dNow;
+      z.lastDist = dNow;
+      if (!roaming && dNow > 2 && (moved < 1 || headway < 0.4)) {
         z.stuckFor = 4;
         z.useField = true;
       } else if (moved < 0.3 && roaming && z.goal) {
@@ -208,7 +215,8 @@ function think(w: World, z: Zombie): void {
   if (z.state === 'chase' || z.state === 'attack') z.state = 'idle';
   if (!z.goal && z.state === 'idle' && w.rng.chance(0.15)) {
     const home = (z.homeHiveId && (w.get(z.homeHiveId) as Hive | undefined)?.pos) || z.pos;
-    let goal = w.grid.nearestFree({ x: home.x + w.rng.range(-14, 14), y: home.y + w.rng.range(-14, 14) });
+    const R = BALANCE.hive.wanderRadius;
+    let goal = w.grid.nearestFree({ x: home.x + w.rng.range(-R, R), y: home.y + w.rng.range(-R, R) });
     // round 12 #139: wanderers walk straight, so only to a spot they can see; otherwise a short
     // shuffle near where they stand (they used to walk into the building between them and the spot)
     if (!w.grid.lineClear(z.pos, goal)) goal = w.grid.nearestFree({ x: z.pos.x + w.rng.range(-6, 6), y: z.pos.y + w.rng.range(-6, 6) });

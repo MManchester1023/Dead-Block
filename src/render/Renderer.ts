@@ -39,6 +39,7 @@ export class Renderer {
 
   /** Entity under the mouse (squad, structure or hive id): health bars only show on hover or selection (#35). */
   hovered: number | null = null;
+  hoveredSquads: number[] = [];
   /** Selected base building, so its bar shows too. */
   selectedStructure: number | null = null;
 
@@ -192,7 +193,7 @@ export class Renderer {
   render(realDt: number, simDt: number, selected: Set<number>): void {
     this.time += realDt;
     const w = this.world;
-    const f: FrameState = { time: this.time, realDt, simDt, selected, hovered: this.hovered, selectedStructure: this.selectedStructure };
+    const f: FrameState = { time: this.time, realDt, simDt, selected, hovered: this.hovered, hoveredSquads: this.hoveredSquads, selectedStructure: this.selectedStructure };
     this.rig.apply(realDt);
     {
       // keep the sun's shadow box centred on what the camera looks at (snapped to texels to avoid shimmer)
