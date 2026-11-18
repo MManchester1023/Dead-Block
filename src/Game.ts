@@ -133,6 +133,16 @@ export class Game {
     let sq = this.selectedSquads;
     if (!sq.length) return;
     const w = this.world;
+    // civilians (STATUS #10) only ever walk; at the Command Post they're evacuated
+    const civ = sq.filter((s) => s.def.category === 'civilian');
+    if (civ.length) {
+      w.issueOrder(civ, { type: 'move', pos: w.grid.nearestFree(p) }, queue);
+      sq = sq.filter((s) => !civ.includes(s));
+      if (!sq.length) {
+        this.renderer.marker(p, 0x9fd0ff);
+        return;
+      }
+    }
 
     const hive = w.hives.find((h) => h.alive && dist(h.pos, p) < h.radius + 2);
     if (hive) {

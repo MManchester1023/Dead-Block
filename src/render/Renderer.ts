@@ -135,6 +135,7 @@ export class Renderer {
       this.crowds = {
         soldier: new Crowd(cast.soldier, 96),
         engineer: new Crowd(cast.engineer, 48),
+        civilian: new Crowd(cast.civilian, 64),
         zombieM: new Crowd(cast.zombieM, 2000),
         zombieF: new Crowd(cast.zombieF, 2000),
       };
@@ -568,7 +569,7 @@ export class Renderer {
       }
     });
     ev.on('memberKilled', (e) => {
-      if (this.crowds) this.corpses.push({ key: e.unitId === 'engineer' ? 'engineer' : 'soldier', x: e.pos.x, z: e.pos.y, facing: e.facing, t0: this.animClock, sx: 1, sy: 1 });
+      if (this.crowds) this.corpses.push({ key: e.unitId === 'engineer' ? 'engineer' : e.unitId === 'civilians' ? 'civilian' : 'soldier', x: e.pos.x, z: e.pos.y, facing: e.facing, t0: this.animClock, sx: 1, sy: 1 });
     });
     ev.on('toxicCloud', (e) => this.spawnCloud(e.pos, e.radius, e.duration));
     ev.on('smoke', (e) => this.spawnSmoke(e.pos, e.color, e.duration));
@@ -1104,7 +1105,7 @@ export class Renderer {
     this.animFrame++;
     for (const s of w.squads) {
       if (!s.alive) continue;
-      const crowd = s.def.id === 'engineer' ? C.engineer : C.soldier;
+      const crowd = s.def.id === 'engineer' ? C.engineer : s.def.id === 'civilians' ? C.civilian : C.soldier;
       const order = s.currentOrder?.type;
       const working = !s.moving && (order === 'build' || order === 'repair' || order === 'deconstruct' || order === 'charge' || order === 'search');
       const tgt = w.get(s.targetId);

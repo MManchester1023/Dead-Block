@@ -727,6 +727,19 @@ export const CHARACTER_SPECS: CharacterSpec[] = [
     simplifyIndexed: true,
   },
   {
+    // STATUS #10: civilians. Placeholder until there's a civilian model and unarmed animations: the
+    // rifleman without his gun, in civilian colours (Mixamo names his materials mat0mat…mat4mat)
+    key: 'civilian',
+    url: 'models/characters/rifleman/rifleman.fbx',
+    recolor: { mat0mat: 0x4f6f9a, mat1mat: 0x4a4038, mat2mat: 0x6a5a48, mat3mat: 0x8a8a84 },
+    clips: ['idle', 'walk', 'death'],
+    clipFiles: { idle: SOLDIER_CLIPS.idle, walk: SOLDIER_CLIPS.walk, death: SOLDIER_CLIPS.death },
+    inPlace: true,
+    deathFalls: true,
+    simplify: 0.03,
+    simplifyIndexed: true,
+  },
+  {
     // v4.9: "Zombie" by pxltiger (CC-BY 4.0, see CREDITS.md). Real fall-back death (#34), in-place walk/run.
     key: 'zombieM',
     url: 'models/zombieidle.glb',

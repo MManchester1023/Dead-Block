@@ -11,7 +11,7 @@ export interface WeaponDef {
   loudness: number; // noise per shot (doc §9 noise)
 }
 
-export type UnitCategory = 'infantry' | 'vehicle' | 'helicopter' | 'support';
+export type UnitCategory = 'infantry' | 'vehicle' | 'helicopter' | 'support' | 'civilian';
 
 export interface UnitDef {
   id: string;
@@ -54,6 +54,13 @@ export const UNITS: Record<string, UnitDef> = {
     producedAt: 'barracks', unlock: 'Starting unit', tags: ['canCover'],
     canBuild: ['outpost', 'sandbags', 'wire', 'mgNest', 'guardTower', 'medBay'],
     abilities: ['demoCharge'],
+  },
+  // STATUS #10 / round 8 #91: survivors found by searching houses (region 3 on). Unarmed, slow, fragile;
+  // walk them to the Command Post to evacuate them for money and supplies. Never recruited.
+  civilians: {
+    id: 'civilians', name: 'Civilians', category: 'civilian', members: 3, memberHp: 16, speed: 4.4,
+    weapon: { name: 'Unarmed', range: 0, damage: 0, cooldown: 99, accuracy: 0, type: 'bullet', loudness: 0 },
+    cost: { money: 0, supplies: 0 }, upkeep: 0, command: 0, buildTime: 0, producedAt: 'none', unlock: 'Found by searching houses (Rail Siding on)',
   },
   medic: { id: 'medic', name: 'Medic Team', category: 'infantry', members: 2, memberHp: 36, speed: 6.4, weapon: carbine, cost: { money: 70, supplies: 20 }, upkeep: 3, command: 2, buildTime: 12, producedAt: 'barracks', requires: 'powerStations', unlock: 'Suburbs power / Barracks Lv2' },
   recon: { id: 'recon', name: 'Recon Pair', category: 'infantry', members: 2, memberHp: 32, speed: 8.4, weapon: { ...carbine, loudness: 0.6 }, cost: { money: 60, supplies: 15 }, upkeep: 3, command: 1, buildTime: 10, producedAt: 'barracks', requires: 'fogOfWar', unlock: 'Suburbs power / Barracks Lv2' },

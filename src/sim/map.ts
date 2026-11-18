@@ -83,6 +83,8 @@ export interface DistrictDef {
   borders?: Rect[];
   /** Power stations (nav cells, top-left) placed when the region opens (v4.17). */
   powerStations?: { x: number; y: number }[];
+  /** Survivors hide in this district's houses: searches can find civilians (STATUS #10, region 3 on). */
+  civilians?: boolean;
 }
 
 /** Everything in metres except `tiles` / `cols` / `rows` / `*Cells`, which are nav-grid cells. */
@@ -312,7 +314,7 @@ export function buildStarterMap(seed = 7): CityMap {
     // region's power station: restoring it brings the power system online and unlocks the Med Bay
     { id: 'railSiding', name: 'Rail Siding', rect: { x: 38, y: 72, w: 130, h: 80 }, starter: true, hiveSites: [{ x: 70, y: 143 }, { x: 155, y: 140 }], initialInfestation: 75, difficulty: 2,
       density: 1.5, mix: { walker: 0.78, runner: 0.22 }, packs: [{ kind: 'runner', count: 6, size: 4 }], locked: true, unlockAfter: 'gasStrip',
-      borders: [{ x: 37, y: 71, w: 133, h: 1 }, { x: 37, y: 72, w: 1, h: 80 }], powerStations: [{ x: 147, y: 106 }] },
+      borders: [{ x: 37, y: 71, w: 133, h: 1 }, { x: 37, y: 72, w: 1, h: 80 }], powerStations: [{ x: 147, y: 106 }], civilians: true },
   ];
 
   // ---- cells → metres ----

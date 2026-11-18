@@ -153,7 +153,8 @@ function think(w: World, z: Zombie): void {
   let bestD = z.def.sight;
   for (const s of w.squadHash.query(z.pos, z.def.sight)) {
     if (!s.alive) continue;
-    const d = dist(z.pos, s.pos);
+    // the dead go for civilians first (STATUS #10)
+    const d = dist(z.pos, s.pos) * (s.def.category === 'civilian' ? BALANCE.civilians.preyBias : 1);
     if (d < bestD && (d < 5 || w.grid.lineClear(z.pos, s.pos))) {
       best = s;
       bestD = d;

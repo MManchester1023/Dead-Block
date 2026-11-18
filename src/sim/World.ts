@@ -17,6 +17,7 @@ import { pickMedium, updateHives } from './systems/hives';
 import { updateEconomy, updateMedical } from './systems/economy';
 import { updateDistricts } from './systems/districts';
 import { updateNoise } from './systems/noise';
+import { updateCivilians } from './systems/civilians';
 import { updateSupport, type PendingImpact, type SupplyCrate } from './systems/support';
 
 export interface DistrictState {
@@ -214,13 +215,16 @@ export class World {
 
   // ---------- entity management ----------
 
+  private survivorGroups = 0;
+
   nextSquadName(defId: string): string {
+    if (defId === 'civilians') return `Survivors ${++this.survivorGroups}`;
     const n = SQUAD_NAMES[this.nameCounter++ % SQUAD_NAMES.length];
     return defId === 'engineer' ? `Sapper ${n}` : n;
   }
 
-  spawnSquad(defId: string, pos: Vec2, name?: string): Squad {
-    const def = UNITS[defId];
+  spawnSquad(defId: string, pos: Vec2, name?: string, members?: number): Squad {
+    const def = members ? { ...UNITS[defId], members } : UNITS[defId];
     const sq = new Squad(def, name ?? this.nextSquadName(defId), this.grid.nearestFree(pos));
     this.squads.push(sq);
     this.byId.set(sq.id, sq);
@@ -607,6 +611,11 @@ export class World {
       this.events.emit('buildingSearched', { buildingId: b.id, pos: door, found: 'zombies' });
       return;
     }
+    // survivors hiding inside (STATUS #10): districts from Rail Siding on
+    if (this.districtAt(door)?.def.civilians && this.rng.chance(S.civilianChance)) {
+      this.findCivilians(s, b, door);
+      return;
+    }
     const r = this.rng.next();
     let found = 'nothing';
     if (r >= S.emptyChance) {
@@ -621,6 +630,33 @@ export class World {
     }
     this.events.emit('buildingSearched', { buildingId: b.id, pos: door, found });
     this.events.emit('radio', { speaker: s.name, text: found === 'nothing' ? 'Building clear. Nothing worth taking.' : `Building clear. Found ${found.replace(/^\+/, '')}.`, tone: found === 'nothing' ? 'info' : 'good' });
+  }
+
+  /** A group of survivors comes out of a searched house (STATUS #10). */
+  findCivilians(s: Squad, b: BuildingDef, door: Vec2): Squad {
+    const [lo, hi] = BALANCE.search.civilianGroup;
+    const first = this.survivorGroups === 0;
+    const c = this.spawnSquad('civilians', door, undefined, this.rng.int(lo, hi));
+    c.facing = s.facing;
+    this.events.emit('buildingSearched', { buildingId: b.id, pos: door, found: 'civilians' });
+    this.events.emit('civiliansFound', { squadId: c.id, count: c.members.length, pos: { ...door }, first });
+    this.events.emit('radio', { speaker: s.name, text: `Found ${c.members.length} survivors hiding in there. Get them back to the Command Post.`, tone: 'good' });
+    return c;
+  }
+
+  /** Civilians at the Command Post are flown out: money and supplies for each one still alive (STATUS #10). */
+  evacuate(c: Squad): void {
+    if (!c.alive) return;
+    const n = c.aliveCount;
+    const P = BALANCE.civilians.perPerson;
+    const money = P.money * n;
+    const supplies = P.supplies * n;
+    this.money += money;
+    this.addSupplies(supplies);
+    for (const m of c.members) m.alive = false;
+    this.byId.delete(c.id);
+    this.events.emit('civiliansEvacuated', { count: n, money, supplies, pos: { ...c.pos } });
+    this.events.emit('radio', { speaker: 'Command Post', text: `${n} survivor${n === 1 ? '' : 's'} evacuated. +$${money} and +${supplies} supplies from the grateful.`, tone: 'good' });
   }
 
   /** Zombies holed up in a building spill out of the door nearest `near` (v4.9 #65). */
@@ -788,6 +824,7 @@ export class World {
     updateEconomy(this, dt);
     updateMedical(this, dt);
     updateSupport(this);
+    updateCivilians(this);
 
     this.refreshHazards();
 
@@ -796,7 +833,7 @@ export class World {
     this.squads = this.squads.filter((s) => s.alive);
     this.structures = this.structures.filter((s) => s.alive);
 
-    if (!this.squads.length && this.commandUsed === 0 && !this.canAfford(UNITS.rifle.cost))
+    if (!this.squads.some((s) => s.def.category !== 'civilian') && this.commandUsed === 0 && !this.canAfford(UNITS.rifle.cost))
       this.finish('defeat', 'Every squad is gone and the treasury is empty.');
   }
 

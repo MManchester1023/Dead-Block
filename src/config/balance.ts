@@ -67,12 +67,22 @@ export const BALANCE = {
   },
 
   // v4.9 (#46, #65): searching houses, and zombies holed up inside some of them
+  /** Civilians (STATUS #10): walked to within this many metres of the Command Post, they're evacuated. */
+  civilians: {
+    evacRange: 9,
+    perPerson: { money: 20, supplies: 8 },
+    /** The dead prefer them: a civilian counts as this much closer when a zombie picks its prey. */
+    preyBias: 0.7,
+  },
   search: {
     timeSec: 5,
     emptyChance: 0.3,
     supplies: [4, 12],
     moneyChance: 0.3,
     money: [8, 20],
+    /** Districts that have survivors (`civilians: true`): chance a search that isn't a nest finds a group. */
+    civilianChance: 0.25,
+    civilianGroup: [2, 4],
     nestChance: 0.25, // share of buildings in infested districts with a few dead holed up inside
     nestSize: [1, 4],
     nestTriggerRange: 5, // metres from the walls: a squad this close disturbs them

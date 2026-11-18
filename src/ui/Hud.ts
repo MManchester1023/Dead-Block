@@ -172,6 +172,8 @@ export class Hud {
     });
     game.world.events.on('districtUnlocked', (e) => this.showBriefing(e.districtId, e.name, e.unlocks));
     game.world.events.on('powerRestored', (e) => e.first && this.showPowerBriefing());
+    game.world.events.on('civiliansFound', (e) => this.toast(`${e.count} survivors found! Select them and walk them to the Command Post.`));
+    game.world.events.on('civiliansEvacuated', (e) => this.toast(`${e.count} survivor${e.count === 1 ? '' : 's'} evacuated: +$${e.money}, +${e.supplies} supplies`));
     game.world.events.on('victory', (e) => this.showEnd(true, e.reason));
     game.world.events.on('defeat', (e) => this.showEnd(false, e.reason));
     this.showIntro();
@@ -364,6 +366,10 @@ export class Hud {
       [cur.cleared || cur.secured, `Clear ${cur.def.name} to 0% <small>(${Math.ceil(cur.infestation)}%)</small>`],
       [cur.secured, 'Build an outpost there with engineers'],
     ];
+    // survivors out in the field (STATUS #10): a standing reminder until they're evacuated
+    const civ = w.squads.filter((s) => s.alive && s.def.category === 'civilian');
+    const waiting = civ.reduce((n, s) => n + s.aliveCount, 0);
+    if (waiting) items.push([false, `Escort ${waiting} survivor${waiting === 1 ? '' : 's'} to the Command Post <small>($${BALANCE.civilians.perPerson.money} + ${BALANCE.civilians.perPerson.supplies}▣ each)</small>`]);
     const region = `<div class="row small"><span>Region ${step} of ${regions.length}: <b>${cur.def.name}</b></span></div>`;
     const head = `<h3 class="collapsible" data-act="collapse:objectives">${this.collapsed.has('objectives') ? '▸' : '▾'} Objectives</h3>`;
     if (this.collapsed.has('objectives')) return this.set(this.objectives, head);
@@ -409,6 +415,10 @@ export class Hud {
         const lv = BALANCE.combat.levels;
         const next = lv[s.level + 1];
         const xp = next ? `${s.xp}/${next.xp} xp` : 'max';
+        if (s.def.category === 'civilian')
+          return `<div class="card"><div class="row"><b>${esc(s.name)}</b><span class="status ${st.tone}">${st.text}</span></div><div class="row small"><span>Civilians · unarmed</span></div>
+          <div class="pips">${pips}</div>
+          <div class="row small"><span>Evacuate at the Command Post: +$${BALANCE.civilians.perPerson.money * s.aliveCount}, +${BALANCE.civilians.perPerson.supplies * s.aliveCount}▣</span></div></div>`;
         return `<div class="card"><div class="row"><b>${esc(s.name)}</b><span class="status ${st.tone}">${st.text}</span></div><div class="row small"><span>${s.def.name}</span></div>
           <div class="pips">${pips}</div>
           <div class="row small"><span>${s.levelName} · ${xp}</span></div>
@@ -422,7 +432,8 @@ export class Hud {
       return `<button class="cmd ${afford ? '' : 'disabled'} ${active ? 'on' : ''}" data-act="${act}"><kbd>${key}</kbd>${label}${c}</button>`;
     };
     const mode = g.mode;
-    let cmds = btn('attackMove', 'Attack-move', 'Ctrl+A', undefined, mode.kind === 'attackMove') + btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'Ctrl+S') + `<button class="cmd" data-act="disband" title="Walk back to the Barracks and stand down: frees command and upkeep, refunds ${BALANCE.economy.disbandRefund * 100}% of the cost">Disband</button>`;
+    const civOnly = sq.every((s) => s.def.category === 'civilian');
+    let cmds = civOnly ? btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'Ctrl+S') : btn('attackMove', 'Attack-move', 'Ctrl+A', undefined, mode.kind === 'attackMove') + btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'Ctrl+S') + `<button class="cmd" data-act="disband" title="Walk back to the Barracks and stand down: frees command and upkeep, refunds ${BALANCE.economy.disbandRefund * 100}% of the cost">Disband</button>`;
     // engineers' build tools live in the bottom-centre build bar (round 9 #104; see renderBuildBar)
     void eng;
     const modeHint =
@@ -430,6 +441,7 @@ export class Hud {
       : mode.kind === 'attackMove' ? 'Attack-move: click a destination'
       : mode.kind === 'charge' ? 'Click a hive to plant a demo charge'
       : mode.kind === 'deconstruct' ? 'Click something your engineers built to take it down (unstarted: full refund, built: half)'
+      : civOnly ? 'Right-click to walk them · get them to the Command Post to evacuate them'
       : `${sq.length} selected · right-click a zombie to focus it · right-click a building to search it · Shift+right-click queues`;
     if (!this.selection.querySelector('.cards')) {
       this.cache.delete(this.selection);
@@ -491,8 +503,9 @@ export class Hud {
     const w = g.world;
     const barracks = w.structures.find((s) => s.def.id === 'barracks');
     const queue = barracks?.queue ?? [];
-    const avail = Object.values(UNITS).filter((u) => !u.requires || isEnabled(u.requires as never));
-    const locked = Object.values(UNITS).filter((u) => u.requires && !isEnabled(u.requires as never));
+    const recruitable = Object.values(UNITS).filter((u) => u.category !== 'civilian');
+    const avail = recruitable.filter((u) => !u.requires || isEnabled(u.requires as never));
+    const locked = recruitable.filter((u) => u.requires && !isEnabled(u.requires as never));
     const rows = avail
       .map((u) => {
         const ok = w.canAfford(u.cost) && w.commandUsed + u.command <= w.commandCap;
@@ -587,7 +600,9 @@ export class Hud {
       gasStrip: `<p>The wire on the east road is cut. Expect a step up: a bigger crowd, <b>Runner packs</b> that hunt together, and a hive that's already at <b>stage 2</b>. Its hordes will go for your newest outpost, so leave it defended.</p>`,
       railSiding: `<p>The fence south of the strip is down. <b>Rail Siding</b> is the last training region and the biggest: a goods yard cut in two by a line of boxcars, <b>two hives</b>, and the dead at full strength.</p>
       <h3>New: the power system</h3>
-      <p>In the east yard stands a <b>power station</b>, dead. Clear the yard, then <b>right-click the station with engineers</b> to restore it. They can only work while no zombie is within 30 m, so hold the ground around them. Power brings the base back to life and unlocks the <b>Med Bay</b>. If the dead wreck the station it goes dark again until your engineers restore it.</p>`,
+      <p>In the east yard stands a <b>power station</b>, dead. Clear the yard, then <b>right-click the station with engineers</b> to restore it. They can only work while no zombie is within 30 m, so hold the ground around them. Power brings the base back to life and unlocks the <b>Med Bay</b>. If the dead wreck the station it goes dark again until your engineers restore it.</p>
+      <h3>New: survivors</h3>
+      <p>People are hiding in the houses here. <b>Searching a building</b> can turn up a group of <b>civilians</b>: select them like a squad and <b>walk them to the Command Post</b> to evacuate them for <b>$${BALANCE.civilians.perPerson.money} and ${BALANCE.civilians.perPerson.supplies} supplies each</b>. They're unarmed and slow, and the dead go for them first, so escort them.</p>`,
     };
     this.game.paused = true;
     this.modal.innerHTML = `<div class="dialog small">
