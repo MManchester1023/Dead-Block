@@ -4,8 +4,8 @@ Short version of the roadmap (design doc §21). Ranked by importance in my opini
 
 ## Next, in order
 
-1. **Round 10 quick fixes** (no assets needed): soldiers stop drifting while resting (#106); region 3 roads and rails run to the map edge, rails drawn over roads at crossings (#116, #117); Elite squads gain a fifth soldier (#118).
-2. **Pause menu** (#105): Resume, Controls (all keybinds), Settings (sound, UI scale), Restart; the controls list leaves the start screen.
+1. ✔ **Round 10 quick fixes** (v4.26): soldiers stand still while resting; region 3 road and rail run to the map edge, rails drawn across roads at level crossings; Elite squads gain a fifth soldier.
+2. ✔ **Pause menu** (v4.26): Esc (once there's nothing to cancel) or MENU: Resume, Controls (every keybind), Settings (sound, UI size), Restart (with confirm); the start screen lost its controls list.
 3. **Round 10 assets (waiting on you):** crouch idle animation for soldiers away from their cover (#107); sounds for Bloater death, explosions, hive death, building, power-on, cargo plane/parachute/crate (#108–113); engineer carbine/SMG model + sound (#114); barbed wire model (#115).
 4. ✔ **Round 9 fixes** (v4.23): rifle rolled upright in the hand; long animations sampled by length (10 poses/s), with crowd memory kept to ~99 MB; 2 s to climb in/out of a guard tower; no 0% infestation while zombies remain; command cap 14 (+3 per secured district).
 5. ✔ **Shooting and cover animations** (v4.24): walking while firing (Mixamo Shoot Rifle); squads in cover play Taking Cover once, then Taking Cover Idle, and stand to fire. Rifle fit set by you with the rifle fitter.

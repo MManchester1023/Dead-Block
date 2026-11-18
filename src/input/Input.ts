@@ -219,8 +219,12 @@ export class Input {
         e.preventDefault();
         break;
       case 'escape':
-        if (g.mode.kind !== 'normal') g.setMode({ kind: 'normal' });
-        else g.select([]);
+        // round 10 #105: Esc backs out one step at a time — close the menu, cancel a mode, clear the
+        // selection — and with nothing left to cancel, opens the pause menu
+        if (g.menuOpen) g.openMenu?.();
+        else if (g.mode.kind !== 'normal') g.setMode({ kind: 'normal' });
+        else if (g.selected.size || g.selectedStructure != null) g.select([]);
+        else g.openMenu?.();
         break;
       // v4.9 (#44): WASD pans the camera, so attack-move and stop moved to Ctrl+A / Ctrl+S.
       // (Never bind Ctrl+W: browsers close the tab and a page can't stop it.)

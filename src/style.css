@@ -202,3 +202,15 @@ h3.collapsible:hover { color: #fff; }
 /* make room: the squad panel narrows while the build bar is open */
 #hud.with-build .hud-bottom, .with-build .hud-bottom { grid-template-columns: minmax(300px, 400px); }
 @media (max-width: 900px) { .hud-build { left: 50%; bottom: 300px; max-width: calc(100vw - 20px); } }
+
+/* pause menu (round 10 #105) */
+.dialog.menu { max-width: 640px; }
+.dialog.menu .menu-row { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin: 10px 0; }
+.dialog.menu .menu-row button.on { outline: 1px solid var(--good); }
+.dialog.menu .keys { max-height: 60vh; overflow: auto; text-align: left; }
+.dialog.menu .keys h3 { margin: 10px 0 4px; }
+.dialog.menu .keys table, .dialog.menu table.settings { width: 100%; border-collapse: collapse; }
+.dialog.menu .keys td, .dialog.menu table.settings td { padding: 3px 6px; border-bottom: 1px solid #ffffff12; font-size: 12px; vertical-align: top; }
+.dialog.menu .keys td:first-child { white-space: nowrap; width: 46%; }
+.dialog.menu table.settings td:last-child { text-align: right; }
+.dialog .cols.one { grid-template-columns: 1fr; }

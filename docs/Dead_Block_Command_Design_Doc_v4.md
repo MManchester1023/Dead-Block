@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.26** | Round 10 quick fixes (#106, #116–118) and the pause menu (#105) built. |
 | **v4.25** | Playtest round 10 logged (§22, #105–118): pause menu with keybinds (replacing the start-up controls screen), no idle floating, crouch when not hugging cover, Elite squads +1 soldier, region 3 roads/rails to the map edge with rails over the roads; asset requests (sounds, barbed wire model, engineer weapon, crouch/idle animations). No code changes. |
 | **v4.24** | First sound pass (owner's Pixabay clips: gunfire, zombie deaths, groans, screams; positional, volume button), shooting-while-moving and cover animations (#95), owner-set rifle fit via the rifle fitter. |
 | **v4.23** | Round 9 fixes (#93, #96–#99) and the engineer build menu (#104) built. |
@@ -1037,4 +1038,6 @@ Both tutorial regions cleared on the first try.
 | 116 | Roads and railroads in region 3 don't reach the edge of the map | Region 3's main road and rail start at x = 114 m (the region's west edge), not the map edge. | Run both to the west map edge (through the fence line, which gets barriers across them like the other crossings). | — |
 | 117 | In region 3 the railroad should go on top of the roads | At the level crossings the rail is skipped where it meets a road. | Draw the rails across the road at crossings (the road stays drivable). | — |
 | 118 | Elite squads get +1 soldier | Elite only adds health and damage (same as Veteran). | On reaching Elite, the squad gains a fifth soldier (and the pool grows by one soldier's share). | — |
+
+**Status after v4.26 (round 10):** done: #105 pause menu (Esc backs out one step at a time: menu → mode → selection → opens the menu; Resume restores the previous paused state; Controls lists every keybind; Settings: sound, UI size; Restart asks first; start screen keeps the briefing and field notes only) · #106 resting soldiers stand still · #116 region 3 road and rail to the map edge · #117 rails drawn over roads at crossings · #118 Elite squads gain a fifth soldier (with one soldier's share of health). **Waiting on assets:** #107–115 (see the table above).
 

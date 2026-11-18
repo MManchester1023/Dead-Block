@@ -60,6 +60,50 @@ const ICON: Record<string, string> = {
   lock: svg('<rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'),
 };
 
+type MenuPage = 'main' | 'controls' | 'settings' | 'restart';
+
+/** Every keybind, grouped, for the pause menu's Controls page (round 10 #105). */
+const K = (...keys: string[]) => keys.map((k) => `<kbd>${k}</kbd>`).join('+');
+const CONTROLS: [string, [string, string][]][] = [
+  ['Camera', [
+    [`${K('W')}${K('A')}${K('S')}${K('D')} / arrows / screen edge`, 'Pan'],
+    [`${K('Shift')} + middle-drag`, 'Pan'],
+    ['Mouse wheel', 'Zoom'],
+    [`Middle-drag / ${K('Q')} ${K('E')}`, 'Rotate'],
+    [K('M'), 'Ops map (zoomed-out overview)'],
+  ]],
+  ['Selecting and orders', [
+    ['Left-click / drag a box', 'Select squads (click a name or status too)'],
+    [`${K('Shift')} + click`, 'Add to / remove from selection'],
+    ['Double-click a squad', 'Centre the camera on it'],
+    ['Right-click ground', 'Move'],
+    ['Right-click a zombie', 'Attack that one'],
+    ['Right-click a car / sandbags', 'Take cover (two squads per car)'],
+    ['Right-click a building', 'Search it (supplies, sometimes zombies)'],
+    ['Right-click a guard tower', 'Man it'],
+    [`${K('Shift')} + right-click`, 'Queue orders'],
+    [`${K('Ctrl')}+${K('A')}`, 'Attack-move'],
+    [K('H'), 'Hold position'],
+    [`${K('Ctrl')}+${K('S')}`, 'Stop'],
+    [`${K('Ctrl')}+${K('1')}–${K('9')} / ${K('1')}–${K('9')}`, 'Save / recall a group (press twice to centre)'],
+  ]],
+  ['Engineers', [
+    [K('F'), 'Sandbags'], [K('G'), 'Barbed wire'], [K('T'), 'MG nest'], [K('V'), 'Guard tower (region 2)'],
+    [K('N'), 'Med Bay (after power)'], [K('O'), 'Outpost'], [K('C'), 'Demo charge (click a hive)'], [K('X'), 'Deconstruct'],
+    [K('R'), 'Rotate while placing (MG: turn its field of fire)'],
+    ['Right-click own structure', 'Resume building / repair (or restore the power station)'],
+  ]],
+  ['Base', [
+    [`Click the Barracks / ${K('B')}`, 'Recruit, set the rally point'],
+    ['Click the Command Post', 'Support (supply drop)'],
+  ]],
+  ['Game', [
+    [K('Space'), 'Pause / unpause'],
+    [`${K('+')} ${K('-')}`, 'Game speed'],
+    [K('Esc'), 'Cancel / deselect / this menu'],
+  ]],
+];
+
 export class Hud {
   private top!: HTMLElement;
   private topCtl!: HTMLElement;
@@ -119,6 +163,7 @@ export class Hud {
     });
     game.onChange(() => (this.dirty = true));
     game.toast = (m) => this.toast(m);
+    game.openMenu = () => this.toggleMenu();
 
     // act on pointerdown: the HUD re-renders several times a second, and a 'click' is lost if the
     // button is replaced between mousedown and mouseup (that was the "click twice" bug)
@@ -182,12 +227,26 @@ export class Hud {
       case 'ops': g.renderer.rig.toggleStrategic(); break;
       case 'volume':
         this.sound?.cycleVolume();
+        if (g.menuOpen) this.showMenu('settings');
+        break;
+      case 'menu':
+        this.toggleMenu();
+        break;
+      case 'menu-page':
+        this.showMenu(arg as MenuPage);
+        break;
+      case 'resume':
+        this.toggleMenu();
+        break;
+      case 'restart-confirm':
+        this.showMenu('restart');
         break;
       case 'uiscale': {
         const i = UI_SCALES.indexOf(this.uiScale);
         this.uiScale = UI_SCALES[(i + 1) % UI_SCALES.length];
         pref.set('uiScale', String(this.uiScale));
         this.applyScale();
+        if (g.menuOpen) this.showMenu('settings');
         break;
       }
       case 'collapse':
@@ -256,7 +315,8 @@ export class Hud {
         <button data-act="rot:-1" title="Rotate camera (Q)">⟲</button><span class="compass" title="Camera heading">VIEW ${Math.round(g.renderer.rig.headingDeg)}° ${g.renderer.rig.headingLabel}</span><button data-act="rot:1" title="Rotate camera (E)">⟳</button>
         <button data-act="ops" title="Operations map (M)">${g.renderer.rig.strategic ? 'STREET' : 'OPS MAP'}</button>
         <button data-act="volume" title="Sound volume (click to cycle)">SOUND ${this.sound ? (this.sound.volume ? `${Math.round(this.sound.volume * 100)}%` : 'OFF') : ''}</button>
-        <button data-act="uiscale" title="Interface size (click to cycle)">UI ${Math.round(this.uiScale * 100)}%</button>`);
+        <button data-act="uiscale" title="Interface size (click to cycle)">UI ${Math.round(this.uiScale * 100)}%</button>
+        <button data-act="menu" title="Pause menu: controls, settings, restart (Esc)">MENU</button>`);
   }
 
   private renderDistricts(): void {
@@ -457,19 +517,8 @@ export class Hud {
     this.modal.innerHTML = `<div class="dialog">
       <h1>DEAD BLOCK <span>COMMAND</span></h1>
       <p class="tag">Reclaim it block by block.</p>
-      <p>You hold a fortified base on the city's edge. East of the gate, <b>Roadside Motel</b> is 65% infested and a <b>hive</b> is growing in the southeast lot. Every four minutes it sends a horde at your lines, and every stage it gets worse. It never gets better on its own.</p>
-      <div class="cols">
-        <div><h3>Controls</h3>
-          <ul>
-            <li><kbd>LMB</kbd> select · drag to box-select · <kbd>Shift</kbd> add</li>
-            <li><kbd>RMB</kbd> move · on a zombie = attack it · on a car/sandbags = take cover · on hive = charge it · on a building = search it (5 s, sometimes supplies, sometimes company)</li>
-            <li><kbd>Ctrl</kbd>+<kbd>A</kbd> attack-move · <kbd>H</kbd> hold · <kbd>Ctrl</kbd>+<kbd>S</kbd> stop</li>
-            <li><kbd>Shift</kbd>+<kbd>RMB</kbd> queue waypoints · <kbd>Ctrl</kbd>+<kbd>1-9</kbd> groups</li>
-            <li>Engineers: <kbd>F</kbd> sandbags · <kbd>G</kbd> wire · <kbd>T</kbd> MG nest · <kbd>V</kbd> guard tower (region 2) · <kbd>N</kbd> Med Bay (after power) · <kbd>O</kbd> outpost · <kbd>C</kbd> demo charge · <kbd>X</kbd> deconstruct · <kbd>R</kbd> rotate</li>
-            <li><kbd>WASD</kbd>/arrows/edge/<kbd>Shift</kbd>+<kbd>MMB</kbd> pan · wheel zoom · <kbd>MMB</kbd> drag or <kbd>Q</kbd>/<kbd>E</kbd> rotate · <kbd>M</kbd> ops map</li>
-            <li>Click the <b>Barracks</b> (<kbd>B</kbd>) to recruit and set the rally point · click the <b>Command Post</b> for support</li>
-            <li><kbd>Space</kbd> pause · <kbd>+</kbd>/<kbd>-</kbd> speed</li>
-          </ul></div>
+      <p>You hold a fortified base on the city's edge. East of the gate, <b>Roadside Motel</b> is 65% infested and a <b>hive</b> is growing in the southeast lot. Every few minutes it sends a horde at your lines, and every stage it gets worse. It never gets better on its own.</p>
+      <div class="cols one">
         <div><h3>Field notes</h3>
           <ul>
             <li>Squads <b>lock onto one target</b> and finish it, unless something gets danger-close.</li>
@@ -479,10 +528,54 @@ export class Hud {
             <li>Upkeep comes out of supplies at the end of each day.</li>
           </ul></div>
       </div>
+      <p class="hint">Press <kbd>Esc</kbd> (or <b>MENU</b>, top right) any time for the controls, settings and restart.</p>
       <details class="roadmap"><summary>Build roadmap: what's in this MVP vs. coming next</summary>${tiers}</details>
       <button class="big" data-act="start:training">DEPLOY WITH TRAINING</button>
       <button class="big ghost" data-act="start">DEPLOY (skip training)</button>
     </div>`;
+    this.modal.classList.add('open');
+  }
+
+  private menuWasPaused = false;
+
+  /** Pause menu (round 10 #105): open/close; the game pauses while it's open. */
+  toggleMenu(): void {
+    const g = this.game;
+    if (g.menuOpen) {
+      g.menuOpen = false;
+      this.modal.classList.remove('open');
+      g.paused = this.menuWasPaused;
+    } else {
+      if (this.modal.classList.contains('open')) return; // a briefing / intro / end screen is up
+      this.menuWasPaused = g.paused;
+      g.menuOpen = true;
+      g.paused = true;
+      this.showMenu('main');
+    }
+    g.changed();
+  }
+
+  private showMenu(page: MenuPage): void {
+    const tab = (p: MenuPage, label: string) => `<button class="${page === p ? 'on' : ''}" data-act="menu-page:${p}">${label}</button>`;
+    let body = '';
+    if (page === 'main') {
+      body = `<p class="tag">PAUSED</p>
+        <button class="big" data-act="resume">RESUME</button>
+        <div class="menu-row">${tab('controls', 'Controls')}${tab('settings', 'Settings')}<button data-act="restart-confirm">Restart</button></div>`;
+    } else if (page === 'controls') {
+      body = `<div class="keys">${CONTROLS.map(([group, rows]) => `<h3>${group}</h3><table>${rows.map(([k, what]) => `<tr><td>${k}</td><td>${what}</td></tr>`).join('')}</table>`).join('')}</div>`;
+    } else if (page === 'settings') {
+      const vol = this.sound ? (this.sound.volume ? `${Math.round(this.sound.volume * 100)}%` : 'Off') : 'n/a';
+      body = `<table class="settings">
+        <tr><td>Sound volume</td><td><button data-act="volume">${vol}</button></td></tr>
+        <tr><td>Interface size</td><td><button data-act="uiscale">${Math.round(this.uiScale * 100)}%</button></td></tr>
+      </table><p class="hint">Both are remembered in this browser.</p>`;
+    } else {
+      body = `<p>Restart the campaign from the beginning? Everything in this session is lost (there's no saving yet).</p>
+        <button class="big" data-act="restart">YES, RESTART</button> <button class="big ghost" data-act="menu-page:main">CANCEL</button>`;
+    }
+    const nav = page === 'main' ? '' : `<div class="menu-row">${tab('main', '‹ Back')}${tab('controls', 'Controls')}${tab('settings', 'Settings')}<button data-act="resume">Resume</button></div>`;
+    this.modal.innerHTML = `<div class="dialog small menu"><h1>DEAD BLOCK <span>COMMAND</span></h1>${nav}${body}</div>`;
     this.modal.classList.add('open');
   }
 

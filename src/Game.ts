@@ -64,6 +64,9 @@ export class Game {
   /** A selected building (e.g. the Command Post for support powers). */
   selectedStructure: number | null = null;
   groups = new Map<number, number[]>();
+  /** Pause menu (round 10 #105): set by the HUD; Esc with nothing else to cancel calls it. */
+  openMenu: (() => void) | null = null;
+  menuOpen = false;
   mode: Mode = { kind: 'normal' };
   paused = true;
   speed = 1;
