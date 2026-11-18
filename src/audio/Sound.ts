@@ -23,10 +23,11 @@ import type { Vec2 } from '../core/math';
  *   hive_death    a wet mud explosion when a hive is destroyed (v4.39, round 10 #110)
  *   plane_flyby   a jet passing overhead, timed to peak as the supply plane's shadow crosses the drop (v4.39, #113)
  *   parachute     the crate's chute opening (v4.39, #113)
+ *   crate_land    the supply crate hitting the ground (v4.41, #113)
  *   power_on      the power station starting up (v4.41, round 10 #112; from the owner's recording)
  */
 
-type Bank = 'rifle' | 'carbine' | 'death' | 'groan' | 'scream' | 'explosion' | 'bloater' | 'human' | 'click' | 'radio' | 'hive' | 'flyby' | 'chute' | 'power';
+type Bank = 'rifle' | 'carbine' | 'death' | 'groan' | 'scream' | 'explosion' | 'bloater' | 'human' | 'click' | 'radio' | 'hive' | 'flyby' | 'chute' | 'power' | 'thud';
 const FILES: Record<Bank, string[]> = {
   human: ['human_death_1', 'human_death_2', 'human_death_3'],
   click: ['ui_click'],
@@ -34,6 +35,7 @@ const FILES: Record<Bank, string[]> = {
   flyby: ['plane_flyby'],
   chute: ['parachute'],
   power: ['power_on'],
+  thud: ['crate_land'],
   radio: ['radio_1', 'radio_2', 'radio_3', 'radio_4', 'radio_5', 'radio_6', 'radio_7', 'radio_8'],
   rifle: ['rifle_1', 'rifle_2', 'rifle_3'],
   carbine: ['carbine_1'],
@@ -59,6 +61,7 @@ const LIMITS: Record<Bank, { voices: number; gap: number; volume: number }> = {
   flyby: { voices: 2, gap: 1, volume: 0.45 },
   chute: { voices: 2, gap: 0.3, volume: 0.6 },
   power: { voices: 1, gap: 1, volume: 0.8 },
+  thud: { voices: 2, gap: 0.2, volume: 0.7 },
 };
 
 /** Looping beds: ambience everywhere (volume), and the engineers' work loop (placed at each crew). */
@@ -110,6 +113,7 @@ export class Sound {
   /** Supply crates already given their flyby / parachute sounds. */
   private crateFlyby = new Set<number>();
   private crateChute = new Set<number>();
+  private crateLand = new Set<number>();
   private loops: Record<string, AudioBuffer | undefined> = {};
   private ambience: GainNode[] = [];
   /** One looping work sound per crew at a job (squad id → its nodes). */
@@ -146,8 +150,11 @@ export class Sound {
       const h = game.world.hives.find((x) => x.id === e.hiveId);
       this.play('hive', h ? h.pos : null, { rate: 0.95 + Math.random() * 0.1 });
     });
-    // a big moment: heard wherever the camera is, not only near the station
-    ev.on('powerRestored', () => this.play('power', null));
+    // placed at the station: louder the closer the camera is (owner's call)
+    ev.on('powerRestored', (e) => {
+      const st = game.world.structures.find((s) => s.id === e.id);
+      if (st) this.play('power', st.pos);
+    });
     ev.on('memberKilled', (e) => this.play('human', e.pos, { rate: 0.92 + Math.random() * 0.16 }));
     ev.on('radio', (e) => {
       if (RADIO_SPEAKERS.has(e.speaker)) this.play('radio', null);
@@ -288,6 +295,10 @@ export class Sound {
       if (!this.crateFlyby.has(c.id) && !c.landed && toOverhead <= FLYBY_PEAK && toOverhead > -FLYBY_PEAK) {
         this.crateFlyby.add(c.id);
         this.play('flyby', null, { offset: Math.max(0, FLYBY_PEAK - toOverhead) });
+      }
+      if (!this.crateLand.has(c.id) && c.landed) {
+        this.crateLand.add(c.id);
+        this.play('thud', c.pos, { rate: 0.95 + Math.random() * 0.1 });
       }
       if (!this.crateChute.has(c.id) && !c.landed && toOverhead <= 0) {
         this.crateChute.add(c.id);
