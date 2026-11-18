@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.41** | Power station start-up sound from the owner's recording (§22 #112), heard wherever the camera is. |
 | **v4.40** | New Bloater burst from the owner's recording replaces the layered pop + gore (§22 #108). |
 | **v4.39** | Owner's uploads: hive death = wet mud blast (§22 #110), supply plane fly-by timed to peak over the drop + parachute opening (#113), barbed wire model (CliffUnderside, CC BY 4.0) simplified 245k → 3.5k triangles (#115). The new Bloater sound (a video) had silent audio: old burst kept. |
 | **v4.38** | Sounds from the owner's uploads: engineers' construction loop (three recordings layered; §22 #111), soldier deaths (3), UI click, ambience (suburban bed + very quiet horror drone, seamless loops), radio chatter (8 clips cut from one recording: on Command/Overwatch radio lines and now and then in the background). |
@@ -1045,7 +1046,7 @@ Both tutorial regions cleared on the first try.
 | 109 | Demo charge: explosion sound | No sound yet. | On every explosion (charges, and artillery later), louder for bigger blasts. | An explosion sound ✔ v4.27: satchel charge clip on every non-toxic explosion, louder for bigger blasts. |
 | 110 | Hive: wet death noise | No sound yet. | When a hive is destroyed. | A wet, organic collapse sound ✔ v4.39: wet mud explosion |
 | 111 | Building sound | No sound yet. | Looping hammering/sandbag sounds while engineers build or repair. | A building/hammering loop ✔ v4.38: three construction recordings layered into one loop |
-| 112 | Power station turning on: sound | No sound yet. | When power is restored (a big electrical hum spin-up). | A power-on / generator start sound |
+| 112 | Power station turning on: sound | No sound yet. | When power is restored (a big electrical hum spin-up). | A power-on / generator start sound ✔ v4.41: owner's recording |
 | 113 | Cargo drop: plane fly-by, parachute and crate landing sounds | Flyover is visual only. | Fly-by as the shadow passes, a parachute flutter as the crate falls, a thud on landing. | Plane fly-by, parachute, crate thud ✔ v4.39: jet fly-by + parachute (crate thud still wanted) |
 | 114 | Engineers need a different gun model and sound | Engineers carry the M4 and fire the rifle sound. | A carbine/SMG model with its own fit file (the rifle fitter can handle any weapon) and a lighter gunshot. | An SMG/carbine model + its sound ✔ v4.27: the engineer model's own SCAR + your carbine sound. |
 | 115 | New barbed wire model | Barbed wire is a simple procedural mesh. | Swap in the model. | A barbed wire / razor wire model ✔ v4.39: CliffUnderside (Sketchfab, CC BY 4.0), simplified |

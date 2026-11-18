@@ -96,6 +96,7 @@ v4.39 (uploaded by the owner; authors to fill in where blank):
 | `freesound_community-fighter-jets-passing-overhead-30115.mp3` | Not used yet (kept for air support later) |
 | `2026-11-18 11-19-32.mp4` | First try at the new Bloater burst: silent audio, not used |
 | `2026-11-18 11-34-14.mp4` (owner's recording) | Bloater bursting, cut from its audio (`bloater_death`, v4.40) |
+| `2026-11-18 11-39-23.mp4` (owner's recording) | Power station starting up, cut from its audio (`power_on`, v4.41) |
 
 ## Barbed wire model (v4.39)
 
