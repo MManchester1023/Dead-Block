@@ -5,3 +5,6 @@ dist
 
 # scratch balance-probe tests (run ad hoc, minutes long; not part of the suite)
 tests/zz_*.test.ts
+
+# output of tools/ scripts (screenshots, fingerprints)
+tools/out/

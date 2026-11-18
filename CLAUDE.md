@@ -1,0 +1,62 @@
+# Dead Block Command: notes for Claude
+
+Browser isometric zombie RTS (TypeScript, Three.js, Vite). A personal, non-commercial project by Mat; all
+assets are free-licence downloads, credited in `CREDITS.md`.
+
+## Where things are
+
+- **`docs/Dead_Block_Command_Design_Doc_v4.md`** is the source of truth: version table at the top (one row
+  per change, newest first), §21 roadmap, **§22 playtest log** (rounds of numbered notes, #1–#118 so far).
+- **`STATUS.md`** is the short, ranked to-do list ("work on #N" means item N there) plus what's done.
+- `CREDITS.md` (every model, animation, sound), `assets-src/README.md` (source assets, how to add a Mixamo
+  clip), `tools/README.md` (probes, browser checks, asset scripts).
+- Code: `src/sim/` is the deterministic simulation (World = state + registry + step loop; `rules/` =
+  campaign, commands, damage, buildings; `systems/` = what runs each tick); it never touches the DOM.
+  `src/render/` is the 3D view (Renderer coordinates layers: City, Crowd, Unit, SupplyDrops, Effects,
+  PlacementGhost; `characters.ts` bakes animations into flipbook poses). `src/ui/Hud.ts`, `src/audio/`,
+  `src/config/` (balance.ts, units.ts, features.ts: tune numbers there). `dev-*.html` are developer pages.
+
+## Working with Mat
+
+- Straightforward, honest answers; light-hearted is welcome. Say when something is a guess (most balance
+  numbers are until a playtest) and when you didn't check something.
+- **Playtest notes without a request to code: log them, don't build them.** Add a new round to §22 (table:
+  # | Note | Current state from the code | Proposed fix | Needs from owner), a version row, and the items
+  in STATUS.md in ranked order; give likely causes and proposals, then ask.
+- When asked for "the next thing", pick the most important thing overall, not every open note.
+- After each piece of work: STATUS.md (✔ with the version), a version row in the design doc (and the §22
+  row if it closes a note), CREDITS.md for new assets; commit and push. Each reply ends with a short summary
+  of what changed, what was verified, and what's left to Mat.
+- Mat tests locally and **uploads assets through GitHub's web UI**, so `git fetch` and merge the branch
+  before using an upload. Check uploads before wiring them in: e.g. a Mixamo FBX whose strings say
+  `MotionOnlyScene` has no mesh ("Without Skin"); a clip can be the wrong animation (`Walking.fbx` turned
+  out to be a zombie walk).
+- All work so far is on branch `claude/magical-brown-7bsmza` (the repo's only branch). Push only to the
+  branch the session names. Don't rewrite history (the ~200 MB of old models in it) without Mat's OK.
+
+## Assets: what works
+
+- **Characters** are Mixamo-rigged: export the model to an OBJ zip **without its gun**
+  (`tools/assets/export-obj.cjs`); on Mixamo use the Standard Skeleton and download **FBX Binary, T-pose,
+  With Skin**. Mixamo renames materials to `<name>mat` (relevant for `recolor`).
+- **Animations**: Mixamo FBX (animation-only "Without Skin" is fine for clips), then convert to
+  `.clip.json` (`tools/assets/convert-clips.cjs`); originals go to `assets-src/models/mixamo/clips/`.
+- **Guns** are separate GLBs in the rifle frame (barrel +X, magazine −Z), placed in the hand by a fit file
+  next to them (`public/models/weapons/<gun>.json`), which Mat sets in `dev-rifle.html` (Unit/Gun pickers).
+  A character's own gun can be cut out with `tools/assets/export-gun.cjs`.
+- **Textures** are baked into vertex colours at ≤512 px: shrink bigger ones with
+  `tools/assets/resize-texture.cjs` (not ffmpeg: its colours differ), trim GLBs with `tools/assets/trim_glb.py`.
+- **Sounds**: originals in `assets-src/audio/`; shipped as trimmed mono mp3 (44.1 kHz, 96 kbit) in
+  `public/audio/` via ffmpeg, wired in `src/audio/Sound.ts`. Still wanted: hive death, building,
+  power-on, plane/parachute/crate (#110–113), and a barbed wire model (#115).
+
+## Checking work
+
+- `npm test` (~5 s, must pass) and `npx tsc --noEmit`. `npm run build` for the bundle (~11 MB).
+- Changes that shouldn't alter behaviour: `TAG=before`/`TAG=after npm run probe -- simhash` (identical
+  files), `tools/browser/screens.cjs` + `pngdiff.py`, `tools/browser/bakecheck.cjs --compare`.
+- Gameplay paths: `node tools/browser/smoke.cjs`. Balance: `npm run probe -- region1|region2|region3|roaming`.
+- Dev server for the browser tools: `npx vite --port 5173 --strictPort` as a background task with a long
+  timeout (the default limit stops it mid-session).
+- In this environment, long heredocs with some patterns trip a shell safety check: write edit scripts to a
+  file in the scratchpad and run them instead.
