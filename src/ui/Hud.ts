@@ -34,6 +34,32 @@ const ALERT_SPEAKERS = new Set(['Command', 'Overwatch', 'Intel', 'Quartermaster'
 const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 /** DOM HUD. Rebuilt at ~8 Hz, or immediately on selection/mode changes. */
+/** Engineer build menu entries, in display order (round 9 #104). */
+const BUILD_MENU: { kind: 'structure' | 'tool'; id: string; name: string; key: string; icon: string; tip: string; unlock?: string }[] = [
+  { kind: 'structure', id: 'sandbags', name: 'Sandbags', key: 'F', icon: 'sandbags', tip: 'Cover for squads behind it (R rotates)' },
+  { kind: 'structure', id: 'wire', name: 'Barbed Wire', key: 'G', icon: 'wire', tip: 'Slows everything that crosses it, yours included' },
+  { kind: 'structure', id: 'mgNest', name: 'MG Nest', key: 'T', icon: 'mg', tip: '35 m, 120° field of fire aimed with R' },
+  { kind: 'structure', id: 'guardTower', name: 'Guard Tower', key: 'V', icon: 'tower', tip: 'One squad mans it: +40% range, sees over cover', unlock: 'opens with Gas Station Strip' },
+  { kind: 'structure', id: 'medBay', name: 'Med Bay', key: 'N', icon: 'med', tip: 'In the base; resting squads heal (needs power)', unlock: 'restore the Rail Siding power station' },
+  { kind: 'structure', id: 'outpost', name: 'Outpost', key: 'O', icon: 'outpost', tip: 'Secures a district at 0% infestation' },
+  { kind: 'tool', id: 'charge', name: 'Demo Charge', key: 'C', icon: 'charge', tip: 'Click a hive: 3 s to plant, getting hit restarts it' },
+  { kind: 'tool', id: 'deconstruct', name: 'Deconstruct', key: 'X', icon: 'decon', tip: 'Take down something you built (full refund if unstarted, half if built)' },
+];
+
+/** Small line icons for the build bar (inline SVG: no font or emoji dependence). */
+const svg = (body: string) => `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
+const ICON: Record<string, string> = {
+  sandbags: svg('<rect x="3" y="14" width="8" height="5" rx="2.5"/><rect x="13" y="14" width="8" height="5" rx="2.5"/><rect x="8" y="8.5" width="8" height="5" rx="2.5"/>'),
+  wire: svg('<path d="M2 12h20"/><path d="M5 9l3 6M8 9l-3 6M13 9l3 6M16 9l-3 6"/>'),
+  mg: svg('<path d="M4 18h8l1-4H5z"/><path d="M12 13l9-5"/><path d="M8 18v3M6 21h4"/>'),
+  tower: svg('<path d="M6 21l2-11M18 21l-2-11M7 16h10"/><rect x="6" y="6" width="12" height="4"/><path d="M8 6V4h8v2"/>'),
+  med: svg('<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M12 8v8M8 12h8"/>'),
+  outpost: svg('<path d="M6 21V3"/><path d="M6 4h11l-3 4 3 4H6"/>'),
+  charge: svg('<circle cx="10" cy="14" r="6"/><path d="M14 10l3-3M17 4v2M20 7h-2M19.5 4.5l-1.5 1.5"/>'),
+  decon: svg('<path d="M14 6l4 4M4 20l9-9M15 4l5 5-3 1-3-3z"/>'),
+  lock: svg('<rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'),
+};
+
 export class Hud {
   private top!: HTMLElement;
   private topCtl!: HTMLElement;
@@ -51,6 +77,7 @@ export class Hud {
   private last = 0;
   private toastTimer = 0;
   private uiScale = 1;
+  private buildBar!: HTMLElement;
   private collapsed = new Set<string>();
 
   private applyScale(): void {
@@ -65,6 +92,7 @@ export class Hud {
       <div class="hud-bottom">
         <div class="hud-selection panel"></div>
       </div>
+      <div class="hud-build panel"></div>
       <div class="toast"></div>
       <div class="modal"></div>`;
     const q = (s: string) => root.querySelector(s) as HTMLElement;
@@ -73,6 +101,7 @@ export class Hud {
     this.objectives = q('.hud-objectives');
     this.districts = q('.hud-districts');
     this.selection = q('.hud-selection');
+    this.buildBar = q('.hud-build');
     this.toastEl = q('.toast');
     this.modal = q('.modal');
 
@@ -198,6 +227,7 @@ export class Hud {
     this.renderDistricts();
     this.renderObjectives();
     this.renderSelection();
+    this.renderBuildBar();
   }
 
   private renderTop(): void {
@@ -327,10 +357,8 @@ export class Hud {
     };
     const mode = g.mode;
     let cmds = btn('attackMove', 'Attack-move', 'Ctrl+A', undefined, mode.kind === 'attackMove') + btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'Ctrl+S') + `<button class="cmd" data-act="disband" title="Walk back to the Barracks and stand down: frees command and upkeep, refunds ${BALANCE.economy.disbandRefund * 100}% of the cost">Disband</button>`;
-    if (eng) {
-      const b = (id: string, key: string) => btn(`build:${id}`, STRUCTURES[id].name, key, STRUCTURES[id].cost, mode.kind === 'build' && mode.defId === id);
-      cmds += '<div class="sep"></div>' + b('sandbags', 'F') + b('wire', 'G') + b('mgNest', 'T') + (g.world.unlocked.has('guardTower') ? b('guardTower', 'V') : '') + (g.world.unlocked.has('medBay') ? b('medBay', 'N') : '') + b('outpost', 'O') + btn('charge', 'Demo Charge', 'C', ABILITIES.demoCharge.cost, mode.kind === 'charge') + btn('deconstruct', 'Deconstruct', 'X', undefined, mode.kind === 'deconstruct');
-    }
+    // engineers' build tools live in the bottom-centre build bar (round 9 #104; see renderBuildBar)
+    void eng;
     const modeHint =
       mode.kind === 'build' ? `Placing ${STRUCTURES[mode.defId].name} — click to place · R ${STRUCTURES[mode.defId].arc ? `turns its ${STRUCTURES[mode.defId].arc}° field of fire` : 'rotate'} · Shift to keep placing · right-click cancel`
       : mode.kind === 'attackMove' ? 'Attack-move: click a destination'
@@ -346,6 +374,50 @@ export class Hud {
     this.set(this.selCards, cards);
     this.set(this.selCmds, cmds);
     this.set(this.selection.querySelector('.hint') as HTMLElement, modeHint);
+  }
+
+  /**
+   * Engineer build menu (round 9 #104): pops up bottom-centre whenever the selection is engineers only.
+   * One button per structure with an icon, hotkey and cost; locked or unaffordable items stay visible,
+   * greyed out, with the reason.
+   */
+  private renderBuildBar(): void {
+    const g = this.game;
+    const show = g.engineersOnly;
+    this.root.classList.toggle('with-build', show);
+    this.buildBar.style.display = show ? 'flex' : 'none';
+    if (!show) return this.set(this.buildBar, '');
+    const w = g.world;
+    const mode = g.mode;
+    const items = BUILD_MENU.map((it) => {
+      let active = false;
+      let reason = '';
+      let cost = '';
+      if (it.kind === 'structure') {
+        const def = STRUCTURES[it.id];
+        cost = `$${def.cost.money} · ${def.cost.supplies}▣`;
+        active = mode.kind === 'build' && mode.defId === it.id;
+        if (def.unlock && !w.unlocked.has(def.unlock)) reason = `Locked: ${it.unlock ?? 'not unlocked yet'}`;
+        else if (!w.canAfford(def.cost)) reason = 'Not enough $ / supplies';
+      } else if (it.id === 'charge') {
+        const c = ABILITIES.demoCharge.cost;
+        cost = `$${c.money} · ${c.supplies}▣`;
+        active = mode.kind === 'charge';
+        if (!w.canAfford(c)) reason = 'Not enough $ / supplies';
+      } else {
+        cost = 'refund';
+        active = mode.kind === 'deconstruct';
+      }
+      const act = it.kind === 'structure' ? `build:${it.id}` : it.id;
+      const locked = reason.startsWith('Locked');
+      return `<button class="bb ${reason ? 'disabled' : ''} ${locked ? 'locked' : ''} ${active ? 'on' : ''}" data-act="${act}" title="${esc(reason || it.tip)}">
+        <span class="bb-icon">${locked ? ICON.lock : ICON[it.icon]}</span>
+        <span class="bb-name">${esc(it.name)}</span>
+        <span class="bb-meta"><kbd>${it.key}</kbd>${esc(cost)}</span>
+        ${reason ? `<span class="bb-why">${esc(locked ? it.unlock ?? 'Locked' : reason)}</span>` : ''}
+      </button>`;
+    }).join('');
+    this.set(this.buildBar, `<div class="bb-title">ENGINEERS · BUILD</div><div class="bb-row">${items}</div>`);
   }
 
   private barracksPanel(): string {

@@ -185,3 +185,20 @@ h3.collapsible { cursor: pointer; user-select: none; }
 h3.collapsible:hover { color: #fff; }
 .district.locked { opacity: .6; }
 .district.locked .muted { color: #9a9a92; font-size: 10px; letter-spacing: 1px; }
+
+/* engineer build menu, bottom-centre (round 9 #104) */
+.hud-build { position: absolute; bottom: 10px; left: max(50%, calc(420px + 345px)); transform: translateX(-50%); display: none; flex-direction: column; gap: 4px; padding: 6px 8px 8px; width: max-content; max-width: calc(100vw - 440px); pointer-events: auto; }
+.hud-build .bb-title { font: 600 10px var(--display); letter-spacing: 2px; color: var(--warn); }
+.hud-build .bb-row { display: flex; gap: 5px; flex-wrap: wrap; }
+.hud-build .bb { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 78px; padding: 5px 3px 4px; text-align: center; }
+.hud-build .bb-icon { color: var(--ink); line-height: 0; }
+.hud-build .bb-name { font-size: 11px; line-height: 1.1; }
+.hud-build .bb-meta { font-size: 9px; color: #b8b8a8; white-space: nowrap; }
+.hud-build .bb-meta kbd { font-size: 9px; padding: 0 2px; margin-right: 3px; }
+.hud-build .bb-why { font-size: 8.5px; line-height: 1.1; color: var(--bad); }
+.hud-build .bb.locked .bb-why { color: #a8a898; }
+.hud-build .bb.on { outline: 2px solid var(--good); }
+.hud-build .bb.disabled { opacity: .55; }
+/* make room: the squad panel narrows while the build bar is open */
+#hud.with-build .hud-bottom, .with-build .hud-bottom { grid-template-columns: minmax(300px, 400px); }
+@media (max-width: 900px) { .hud-build { left: 50%; bottom: 300px; max-width: calc(100vw - 20px); } }
