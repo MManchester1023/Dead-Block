@@ -70,7 +70,6 @@ export class World {
   dayTimer = 0;
   money: number = BALANCE.economy.startMoney;
   supplies: number = BALANCE.economy.startSupplies;
-  supplyCap: number = BALANCE.economy.supplyCap;
   commandCap: number = BALANCE.economy.commandCap;
   over: 'victory' | 'defeat' | null = null;
 
@@ -256,8 +255,17 @@ export class World {
     return true;
   }
 
+  /** Dead walking around inside a district (not those still hidden in buildings). Round 11 #120. */
+  deadIn(districtId: string): number {
+    const r = this.districts.get(districtId)?.def.rect;
+    if (!r) return 0;
+    let n = 0;
+    for (const z of this.zombies) if (z.alive && z.pos.x >= r.x && z.pos.y >= r.y && z.pos.x < r.x + r.w && z.pos.y < r.y + r.h) n++;
+    return n;
+  }
+
   addSupplies(n: number): void {
-    this.supplies = Math.min(this.supplyCap, this.supplies + n);
+    this.supplies += n; // round 11 #136: no cap (was 150)
   }
 
   // ---------- commands (called by input/UI) ----------
@@ -283,6 +291,10 @@ export class World {
   orderCharge(engineers: Squad[], hive: Hive, queue = false): string | null {
     return Commands.orderCharge(this, engineers, hive, queue);
   }
+  upgradeStructure(st: Structure): string | null {
+    return Commands.upgradeStructure(this, st);
+  }
+
   orderSearch(squads: Squad[], b: BuildingDef, queue = false): string | null {
     return Commands.orderSearch(this, squads, b, queue);
   }

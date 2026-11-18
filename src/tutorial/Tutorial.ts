@@ -228,8 +228,8 @@ export const ROADSIDE_MOTEL_TUTORIAL: TutorialStep[] = [
   {
     id: 'secure',
     title: 'Secure the district',
-    text: 'With the hive gone, infestation drains as you kill. At <b>0%</b>, have engineers build an <b>Outpost</b> (<b>O</b>) inside the district. A secured district pays money and supplies, but if the dead retake it, the outpost becomes a hive.',
-    objective: 'Bring Roadside Motel to 0% and build an Outpost there.',
+    text: 'With the hive gone, infestation drains as you kill. At <b>2% or less</b>, have engineers build an <b>Outpost</b> (<b>O</b>) inside the district. A secured district pays money and supplies, but if the dead retake it, the outpost becomes a hive.',
+    objective: 'Bring Roadside Motel to 2% or less and build an Outpost there.',
     done: (g) => [...g.world.districts.values()].some((d) => d.def.id !== 'base' && d.secured),
     highlight: '.hud-districts, .hud-objectives',
   },

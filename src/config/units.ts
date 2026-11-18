@@ -36,7 +36,8 @@ export interface UnitDef {
 
 // v4.21 (#86): riflemen see/engage a little further (was 24 m; carbine was 18 m)
 const rifle: WeaponDef = { name: 'Service rifle', range: 30, damage: 9, cooldown: 0.9, accuracy: 0.62, type: 'bullet', loudness: 2.2 };
-const carbine: WeaponDef = { name: 'Carbine', range: 22, damage: 7, cooldown: 1.0, accuracy: 0.7, type: 'bullet', loudness: 1.8 };
+// round 11 #134: engineers hit a little harder than riflemen per soldier (was 7: ~4.9 dmg/s vs the rifle's ~6.2; now ~7.0)
+const carbine: WeaponDef = { name: 'Carbine', range: 22, damage: 10, cooldown: 1.0, accuracy: 0.7, type: 'bullet', loudness: 1.8 };
 
 /**
  * Full roster from doc §7. Only units whose `requires` feature is on (or which have none)
@@ -96,9 +97,10 @@ export interface ZombieDef {
   bounty: { money: number; supplies: number };
 }
 
+// round 11 #131: Runners 22 → 17 hp, one rifle hit fewer than before (2 in region 3, Walkers 4)
 export const ZOMBIES: Record<string, ZombieDef> = {
   walker: { id: 'walker', name: 'Walker', hp: 36, speed: 2.7, damage: 7, attackCooldown: 1.2, sight: 14, hearing: 1, threat: ThreatClass.Normal, class: 'normal', radius: 0.4, bounty: { money: 1, supplies: 1 } },
-  runner: { id: 'runner', name: 'Runner', hp: 22, speed: 7.6, damage: 5, attackCooldown: 0.8, sight: 18, hearing: 1.4, threat: ThreatClass.Normal, class: 'normal', radius: 0.38, bounty: { money: 1, supplies: 1 } },
+  runner: { id: 'runner', name: 'Runner', hp: 17, speed: 7.6, damage: 5, attackCooldown: 0.8, sight: 18, hearing: 1.4, threat: ThreatClass.Normal, class: 'normal', radius: 0.38, bounty: { money: 1, supplies: 1 } },
   bloater: { id: 'bloater', name: 'Bloater', hp: 120, speed: 1.8, damage: 10, attackCooldown: 1.6, sight: 12, hearing: 0.8, threat: ThreatClass.Special, class: 'medium', radius: 0.75, onDeath: 'toxicCloud', bounty: { money: 4, supplies: 3 } },
   screamer: { id: 'screamer', name: 'Screamer', hp: 40, speed: 3.2, damage: 3, attackCooldown: 1.5, sight: 24, hearing: 1.2, threat: ThreatClass.Special, class: 'medium', radius: 0.4, requires: 'specialZombies', bounty: { money: 3, supplies: 2 } },
   brute: { id: 'brute', name: 'Brute', hp: 300, speed: 2.8, damage: 25, attackCooldown: 1.8, sight: 16, hearing: 1, threat: ThreatClass.Special, class: 'medium', radius: 0.9, requires: 'specialZombies', bounty: { money: 10, supplies: 6 } },
@@ -139,6 +141,8 @@ export interface StructureDef {
   needsPower?: boolean;
   /** Med Bay (v4.17): squads resting within `radius` m heal `perSec` of their max health per second, paying supplies. */
   heal?: { radius: number; perSec: number; suppliesPerHp: number; restAfterHitSec: number };
+  /** A one-time upgrade bought from the structure's panel (round 11 #129: the outpost garrison). Adds `weapon`. */
+  upgrade?: { name: string; desc: string; cost: { money: number; supplies: number }; weapon: WeaponDef };
 }
 
 export const STRUCTURES: Record<string, StructureDef> = {
@@ -152,9 +156,10 @@ export const STRUCTURES: Record<string, StructureDef> = {
     heal: { radius: 10, perSec: 0.025, suppliesPerHp: 0.12, restAfterHitSec: 5 } },
   // v4.13: introduced by tutorial region 2 (#54, #74)
   guardTower: { id: 'guardTower', name: 'Guard Tower', hp: 900, cost: { money: 120, supplies: 40 }, buildTime: 18, size: { w: 2, h: 2 }, blocksMovement: true, hotkey: 'V', garrison: { rangeMult: 1.4, cover: 0.5, height: 5, climbSec: 2 }, unlock: 'guardTower' },
-  // STATUS #11: a manned post: a small garrison shoots all round, enough for strays, not for a roaming pack
+  // STATUS #11 gave every outpost a small all-round garrison; round 11 #129 made it a paid upgrade
   outpost: { id: 'outpost', name: 'Outpost', hp: 600, cost: { money: 100, supplies: 30 }, buildTime: 30, size: { w: 3, h: 3 }, blocksMovement: true, requiresSecured: true, hotkey: 'O',
-    weapon: { name: 'Outpost garrison', range: 26, damage: 7, cooldown: 0.7, accuracy: 0.7, type: 'bullet', loudness: 1.5 } },
+    upgrade: { name: 'Garrison', desc: 'A few soldiers man the outpost: 26 m all-round fire, enough for strays, not for a roaming pack',
+      cost: { money: 80, supplies: 25 }, weapon: { name: 'Outpost garrison', range: 26, damage: 7, cooldown: 0.7, accuracy: 0.7, type: 'bullet', loudness: 1.5 } } },
   sandbags: { id: 'sandbags', name: 'Sandbag Wall', hp: 260, cost: { money: 15, supplies: 10 }, buildTime: 6, size: { w: 3, h: 1 }, blocksMovement: true, cover: 0.55, climbable: true, hotkey: 'Q' },
   wire: { id: 'wire', name: 'Barbed Wire', hp: 120, cost: { money: 10, supplies: 5 }, buildTime: 4, size: { w: 3, h: 1 }, blocksMovement: false, slow: 0.35, hotkey: 'W' },
   mgNest: { id: 'mgNest', name: 'MG Emplacement', hp: 380, cost: { money: 140, supplies: 45 }, buildTime: 12, size: { w: 2, h: 2 }, blocksMovement: true, cover: 0.5, hotkey: 'E', arc: 120, weapon: { name: 'Mounted HMG', range: 35, damage: 8, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 } },

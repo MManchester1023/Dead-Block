@@ -52,12 +52,15 @@ export function updateDistricts(w: World, dt: number): void {
       else if (d.infestation > left) d.infestation = Math.max(alive > 0 ? 1 : left, d.infestation - BALANCE.infestation.unpaidDrainPerSec * dt);
     }
 
-    if (!d.cleared && d.infestation <= 0) {
+    // round 11 #120: clear enough for an outpost at <= 2% once the hives are dead (stragglers left
+    // inside make the secured district CONTESTED, which deals with them)
+    if (!d.cleared && !hives.length && d.infestation <= BALANCE.infestation.outpostMax) {
       d.cleared = true;
       w.money += BALANCE.economy.districtClearBounty;
+      const left = w.deadIn(d.def.id);
       w.events.emit('radio', {
         speaker: 'Command',
-        text: `${d.def.name} reads 0% infestation. Get engineers in there and plant an outpost. +$${BALANCE.economy.districtClearBounty}`,
+        text: `${d.def.name} is as good as clear${left ? ` (${left} dead still wandering)` : ''}. Get engineers in there and plant an outpost. +$${BALANCE.economy.districtClearBounty}`,
         tone: 'good',
       });
     }

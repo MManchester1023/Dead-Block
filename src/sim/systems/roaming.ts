@@ -84,11 +84,6 @@ export function sendPack(w: World, d: DistrictState, group: readonly [number, nu
     z.useField = false;
   }
   w.events.emit('roamers', { from: d.def.id, to: to.def.id, count: pack.length, outpostId: outpost?.id ?? null, pos: { ...lead.pos } });
-  if (outpost || to.secured)
-    w.events.emit('radio', {
-      speaker: 'Overwatch',
-      text: `Movement: a pack of ${pack.length} drifting out of ${d.def.name} toward ${outpost ? `the ${to.def.name} outpost` : to.def.name}.`,
-      tone: 'warn',
-    });
+  // round 11 #132: no radio call for a pack setting off (the CONTESTED alert on arrival stays)
   return pack.length;
 }

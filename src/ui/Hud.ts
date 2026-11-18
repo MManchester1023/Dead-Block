@@ -41,7 +41,7 @@ const BUILD_MENU: { kind: 'structure' | 'tool'; id: string; name: string; key: s
   { kind: 'structure', id: 'mgNest', name: 'MG Nest', key: 'T', icon: 'mg', tip: '35 m, 120° field of fire aimed with R' },
   { kind: 'structure', id: 'guardTower', name: 'Guard Tower', key: 'V', icon: 'tower', tip: 'One squad mans it: +40% range, sees over cover', unlock: 'opens with Gas Station Strip' },
   { kind: 'structure', id: 'medBay', name: 'Med Bay', key: 'N', icon: 'med', tip: 'In the base; resting squads heal (needs power)', unlock: 'restore the Rail Siding power station' },
-  { kind: 'structure', id: 'outpost', name: 'Outpost', key: 'O', icon: 'outpost', tip: 'Secures a district at 0% infestation' },
+  { kind: 'structure', id: 'outpost', name: 'Outpost', key: 'O', icon: 'outpost', tip: 'Secures a district once its hives are dead and infestation is 2% or less' },
   { kind: 'tool', id: 'charge', name: 'Demo Charge', key: 'C', icon: 'charge', tip: 'Click a hive: 3 s to plant, getting hit restarts it' },
   { kind: 'tool', id: 'deconstruct', name: 'Deconstruct', key: 'X', icon: 'decon', tip: 'Take down something you built (full refund if unstarted, half if built)' },
 ];
@@ -263,6 +263,7 @@ export class Hud {
       case 'hold': g.hold(); break;
       case 'stop': g.stop(); break;
       case 'disband': g.disband(); break;
+      case 'upgrade': g.upgradeSelected(); break;
       case 'pause': g.togglePause(); break;
       case 'speed': g.setSpeed(Number(arg)); break;
       case 'focus': {
@@ -373,7 +374,7 @@ export class Hud {
     this.set(this.top, `
       <div class="brand">DEAD BLOCK <span>COMMAND</span></div>
       <div class="res" title="Money: the hard resource. Income from secured districts, kills, clears and hives."><b>$</b>${Math.floor(w.money)}<small class="rate">${inc.money ? `+${inc.money}/min` : ''}</small></div>
-      <div class="res" title="Supplies (cap). Income from the base depot, secured districts and kills."><b>▣</b>${Math.floor(w.supplies)}<small>/${w.supplyCap}</small><small class="rate">+${inc.supplies}/min</small></div>
+      <div class="res" title="Supplies. Income from the base depot, secured districts and kills."><b>▣</b>${Math.floor(w.supplies)}<small class="rate">+${inc.supplies}/min</small></div>
       <div class="res" title="Command used / cap"><b>★</b>${w.commandUsed}<small>/${w.commandCap}</small></div>
       <div class="res day" title="Upkeep is charged at the end of each day">
         Day ${w.day}<div class="bar"><i style="width:${dayPct.toFixed(1)}%"></i></div><small>upkeep −${upkeep}</small>
@@ -403,7 +404,7 @@ export class Hud {
       const status = d.secured && d.contested ? '<span class="warn">CONTESTED</span>' : d.secured ? '<span class="good">SECURED</span>' : d.cleared ? '<span class="warn">CLEAR — build outpost</span>' : '<span class="bad">INFESTED</span>';
       html += `<div class="district">
         <div class="row"><b>${d.def.name}</b>${status}</div>
-        <label>Infestation ${Math.ceil(d.infestation)}%</label><div class="bar red"><i style="width:${d.infestation}%"></i></div>
+        <label>Infestation ${Math.ceil(d.infestation)}%${!d.secured && !hive.length ? ` · ${w.deadIn(d.def.id)} dead left` : ''}</label><div class="bar red"><i style="width:${d.infestation}%"></i></div>
         <label>Noise</label><div class="bar amber"><i style="width:${d.noise}%"></i></div>
         ${hive.map((h) => `<div class="row small"><span>Hive stage ${h.stage}/4</span><span>next pulse ${fmtTime(Math.max(0, h.pulseTimer))}</span></div>`).join('')}
         ${(() => {
@@ -430,7 +431,7 @@ export class Hud {
       ...(cur.def.powerStations?.length
         ? [[!!station?.built || w.unlocked.has('medBay'), `Restore the power station <small>(clear the yard, then right-click it with engineers${station && !station.built ? `: ${Math.floor((station.buildProgress / station.def.buildTime) * 100)}%` : ''})</small>`] as [boolean, string]]
         : []),
-      [cur.cleared || cur.secured, `Clear ${cur.def.name} to 0% <small>(${Math.ceil(cur.infestation)}%)</small>`],
+      [cur.cleared || cur.secured, `Clear ${cur.def.name} to ${BALANCE.infestation.outpostMax}% or less <small>(${Math.ceil(cur.infestation)}%${hiveDown && !cur.secured ? `, ${w.deadIn(id)} dead left` : ''})</small>`],
       [cur.secured, 'Build an outpost there with engineers'],
     ];
     // survivors out in the field (STATUS #10): a standing reminder until they're evacuated
@@ -465,6 +466,18 @@ export class Hud {
       }).join('');
       const hint = g.mode.kind === 'support' ? 'Click the map to drop the marker smoke · right-click to cancel' : 'Pick a support power, then click the map. Each call-in is marked with its own smoke colour.';
       this.set(this.selection, `<h3>Command Post · Support</h3><div class="support-list">${rows}</div><p class="hint">${hint}</p>`);
+      return;
+    }
+    if (!sq.length && st?.def.upgrade) {
+      // round 11 #129: an outpost starts unarmed; its garrison is bought here
+      const up = st.def.upgrade;
+      const w = g.world;
+      const err = st.upgraded ? null : !st.built ? 'Finish building it first' : !w.canAfford(up.cost) ? 'Not enough money or supplies' : null;
+      const hp = `<div class="row small"><span>Health</span><span>${Math.ceil(st.hp)} / ${st.def.hp}</span></div>`;
+      const btn = st.upgraded
+        ? `<div class="row small"><span class="good">✔ ${esc(up.name)}</span><span>${up.weapon.range} m all round</span></div>`
+        : `<button class="cmd ${err ? 'disabled' : ''}" data-act="upgrade" title="${esc(up.desc)}"><span><b>${esc(up.name)}</b><small>${err ? esc(err) : `$${up.cost.money} · ${up.cost.supplies}▣`}</small></span></button>`;
+      this.set(this.selection, `<h3>${esc(st.def.name)}</h3>${hp}${btn}<p class="hint">${esc(up.desc)}.</p>`);
       return;
     }
     if (!sq.length) {

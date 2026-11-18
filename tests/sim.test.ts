@@ -13,26 +13,26 @@ const T = (id: number, x: number, y: number, threat = ThreatClass.Normal, alive 
   id, faction: 'zombie', pos: { x, y }, alive, threat, radius: 0,
 });
 
-describe('threat-priority targeting (doc §5)', () => {
-  const base = { pos: { x: 0, y: 0 }, range: 10, dangerClose: 3 };
+describe('closest-first targeting (round 11 #130)', () => {
+  const base = { pos: { x: 0, y: 0 }, range: 20, dangerClose: 4 };
 
-  it('keeps shooting the locked target instead of switching to a nearer one', () => {
+  it('switches from the current target to a nearer one', () => {
     const locked = T(1, 8, 0);
-    const nearer = T(2, 5, 0);
-    expect(pickTarget({ ...base, current: locked, candidates: [locked, nearer] })).toBe(locked);
+    const nearer = T(2, 6, 0);
+    expect(pickTarget({ ...base, current: locked, candidates: [locked, nearer] })).toBe(nearer);
   });
 
-  it('breaks the lock for anything danger-close', () => {
-    const locked = T(1, 8, 0);
-    const inFace = T(2, 2, 0);
-    expect(pickTarget({ ...base, current: locked, candidates: [locked, inFace] })).toBe(inFace);
-  });
-
-  it('prefers higher threat when nothing is danger-close', () => {
-    const walker = T(1, 4, 0);
+  it('takes the nearest even over a higher threat', () => {
+    const walker = T(1, 6, 0);
     const special = T(2, 9, 0, ThreatClass.Special);
-    const boss = T(3, 9.5, 0, ThreatClass.Boss);
-    expect(pickTarget({ ...base, current: null, candidates: [walker, special, boss] })).toBe(boss);
+    expect(pickTarget({ ...base, current: null, candidates: [special, walker] })).toBe(walker);
+  });
+
+  it('on a near-tie keeps the current target, else prefers the bigger threat', () => {
+    const a = T(1, 8, 0);
+    const b = T(2, 7.8, 0, ThreatClass.Special);
+    expect(pickTarget({ ...base, current: a, candidates: [a, b] })).toBe(a);
+    expect(pickTarget({ ...base, current: null, candidates: [a, b] })).toBe(b);
   });
 
   it('drops dead or out-of-range locks', () => {
@@ -138,14 +138,17 @@ describe('world rules', () => {
     expect(d.infestation).toBeGreaterThan(0);
   });
 
-  it('outposts require 0% infestation', () => {
+  it('outposts need the hives dead and infestation at 2% or less (round 11 #120)', () => {
     const w = new World();
     const d = w.districts.get('motel')!;
-    expect(w.canPlace('outpost', { x: 45, y: 31 })).toMatch(/Infestation/);
-    d.infestation = 0;
+    expect(w.canPlace('outpost', { x: 45, y: 31 })).toBe('Destroy the hive first');
+    for (const h of w.hives) h.alive = false;
+    d.infestation = 3;
+    expect(w.canPlace('outpost', { x: 45, y: 31 })).toMatch(/Infestation must be 2% or less/);
+    d.infestation = 2;
     for (const z of w.zombies) z.alive = false;
     w.step(1 / 30);
-    d.infestation = 0;
+    d.infestation = 2;
     w.money = 999;
     w.supplies = 999;
     expect(w.canPlace('outpost', { x: 45, y: 30 })).toBeNull();
@@ -158,7 +161,7 @@ describe('world rules', () => {
     for (let t = 0; t < BALANCE.economy.dayLengthSec * 30 + 2; t++) w.step(1 / 30);
     expect(w.day).toBe(2);
     const income = (BALANCE.economy.baseSuppliesPerMin * BALANCE.economy.dayLengthSec) / 60;
-    expect(w.supplies).toBeCloseTo(Math.min(BALANCE.economy.supplyCap, before + income) - 4, 0);
+    expect(w.supplies).toBeCloseTo(before + income - 4, 0);
   });
 
   it('finds a path from the base out to the motel', () => {

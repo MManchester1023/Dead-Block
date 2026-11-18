@@ -93,7 +93,8 @@ export function canPlace(w: World, defId: string, tile: { x: number; y: number }
     const d = w.districtAt({ x: (tile.x + fp.w / 2) * w.grid.cell, y: (tile.y + fp.h / 2) * w.grid.cell });
     if (!d || d.def.id === 'base') return 'Outposts go in a district';
     if (d.outpostId) return 'District already has an outpost';
-    if (d.infestation > 0) return `Infestation must be 0% (now ${Math.ceil(d.infestation)}%)`;
+    if (w.hives.some((h) => h.alive && h.districtId === d.def.id)) return 'Destroy the hive first';
+    if (d.infestation > BALANCE.infestation.outpostMax) return `Infestation must be ${BALANCE.infestation.outpostMax}% or less (now ${Math.ceil(d.infestation)}%)`;
   }
   const c = { x: (tile.x + fp.w / 2) * w.grid.cell, y: (tile.y + fp.h / 2) * w.grid.cell };
   for (const z of w.zombieHash.query(c, Math.max(fp.w, fp.h) * w.grid.cell * 0.5 + 1.5)) if (z.alive) return 'Zombies in the way';
@@ -117,6 +118,18 @@ export function orderCharge(w: World, engineers: Squad[], hive: Hive, queue = fa
   const eng = engineers.filter((s) => s.def.abilities?.includes('demoCharge'));
   if (!eng.length) return 'Only engineers carry demo charges';
   issueOrder(w, eng.slice(0, 1), { type: 'charge', pos: hive.pos, targetId: hive.id }, queue);
+  return null;
+}
+
+/** Buy a structure's one-time upgrade (round 11 #129: the outpost garrison). */
+export function upgradeStructure(w: World, st: Structure): string | null {
+  const up = st.def.upgrade;
+  if (!up) return 'Nothing to upgrade';
+  if (st.upgraded) return `${up.name} already bought`;
+  if (!st.built) return 'Finish building it first';
+  if (!w.spend(up.cost)) return 'Not enough money or supplies';
+  st.upgraded = true;
+  w.events.emit('radio', { speaker: 'Command', text: `${up.name} in place at the ${st.def.name.toLowerCase()}.`, tone: 'good' });
   return null;
 }
 
@@ -175,7 +188,7 @@ export function standDown(w: World, s: Squad): void {
   const k = BALANCE.economy.disbandRefund;
   const refund = { money: Math.round(s.def.cost.money * k), supplies: Math.round(s.def.cost.supplies * k) };
   w.money += refund.money;
-  w.supplies = Math.min(w.supplyCap, w.supplies + refund.supplies);
+  w.addSupplies(refund.supplies);
   for (const m of s.members) m.alive = false;
   w.forget(s.id);
   w.events.emit('radio', { speaker: 'Barracks', text: `${s.name} stood down. +$${refund.money} and +${refund.supplies} supplies back in stores.`, tone: 'info' });

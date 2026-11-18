@@ -139,7 +139,19 @@ export class Renderer {
         bar.rotation.set(-Math.PI / 2, 0, a);
         x.add(bar);
       }
-      x.position.set(e.pos.x, 0.07, e.pos.y);
+      // round 11 #124: on the searched building's own wall (nearest the squad), not where the squad
+      // stood, which between two close houses could look like the other one was searched
+      const b = this.world.map.buildings.find((bb) => bb.id === e.buildingId);
+      let at = e.pos;
+      if (b) {
+        const ex = Math.max(b.rect.x, Math.min(b.rect.x + b.rect.w, e.pos.x));
+        const ey = Math.max(b.rect.y, Math.min(b.rect.y + b.rect.h, e.pos.y));
+        const dx = e.pos.x - ex;
+        const dy = e.pos.y - ey;
+        const l = Math.hypot(dx, dy) || 1;
+        at = { x: ex + (dx / l) * 1.2, y: ey + (dy / l) * 1.2 };
+      }
+      x.position.set(at.x, 0.07, at.y);
       this.scene.add(x);
     });
     ev.on('zombieKilled', (e) => {

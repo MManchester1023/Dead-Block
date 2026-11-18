@@ -22,7 +22,7 @@ export type Mode =
  * Owns the fixed-step loop, pause/speed (doc §2), the current selection and the
  * input mode. Input and HUD talk to the world only through here.
  */
-const SELECTABLE = new Set(['commandPost', 'barracks']);
+const SELECTABLE = new Set(['commandPost', 'barracks', 'outpost']);
 
 /** Something squads can hide behind: an abandoned car, a pump island, or built sandbags/walls. */
 interface CoverSpot {
@@ -314,6 +314,15 @@ export class Game {
   hold(): void {
     const sq = this.selectedSquads;
     if (sq.length) this.world.issueOrder(sq, { type: 'hold', pos: sq[0].pos });
+    this.changed();
+  }
+
+  /** Buy the selected structure's upgrade (round 11 #129: outpost garrison). */
+  upgradeSelected(): void {
+    const st = this.world.structures.find((s) => s.id === this.selectedStructure && s.alive);
+    if (!st) return;
+    const err = this.world.upgradeStructure(st);
+    if (err) this.toast(err);
     this.changed();
   }
 

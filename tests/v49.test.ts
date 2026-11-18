@@ -29,7 +29,7 @@ describe('v4.9 playtest round 5', () => {
     for (const h of w.hives) h.alive = false;
     const d = w.districts.get('motel')!;
     d.infestation = 5;
-    for (let i = 0; i < 30 * 15 && !d.cleared; i++) w.step(1 / 30);
+    for (let i = 0; i < 30 * 15; i++) w.step(1 / 30);
     expect(d.infestation).toBe(0);
     expect(d.cleared).toBe(true);
   });

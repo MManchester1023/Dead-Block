@@ -211,6 +211,13 @@ export class Structure implements Targetable {
   size: { w: number; h: number };
   /** Direction the field of fire points (radians, sim frame), for structures with an `arc` (v4.13). */
   aim = 0;
+  /** Its `def.upgrade` has been bought (round 11 #129). */
+  upgraded = false;
+
+  /** The gun it fires: its own, or the one its upgrade adds. */
+  get weapon() {
+    return this.def.weapon ?? (this.upgraded ? this.def.upgrade?.weapon : undefined);
+  }
 
   /** `tile` is the top-left nav cell; `size` is in cells. `pos`/`radius` are metres. */
   constructor(public def: StructureDef, public tile: { x: number; y: number }, built: boolean, rotated = false) {

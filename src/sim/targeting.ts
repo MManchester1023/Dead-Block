@@ -4,6 +4,7 @@ import type { Targetable } from './types';
 export interface TargetQuery {
   pos: Vec2;
   range: number;
+  /** Kept for callers; round 11 #130 made every target "nearest first", so it no longer changes the pick. */
   dangerClose: number;
   current: Targetable | null;
   candidates: Iterable<Targetable>;
@@ -12,42 +13,28 @@ export interface TargetQuery {
 }
 
 /**
- * Threat-priority focus fire (doc §5, v4):
- *  1. Lock a target and keep shooting it until it dies or leaves range.
- *  2. Anything danger-close overrides the lock (nearest danger-close first).
- *  3. Otherwise pick by threat class (boss > special > normal > structure), nearest within class.
+ * Round 11 #130: the closest target you can engage always comes first (it used to be threat class
+ * first, with a lock on the current target). Ties (within 0.5 m) keep the current target, then go to
+ * the higher threat, so a squad doesn't flicker between two dead at the same distance.
+ * A target the player clicks (forced attack, combat.ts) still overrides this.
  */
 export function pickTarget(q: TargetQuery): Targetable | null {
-  const { pos, range, dangerClose } = q;
+  const { pos, range } = q;
   const engage = q.canEngage ?? (() => true);
-  const inRange = (t: Targetable) => t.alive && dist(pos, t.pos) - t.radius <= range && engage(t);
-
-  let nearestClose: Targetable | null = null;
-  let nearestCloseD = Infinity;
+  const TIE = 0.5;
   let best: Targetable | null = null;
-  let bestThreat = -1;
   let bestD = Infinity;
-
   for (const t of q.candidates) {
-    if (!inRange(t)) continue;
+    if (!t.alive) continue;
     const d = dist(pos, t.pos) - t.radius;
-    if (d <= dangerClose && (d < nearestCloseD - 1e-6 || (Math.abs(d - nearestCloseD) < 1e-6 && t.threat > (nearestClose?.threat ?? -1)))) {
-      nearestClose = t;
-      nearestCloseD = d;
+    if (d > range || d > bestD + TIE || !engage(t)) continue;
+    if (best && Math.abs(d - bestD) <= TIE) {
+      // a tie: stay on what we're shooting, else take the bigger threat
+      if (best === q.current) continue;
+      if (t !== q.current && t.threat <= best.threat) continue;
     }
-    if (t.threat > bestThreat || (t.threat === bestThreat && d < bestD)) {
-      best = t;
-      bestThreat = t.threat;
-      bestD = d;
-    }
+    best = t;
+    bestD = Math.min(bestD, d); // the nearest distance seen, so ties can't creep outward
   }
-
-  const cur = q.current && inRange(q.current) ? q.current : null;
-  if (cur) {
-    const curD = dist(pos, cur.pos) - cur.radius;
-    if (curD <= dangerClose) return cur; // already shooting the thing in our face
-    if (nearestClose) return nearestClose; // something got too close — deal with it first
-    return cur; // focus fire: finish what we started
-  }
-  return nearestClose ?? best;
+  return best;
 }

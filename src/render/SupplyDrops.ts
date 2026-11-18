@@ -25,7 +25,8 @@ function cargoPlaneShadow(): THREE.ShapeGeometry {
 export class SupplyDrops {
   private crates = new Map<number, THREE.Group>();
   private blobs = new Map<number, THREE.Mesh>();
-  private flyovers = new Map<number, { mesh: THREE.Mesh; dir: Vec2; done: boolean }>();
+  /** Round 11 #123: each flyover keeps its own clock (`overheadAt`, sim time), so it flies on after the crate is picked up. */
+  private flyovers = new Map<number, { mesh: THREE.Mesh; dir: Vec2; pos: Vec2; overheadAt: number }>();
 
   constructor(private scene: THREE.Scene, private world: World) {}
 
@@ -64,7 +65,7 @@ export class SupplyDrops {
       const untilLand = c.landsAt - w.time;
       const released = c.landed || untilLand <= CRATE_FALL_SEC;
       v.visible = released;
-      this.flyover(c.id, c.pos, untilLand - CRATE_FALL_SEC);
+      if (!this.flyovers.has(c.id) && !c.landed) this.flyover(c.id, c.pos, c.landsAt - CRATE_FALL_SEC);
       const height = c.landed ? 0 : Math.max(0, untilLand) * 7;
       v.position.set(c.pos.x, height, c.pos.y);
       const blob = this.blobs.get(c.id);
@@ -85,20 +86,26 @@ export class SupplyDrops {
         if (blob) this.scene.remove(blob);
         this.blobs.delete(id);
       }
-    for (const [id, f] of this.flyovers)
-      if (!seen.has(id) && f.done) {
+    for (const [id, f] of this.flyovers) {
+      const along = (w.time - f.overheadAt) * FLYOVER_SPEED; // metres past the drop point
+      if (along > 400) {
         this.scene.remove(f.mesh);
+        f.mesh.geometry.dispose();
+        (f.mesh.material as THREE.Material).dispose();
         this.flyovers.delete(id);
+        continue;
       }
+      f.mesh.visible = along > -400;
+      f.mesh.position.set(f.pos.x + f.dir.x * along, 0.15, f.pos.y + f.dir.y * along);
+    }
   }
 
   /**
    * Aircraft shadow sweeping over `pos` (reused later for gun runs, bombing runs, AC-130 orbits).
-   * `tOverhead` = seconds until it's directly above. Approaches from the base side.
+   * `overheadAt` = sim time it's directly above. Approaches from the base side; `update` moves it.
    */
-  private flyover(id: number, pos: Vec2, tOverhead: number): void {
-    let f = this.flyovers.get(id);
-    if (!f) {
+  private flyover(id: number, pos: Vec2, overheadAt: number): void {
+    {
       const mesh = new THREE.Mesh(cargoPlaneShadow(), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.32, depthWrite: false }));
       mesh.rotation.x = -Math.PI / 2;
       mesh.renderOrder = 2;
@@ -107,13 +114,10 @@ export class SupplyDrops {
       const dx = pos.x - (gate.x + gate.w);
       const dy = pos.y - (gate.y + gate.h / 2);
       const l = Math.hypot(dx, dy) || 1;
-      f = { mesh, dir: { x: dx / l, y: dy / l }, done: false };
-      this.flyovers.set(id, f);
+      const dir = { x: dx / l, y: dy / l };
+      mesh.rotation.z = -Math.atan2(dir.y, dir.x);
+      mesh.visible = false;
+      this.flyovers.set(id, { mesh, dir, pos: { ...pos }, overheadAt });
     }
-    const along = -tOverhead * FLYOVER_SPEED; // metres past the drop point
-    f.done = along > 400;
-    f.mesh.visible = !f.done && along > -400;
-    f.mesh.position.set(pos.x + f.dir.x * along, 0.15, pos.y + f.dir.y * along);
-    f.mesh.rotation.z = -Math.atan2(f.dir.y, f.dir.x);
   }
 }

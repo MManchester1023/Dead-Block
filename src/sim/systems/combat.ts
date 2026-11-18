@@ -80,7 +80,7 @@ export function updateCombat(w: World, dt: number): void {
     if (!s.moving) s.facing = Math.atan2(t.pos.y - s.pos.y, t.pos.x - s.pos.x);
     // builders only defend themselves against danger-close threats
     if (busy && dist(t.pos, s.pos) > BALANCE.combat.dangerCloseRadius + 2) continue;
-    const accMult = s.moving ? 0.6 : 1;
+    const accMult = s.moving ? 0.5 : 1; // round 11 #128: firing on the move (was 0.6)
     for (const m of s.members) {
       if (!m.alive) continue;
       m.cooldown -= dt;
@@ -96,7 +96,7 @@ export function updateCombat(w: World, dt: number): void {
   }
 
   for (const st of w.structures) {
-    const wpn = st.def.weapon;
+    const wpn = st.weapon;
     if (!wpn || !st.built || !st.alive) continue;
     st.cooldown -= dt;
     // v4.13 (#71): emplacements with a field of fire only engage inside it

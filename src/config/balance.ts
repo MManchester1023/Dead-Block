@@ -6,7 +6,6 @@ export const BALANCE = {
   economy: {
     startMoney: 250,
     startSupplies: 100,
-    supplyCap: 150,
     commandCap: 14, // v4.9: 8 → 16; round 9 #99: a little lower
     commandPerSecuredDistrict: 3,
     disbandRefund: 0.25, // share of a squad's cost returned when it stands down at the Barracks
@@ -109,6 +108,8 @@ export const BALANCE = {
     perKill: { walker: 0.5, runner: 0.6, bloater: 1.5 } as Record<string, number>,
     hiveDestroyed: 45,
     floorWithHive: 1,
+    /** Round 11 #120: once every hive in a district is dead, an outpost can go in at this much or less. */
+    outpostMax: 2,
     regrowPerMinWithHive: 0.6, // infestation creeps up while hives live
     unpaidDrainPerSec: 0.5, // no hive: infestation above what's left to kill drains at this rate
   },

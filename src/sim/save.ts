@@ -42,7 +42,6 @@ export function saveWorld(w: World, view?: SaveData['view']): SaveData {
     dayTimer: w.dayTimer,
     money: w.money,
     supplies: w.supplies,
-    supplyCap: w.supplyCap,
     commandCap: w.commandCap,
     over: w.over,
     nestTimer: w.nestTimer,
@@ -95,7 +94,6 @@ export function loadWorld(data: SaveData, seed = 1337): World {
   w.dayTimer = s.dayTimer;
   w.money = s.money;
   w.supplies = s.supplies;
-  w.supplyCap = s.supplyCap;
   w.commandCap = s.commandCap;
   w.over = s.over;
   w.nestTimer = s.nestTimer;
