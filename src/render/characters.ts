@@ -203,6 +203,8 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
   });
   const hipsRest = hips ? hips.position.clone() : null;
   const rifle = spec.rifle ? (spec.rifleModel ? await loadRifleModel(spec.rifleModel) : rifleGeometry(1)) : undefined; // built in metres
+  // how the rifle sits in the hand: a settings file next to the model, editable with dev-rifle.html
+  const fit = spec.rifleModel ? await loadRifleFit(spec.rifleModel) : DEFAULT_FIT;
 
   const book: Flipbook = { key: spec.key, deathFalls: !!spec.deathFalls, frames: {}, durations: {}, loops: {} };
   const baseColor = new THREE.BufferAttribute(colors, 3);
@@ -251,7 +253,7 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
         hp.applyMatrix4(norm);
         const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2).multiply(hq);
         if (spec.rifleRot) q.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...spec.rifleRot)));
-        const r = rifle.clone().applyMatrix4(new THREE.Matrix4().compose(hp, q, new THREE.Vector3(1, 1, 1)));
+        const r = rifle.clone().applyMatrix4(rifleFitMatrix(fit)).applyMatrix4(new THREE.Matrix4().compose(hp, q, new THREE.Vector3(1, 1, 1)));
         g = spec.simplify ? mergeSimple(g, r) : mergeIndexed(g, r, rifleShared);
       }
       if (spec.simplify) {
@@ -270,6 +272,40 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
   return book;
 }
 
+/**
+ * How a rifle model sits in the hand (round 9 #93 follow-up): a small JSON file next to the model
+ * (`m4.glb` → `m4.json`), edited visually with the dev page `dev-rifle.html`. All in the hand's frame,
+ * where the rifle points along +Y with its grip at the origin: `offset` slides it (metres), `rotationDeg`
+ * turns it (X, Y, Z degrees), `scale` resizes it.
+ */
+export interface RifleFit {
+  offset: [number, number, number];
+  rotationDeg: [number, number, number];
+  scale: number;
+}
+export const DEFAULT_FIT: RifleFit = { offset: [0, 0, 0], rotationDeg: [0, 0, 0], scale: 1 };
+
+export async function loadRifleFit(modelUrl: string): Promise<RifleFit> {
+  try {
+    const res = await fetch(modelUrl.replace(/\.glb$/i, '.json'));
+    if (!res.ok) return DEFAULT_FIT;
+    const j = (await res.json()) as Partial<RifleFit>;
+    return { ...DEFAULT_FIT, ...j };
+  } catch {
+    return DEFAULT_FIT;
+  }
+}
+
+/** The fit as a matrix applied to the rifle geometry before it's placed in the hand. */
+export function rifleFitMatrix(fit: RifleFit): THREE.Matrix4 {
+  const d = Math.PI / 180;
+  return new THREE.Matrix4().compose(
+    new THREE.Vector3(...fit.offset),
+    new THREE.Quaternion().setFromEuler(new THREE.Euler(fit.rotationDeg[0] * d, fit.rotationDeg[1] * d, fit.rotationDeg[2] * d)),
+    new THREE.Vector3(fit.scale, fit.scale, fit.scale),
+  );
+}
+
 const rifleCache = new Map<string, Promise<THREE.BufferGeometry>>();
 
 /**
@@ -277,7 +313,7 @@ const rifleCache = new Map<string, Promise<THREE.BufferGeometry>>();
  * metres, muzzle along +Y, magazine down (-Z), the pistol grip at the origin (that's where the hand is).
  * The source mesh has the barrel on +X and the magazine on -Z; parts are coloured by their materials.
  */
-function loadRifleModel(url: string): Promise<THREE.BufferGeometry> {
+export function loadRifleModel(url: string): Promise<THREE.BufferGeometry> {
   let p = rifleCache.get(url);
   if (!p) {
     p = (async () => {
@@ -574,7 +610,7 @@ export class Crowd {
 // ---------------------------------------------------------------- the cast
 
 // Mixamo "Rifle Idle" (the shooter pack's "Rifle Aiming Idle" won't parse in FBXLoader)
-const SOLDIER_CLIPS: Partial<Record<Clip, string>> = {
+export const SOLDIER_CLIPS: Partial<Record<Clip, string>> = {
   idle: 'models/characters/soldier/idle.fbx',
   walk: 'models/characters/soldier/walk.fbx',
   shoot: 'models/characters/soldier/shoot.fbx',

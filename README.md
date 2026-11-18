@@ -21,4 +21,5 @@ Then open http://localhost:5173. Tests: `npm test`.
 - **[CREDITS.md](CREDITS.md)**: model authors and licences.
 - `src/`: `sim/` is the game rules (no graphics), `render/` the 3D view, `ui/` the HUD, `config/` every tunable number.
 - `assets-src/models/`: uploaded models waiting to be used (not shipped).
+- **Rifle fitter**: with `npm run dev` running, open http://localhost:5173/dev-rifle.html to line the rifle up in the soldiers' hands (sliders, any animation), then save `m4.json` into `public/models/weapons/`.
 - [README_old.md](README_old.md): the previous, detailed README (architecture notes).
