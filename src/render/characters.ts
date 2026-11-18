@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { HUMAN_HEIGHT } from '../config/world';
+import { MIXAMO_TO_KOLOS, MIXAMO_TO_RIGIFY, RIGIFY_PARENTS, bonesByBase, makeRetargeter, rebuildHierarchy, type Retargeter } from './retarget';
 
 /**
  * Animated characters for crowds of thousands (doc §14 v4.1 crowd tech).
@@ -17,7 +18,7 @@ import { HUMAN_HEIGHT } from '../config/world';
  * baked into vertex colours so each pose is a single draw call (the source meshes have ~120 groups).
  */
 
-export type Clip = 'idle' | 'walk' | 'run' | 'shoot' | 'punch' | 'death' | 'work' | 'walkShoot' | 'coverIn' | 'cover';
+export type Clip = 'idle' | 'walk' | 'run' | 'shoot' | 'punch' | 'death' | 'work' | 'walkShoot' | 'coverIn' | 'cover' | 'crouch';
 
 /** Poses baked per second of animation (round 9 #96), and the most any one clip gets. */
 const POSES_PER_SEC = 10;
@@ -36,6 +37,8 @@ const CLIP_SOURCES: Record<Clip, { name: string; frames: number; loop: boolean }
   walkShoot: { name: 'walkShoot', frames: 12, loop: true },
   coverIn: { name: 'coverIn', frames: 14, loop: false },
   cover: { name: 'cover', frames: 12, loop: true },
+  // round 10 #107: soldiers of a squad in cover who are too far from the cover itself to lean on it
+  crouch: { name: 'crouch', frames: 12, loop: true },
 };
 
 export interface CharacterSpec {
@@ -76,6 +79,24 @@ export interface CharacterSpec {
   textureByMesh?: Record<string, string>;
   /** Per-mesh flat colours, by skinned-mesh name (eyes, lashes…). */
   colorByMesh?: Record<string, number>;
+  /**
+   * Round 10: a model with its own (non-Mixamo) skeleton, driven by the Mixamo clip files through
+   * `retarget.ts`. Bone names are matched without Sketchfab's numeric suffixes.
+   */
+  retarget?: {
+    /** Mixamo bone → this model's bone. */
+    map: Record<string, string>;
+    /** Only this part of the file (a file holding several characters): the root of its skeleton. */
+    root?: string;
+    /** Rebuild a flattened bone chain first (child → parent). */
+    parents?: Record<string, string>;
+    /** Reset to the skin's bind pose first (when the file's node pose isn't the T-pose). */
+    bindPose?: boolean;
+    /** Mesh nodes to keep (default: every skinned mesh under the file). */
+    meshes?: string[];
+  };
+  /** Skinned meshes to leave out (e.g. a built-in gun when the game adds its own). */
+  skipMeshes?: string[];
 }
 
 export interface Flipbook {
@@ -97,6 +118,8 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
   obj.updateMatrixWorld(true);
   // separate animation files (Mixamo) and an external texture, loaded alongside the model
   const fileClips: Partial<Record<Clip, THREE.AnimationClip>> = {};
+  /** The animation files' own skeletons (retargeted models play the clip on these and copy the pose). */
+  const fileObjs: Partial<Record<Clip, THREE.Group>> = {};
   /** Rest height of the hips in each animation file's own skeleton (its units can differ from the model's). */
   const fileHipsY: Partial<Record<Clip, number>> = {};
   if (spec.clipFiles) {
@@ -105,6 +128,7 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
       Object.entries(spec.clipFiles).map(async ([clip, url]) => {
         const a = await fbx.loadAsync(url!);
         if (a.animations[0]) fileClips[clip as Clip] = a.animations[0];
+        fileObjs[clip as Clip] = a;
         a.traverse((o) => {
           if ((o as THREE.Bone).isBone && /hips$/i.test(o.name) && fileHipsY[clip as Clip] === undefined) fileHipsY[clip as Clip] = o.position.y;
         });
@@ -117,10 +141,25 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
 
   // every skinned part (Quaternius files are one mesh; Sketchfab exports are often split per limb)
   const parts: THREE.SkinnedMesh[] = [];
+  const rt = spec.retarget;
   obj.traverse((o) => {
-    if ((o as THREE.SkinnedMesh).isSkinnedMesh) parts.push(o as THREE.SkinnedMesh);
+    if (!(o as THREE.SkinnedMesh).isSkinnedMesh) return;
+    if (spec.skipMeshes?.includes(o.name) || (rt?.meshes && !rt.meshes.includes(o.name))) return;
+    parts.push(o as THREE.SkinnedMesh);
   });
   if (!parts.length) throw new Error(`${spec.key}: no skinned mesh`);
+  // retargeted model: its skeleton (or the one character's part of the file), in its bind pose
+  const skelRoot = rt?.root ? obj.getObjectByName(rt.root) : obj;
+  if (rt && !skelRoot) throw new Error(`${spec.key}: no ${rt.root}`);
+  if (rt?.parents) rebuildHierarchy(skelRoot!, rt.parents);
+  if (rt?.bindPose) {
+    for (const sk of parts) sk.skeleton.pose();
+    obj.updateMatrixWorld(true);
+  }
+  // one retargeter per animation file (each file carries its own copy of the Mixamo skeleton, in its own units);
+  // all made now, while the model is still in its rest pose
+  const retargeters: Partial<Record<Clip, Retargeter>> = {};
+  if (rt) for (const [clip, src] of Object.entries(fileObjs)) retargeters[clip as Clip] = makeRetargeter(src!, skelRoot!, rt.map);
   const offsets: number[] = [];
   let n = 0;
   for (const sk of parts) {
@@ -199,7 +238,8 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
     .multiply(new THREE.Matrix4().makeTranslation(-(bbox.min.x + bbox.max.x) / 2, -bbox.min.y, -(bbox.min.z + bbox.max.z) / 2));
 
   const mixer = new THREE.AnimationMixer(obj);
-  const fist = spec.rifle ? obj.getObjectByName(spec.rifleBone ?? 'FistR') : undefined;
+  const fist = spec.rifle ? (rt ? bonesByBase(skelRoot!).get(spec.rifleBone ?? '') : obj.getObjectByName(spec.rifleBone ?? 'FistR')) : undefined;
+  if (spec.rifle && !fist) throw new Error(`${spec.key}: no rifle bone ${spec.rifleBone}`);
   // Mixamo hips: pin x/z to the rest position so a walk that travels forward loops in place
   let hips: THREE.Object3D | undefined;
   obj.traverse((o) => {
@@ -222,8 +262,18 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
     const anim = fileClips[clip] ?? obj.animations.find((a) => a.name.endsWith('|' + src.name) || a.name === src.name);
     if (!anim) continue;
     mixer.stopAllAction();
-    const action = mixer.clipAction(anim);
+    // a retargeted model: play the clip on its file's Mixamo skeleton, then copy the pose across
+    const srcObj = rt ? fileObjs[clip] : undefined;
+    const retarget = rt ? retargeters[clip] : undefined;
+    if (rt && (!srcObj || !retarget)) continue;
+    const action = (srcObj ? new THREE.AnimationMixer(srcObj) : mixer).clipAction(anim);
     action.reset().play();
+    let srcHips: THREE.Object3D | undefined;
+    srcObj?.traverse((o) => {
+      if (!srcHips && (o as THREE.Bone).isBone && /hips$/i.test(o.name)) srcHips = o;
+    });
+    const srcHipsRest = srcHips ? srcHips.position.clone() : null;
+    const srcHand = srcObj?.getObjectByName('mixamorigRightHand');
     const frames: THREE.BufferGeometry[] = [];
     const hold = spec.clipHold?.[clip];
     // round 9 #96: sample by length, not a fixed count. A 4–6 s Mixamo idle or work loop with a dozen
@@ -231,8 +281,14 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
     const nFrames = hold !== undefined ? 1 : Math.max(src.frames, Math.min(POSE_CAP, Math.round(anim.duration * POSES_PER_SEC)));
     for (let f = 0; f < nFrames; f++) {
       const t = hold !== undefined ? hold * anim.duration : src.loop ? (f / nFrames) * anim.duration : (f / (nFrames - 1)) * anim.duration * 0.999;
-      mixer.setTime(t);
-      if (spec.inPlace && hips && hipsRest) {
+      action.getMixer().setTime(t);
+      if (retarget) {
+        if (spec.inPlace && srcHips && srcHipsRest) {
+          srcHips.position.x = srcHipsRest.x;
+          srcHips.position.z = srcHipsRest.z;
+        }
+        retarget.apply();
+      } else if (spec.inPlace && hips && hipsRest) {
         hips.position.x = hipsRest.x;
         hips.position.z = hipsRest.z;
         // the clip's hip height is in its own skeleton's units: rescale to this model's
@@ -254,6 +310,9 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
         const hp = new THREE.Vector3();
         const hq = new THREE.Quaternion();
         fist.matrixWorld.decompose(hp, hq, new THREE.Vector3());
+        // a retargeted model's hand bone has its own axes: hold the gun the way the Mixamo hand does
+        // (same facing and up as the model), so one fit file works for every soldier model
+        if (srcHand) srcHand.getWorldQuaternion(hq);
         hp.applyMatrix4(norm);
         const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2).multiply(hq);
         if (spec.rifleRot) q.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...spec.rifleRot)));
@@ -624,6 +683,35 @@ export const SOLDIER_CLIPS: Partial<Record<Clip, string>> = {
   coverIn: 'models/characters/soldier/cover_in.fbx',
   cover: 'models/characters/soldier/cover.fbx',
 };
+
+/** Dev: the round 10 models on trial (not in the game yet). */
+export const TRIAL_SPECS: CharacterSpec[] = [
+  {
+    key: 'rifleman2',
+    url: 'models/characters/rifleman/low_poly_soldier.glb',
+    clips: ['idle', 'walk', 'shoot', 'death', 'walkShoot', 'coverIn', 'cover', 'crouch'],
+    clipFiles: { ...SOLDIER_CLIPS, crouch: 'models/characters/soldier/crouch.fbx' },
+    retarget: { map: MIXAMO_TO_KOLOS },
+    skipMeshes: ['Object_78', 'Object_80'],
+    inPlace: true,
+    deathFalls: true,
+    rifle: true,
+    rifleBone: 'handR',
+    rifleModel: 'models/weapons/m4.glb',
+  },
+  {
+    key: 'engineer2',
+    url: 'models/characters/engineer/low_poly_soldiers.glb',
+    clips: ['idle', 'walk', 'shoot', 'death', 'work', 'walkShoot', 'coverIn', 'cover', 'crouch'],
+    clipFiles: { ...SOLDIER_CLIPS, work: 'models/characters/soldier/work.fbx', crouch: 'models/characters/soldier/crouch.fbx' },
+    retarget: { map: MIXAMO_TO_RIGIFY, parents: RIGIFY_PARENTS, root: 'GLTF_created_1_rootJoint', meshes: ['Object_182', 'Object_184', 'Object_188', 'Object_190', 'Object_192', 'Object_194', 'Object_196'] },
+    inPlace: true,
+    deathFalls: true,
+    rifle: true,
+    rifleBone: 'DEF-handR',
+    rifleModel: 'models/weapons/m4.glb',
+  },
+];
 
 export const CHARACTER_SPECS: CharacterSpec[] = [
   // v4.18: "Military RTS Character 1" (britdawgmasterfunk, CC-BY 4.0), rigged on Mixamo, with Mixamo

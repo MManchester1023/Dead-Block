@@ -38,6 +38,117 @@ export const MIXAMO_TO_CC: Record<string, string> = {
   mixamorigRightToeBase: 'CC_Base_R_ToeBase',
 };
 
+/**
+ * Mixamo → "low poly soldier" (Kolos Studios, round 10 rifleman): a plain Blender rig. Bone names as
+ * three.js sanitises them, without Sketchfab's numeric suffix (`hips_01` → `hips`); see `baseName`.
+ * It has one spine bone between hips and chest, so Mixamo's Spine1 goes unmapped.
+ */
+export const MIXAMO_TO_KOLOS: Record<string, string> = {
+  mixamorigHips: 'hips',
+  mixamorigSpine: 'spine',
+  mixamorigSpine2: 'chest',
+  mixamorigNeck: 'neck',
+  mixamorigHead: 'head',
+  mixamorigLeftShoulder: 'shoulderL',
+  mixamorigLeftArm: 'armL',
+  mixamorigLeftForeArm: 'forearmL',
+  mixamorigLeftHand: 'handL',
+  mixamorigRightShoulder: 'shoulderR',
+  mixamorigRightArm: 'armR',
+  mixamorigRightForeArm: 'forearmR',
+  mixamorigRightHand: 'handR',
+  mixamorigLeftUpLeg: 'uplegL',
+  mixamorigLeftLeg: 'legL',
+  mixamorigLeftFoot: 'footL',
+  mixamorigLeftToeBase: 'toeL',
+  mixamorigRightUpLeg: 'uplegR',
+  mixamorigRightLeg: 'legR',
+  mixamorigRightFoot: 'footR',
+  mixamorigRightToeBase: 'toeR',
+};
+
+/** Mixamo → Rigify deform bones ("Low Poly Soldiers Rigged Free", MadTrollStudio, round 10 engineer). */
+export const MIXAMO_TO_RIGIFY: Record<string, string> = {
+  mixamorigHips: 'DEF-pelvis',
+  mixamorigSpine: 'DEF-spine',
+  mixamorigSpine2: 'DEF-Chest',
+  mixamorigNeck: 'DEF-neck',
+  mixamorigHead: 'DEF-head',
+  mixamorigLeftShoulder: 'DEF-shoulderL',
+  mixamorigLeftArm: 'DEF-armL',
+  mixamorigLeftForeArm: 'DEF-lowerarmL',
+  mixamorigLeftHand: 'DEF-handL',
+  mixamorigRightShoulder: 'DEF-shoulderR',
+  mixamorigRightArm: 'DEF-armR',
+  mixamorigRightForeArm: 'DEF-lowerarmR',
+  mixamorigRightHand: 'DEF-handR',
+  mixamorigLeftUpLeg: 'DEF-legL',
+  mixamorigLeftLeg: 'DEF-shin-L',
+  mixamorigLeftFoot: 'DEF-footL',
+  mixamorigLeftToeBase: 'DEF-toesL',
+  mixamorigRightUpLeg: 'DEF-legR',
+  mixamorigRightLeg: 'DEF-shin-R',
+  mixamorigRightFoot: 'DEF-footR',
+  mixamorigRightToeBase: 'DEF-toesR',
+};
+
+/**
+ * That Rigify export has every deform bone parented straight to the root (the chain lived in
+ * constraints that glTF drops), so moving the upper arm wouldn't carry the hand. Child → parent, to
+ * rebuild the chain before retargeting; fingers follow their hand.
+ */
+export const RIGIFY_PARENTS: Record<string, string> = {
+  'DEF-spine': 'DEF-pelvis',
+  'DEF-Chest': 'DEF-spine',
+  'DEF-neck': 'DEF-Chest',
+  'DEF-head': 'DEF-neck',
+  'DEF-shoulderL': 'DEF-Chest',
+  'DEF-armL': 'DEF-shoulderL',
+  'DEF-lowerarmL': 'DEF-armL',
+  'DEF-handL': 'DEF-lowerarmL',
+  'DEF-shoulderR': 'DEF-Chest',
+  'DEF-armR': 'DEF-shoulderR',
+  'DEF-lowerarmR': 'DEF-armR',
+  'DEF-handR': 'DEF-lowerarmR',
+  'DEF-legL': 'DEF-pelvis',
+  'DEF-shin-L': 'DEF-legL',
+  'DEF-footL': 'DEF-shin-L',
+  'DEF-toesL': 'DEF-footL',
+  'DEF-legR': 'DEF-pelvis',
+  'DEF-shin-R': 'DEF-legR',
+  'DEF-footR': 'DEF-shin-R',
+  'DEF-toesR': 'DEF-footR',
+  'DEF-finger*L': 'DEF-handL',
+  'DEF-finger*R': 'DEF-handR',
+};
+
+/** A bone's name without the numeric suffix Sketchfab exports add (`DEF-handR_120` → `DEF-handR`). */
+export const baseName = (n: string) => n.replace(/_\d+$/, '');
+
+/** Bones under `root`, by base name (the first one wins). */
+export function bonesByBase(root: THREE.Object3D): Map<string, THREE.Bone> {
+  const m = new Map<string, THREE.Bone>();
+  root.traverse((o) => {
+    if ((o as THREE.Bone).isBone && !m.has(baseName(o.name))) m.set(baseName(o.name), o as THREE.Bone);
+  });
+  return m;
+}
+
+/** Re-parent bones (child base name → parent base name; `*` matches any run of characters), keeping their world pose. */
+export function rebuildHierarchy(root: THREE.Object3D, parents: Record<string, string>): void {
+  root.updateMatrixWorld(true);
+  const B = bonesByBase(root);
+  const rules = Object.entries(parents).map(([c, p]) => [new RegExp('^' + c.replace(/[.+?^${}()|[\]\\-]/g, '\\$&').replace(/\*/g, '.*') + '$'), p] as const);
+  for (const [name, bone] of B)
+    for (const [re, p] of rules)
+      if (re.test(name)) {
+        const parent = B.get(p);
+        if (parent && parent !== bone.parent) parent.attach(bone);
+        break;
+      }
+  root.updateMatrixWorld(true);
+}
+
 /** Bone → the child that defines which way it points (for the rest-pose alignment). */
 const AIM_CHILD: Record<string, string> = {
   mixamorigHips: 'mixamorigSpine',
@@ -59,13 +170,6 @@ const AIM_CHILD: Record<string, string> = {
   mixamorigRightFoot: 'mixamorigRightToeBase',
 };
 
-const byName = (root: THREE.Object3D) => {
-  const m = new Map<string, THREE.Bone>();
-  root.traverse((o) => {
-    if ((o as THREE.Bone).isBone) m.set(o.name, o as THREE.Bone);
-  });
-  return m;
-};
 
 const worldQuat = (o: THREE.Object3D) => o.getWorldQuaternion(new THREE.Quaternion());
 const worldPos = (o: THREE.Object3D) => o.getWorldPosition(new THREE.Vector3());
@@ -82,8 +186,8 @@ export interface Retargeter {
 export function makeRetargeter(source: THREE.Object3D, target: THREE.Object3D, map: Record<string, string>): Retargeter {
   source.updateMatrixWorld(true);
   target.updateMatrixWorld(true);
-  const S = byName(source);
-  const T = byName(target);
+  const S = bonesByBase(source);
+  const T = bonesByBase(target);
   const pairs: { s: THREE.Bone; t: THREE.Bone; sRest: THREE.Quaternion; tAligned: THREE.Quaternion; depth: number }[] = [];
   const depth = (b: THREE.Object3D) => {
     let d = 0;
@@ -98,8 +202,11 @@ export function makeRetargeter(source: THREE.Object3D, target: THREE.Object3D, m
     const tRest = worldQuat(t);
     // rest-pose alignment: rotate the target bone so it points where the source bone points
     let align = new THREE.Quaternion();
-    const sc = AIM_CHILD[sn] ? S.get(AIM_CHILD[sn]) : undefined;
-    const tc = AIM_CHILD[sn] ? T.get(map[AIM_CHILD[sn]]) : undefined;
+    // the aim child: the next bone down the chain that both skeletons have (Kolos has no Spine1)
+    let ac = AIM_CHILD[sn];
+    while (ac && !map[ac]) ac = AIM_CHILD[ac];
+    const sc = ac ? S.get(ac) : undefined;
+    const tc = ac ? T.get(map[ac]) : undefined;
     if (sc && tc) {
       const sd = worldPos(sc).sub(worldPos(s)).normalize();
       const td = worldPos(tc).sub(worldPos(t)).normalize();
