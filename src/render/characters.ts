@@ -258,7 +258,8 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
   const rifleShared: { color?: THREE.BufferAttribute; index?: THREE.BufferAttribute } = {};
   // round 4 #33: one simplification plan (made from the first pose) is reused for every frame, so the
   // decimated mesh is identical frame to frame instead of shimmering
-  let plan: ClusterPlan | null = null;
+  // (one plan per mesh layout: frames with the rifle in hand have more vertices than the 'work' frames without)
+  const plans = new Map<number, ClusterPlan>();
   for (const clip of spec.clips) {
     const src = { ...CLIP_SOURCES[clip], name: spec.clipNames?.[clip] ?? CLIP_SOURCES[clip].name };
     const anim = fileClips[clip] ?? obj.animations.find((a) => a.name.endsWith('|' + src.name) || a.name === src.name);
@@ -322,7 +323,9 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
         g = spec.simplify ? mergeSimple(g, r) : mergeIndexed(g, r, rifleShared);
       }
       if (spec.simplify) {
-        plan ??= makeClusterPlan(g, spec.simplify, spec.simplifyColors ?? 8);
+        const nv = g.attributes.position.count;
+        let plan = plans.get(nv);
+        if (!plan) plans.set(nv, (plan = makeClusterPlan(g, spec.simplify, spec.simplifyColors ?? 8)));
         g = applyClusterPlan(plan, g, spec.simplifyIndexed);
       }
       g.computeVertexNormals();

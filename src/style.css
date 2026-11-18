@@ -214,3 +214,11 @@ h3.collapsible:hover { color: #fff; }
 .dialog.menu .keys td:first-child { white-space: nowrap; width: 46%; }
 .dialog.menu table.settings td:last-child { text-align: right; }
 .dialog .cols.one { grid-template-columns: 1fr; }
+
+/* save / load page (STATUS #16) */
+.dialog.menu table.saves td { padding: 6px; font-size: 12px; }
+.dialog.menu table.saves td small { opacity: 0.6; margin-left: 6px; }
+.dialog.menu .slot-btns { white-space: nowrap; text-align: right; }
+.dialog.menu .slot-btns button { margin-left: 4px; }
+.dialog.menu .slot-btns button.warn { outline: 1px solid var(--bad, #d2443a); }
+.dialog button.big small { display: block; font-size: 11px; opacity: 0.7; font-weight: normal; }

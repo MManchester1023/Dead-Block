@@ -90,6 +90,21 @@ export const BALANCE = {
     loudness: 0.8,
   },
 
+  /** Roaming packs (STATUS #11, round 8 #88); how often and how big is per difficulty tier (`roam`). */
+  roaming: {
+    /** Districts this close (metres) count as neighbours. */
+    neighbourGap: 15,
+    /** Chance a pack heads for a neighbour's outpost (when there is one) rather than just next door. */
+    outpostBias: 0.6,
+    /** A district with no live hive sends packs this many times less often. */
+    noHiveSlower: 2,
+    /** Each zombie loose inside a secured district raises its infestation this much per minute… */
+    securedCreepPerZombiePerMin: 1.5,
+    /** …up to this cap; at the cap the district pays no income. With none left inside it falls back. */
+    securedCap: 30,
+    securedRecoverPerMin: 6,
+  },
+
   infestation: {
     perKill: { walker: 0.5, runner: 0.6, bloater: 1.5 } as Record<string, number>,
     hiveDestroyed: 45,
@@ -137,6 +152,8 @@ export interface DifficultyTier {
   firstPulseDelaySec: number;
   pulseIntervalSec: readonly number[];
   pulseSize: number; // multiplier on pulse size
+  /** Roaming packs leaving this district (STATUS #11): seconds between packs, and pack size. None = stays put. */
+  roam?: { everySec: readonly [number, number]; group: readonly [number, number] };
 }
 
 export const DIFFICULTY: readonly DifficultyTier[] = [
@@ -147,8 +164,10 @@ export const DIFFICULTY: readonly DifficultyTier[] = [
   // Easy (tutorial region 2, v4.13 #74): a real step up: more and tougher dead, Runner-heavy
   { name: 'Easy', zombieHp: 0.85, density: 1.15, spawnIntervalSec: [13, 12, 9, 7], spawnGroup: [1, 1, 2, 3],
     normalPool: [14, 24, 60, 120], mediumPool: [3, 4, 8, 12], mediumChance: [0.15, 0.2, 0.22, 0.25], runnerShare: [0.15, 0.25, 0.3, 0.35],
-    mediumStart: 0.07, mediumStartMin: 4, firstPulseDelaySec: 420, pulseIntervalSec: [330, 260, 210, 180], pulseSize: 1 },
+    mediumStart: 0.07, mediumStartMin: 4, firstPulseDelaySec: 420, pulseIntervalSec: [330, 260, 210, 180], pulseSize: 1,
+    roam: { everySec: [300, 420], group: [3, 5] } },
   { name: 'Standard', zombieHp: 1, density: 1, spawnIntervalSec: [18, 11, 7, 4], spawnGroup: [1, 2, 3, 4],
     normalPool: [10, 34, 105, 270], mediumPool: [2, 6, 15, 30], mediumChance: [0.12, 0.18, 0.22, 0.25], runnerShare: [0.08, 0.15, 0.22, 0.3],
-    mediumStart: 0.06, mediumStartMin: 2, firstPulseDelaySec: 480, pulseIntervalSec: [300, 240, 200, 180], pulseSize: 1 },
+    mediumStart: 0.06, mediumStartMin: 2, firstPulseDelaySec: 480, pulseIntervalSec: [300, 240, 200, 180], pulseSize: 1,
+    roam: { everySec: [180, 270], group: [4, 8] } },
 ];

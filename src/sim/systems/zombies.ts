@@ -73,7 +73,8 @@ export function updateZombies(w: World, dt: number): void {
     const dl = Math.hypot(dx, dy) || 1;
     dx /= dl;
     dy /= dl;
-    const speed = z.def.speed * (roaming ? 0.5 : 1) * w.grid.slowAt(z.pos);
+    // a roaming pack (STATUS #11) shambles along a bit slower than a horde on the move
+    const speed = z.def.speed * (roaming ? 0.5 : z.state === 'roam' ? 0.75 : 1) * w.grid.slowAt(z.pos);
     z.facing = Math.atan2(dy, dx);
     const blocked = moveWithCollision(w.grid, z.pos, dx * speed * dt, dy * speed * dt, z.radius * 0.6);
 
@@ -101,7 +102,7 @@ export function updateZombies(w: World, dt: number): void {
         if (st.def.id === 'baseWall' || (st.def.restore && !st.built)) {
           z.useField = true;
           z.stuckFor = Math.max(z.stuckFor, 2);
-        } else if (z.state === 'chase' || z.state === 'pulse' || z.state === 'investigate') {
+        } else if (z.state === 'chase' || z.state === 'pulse' || z.state === 'investigate' || z.state === 'roam') {
           // scratch at whatever else is in the way (sandbags across the gate, an outpost…)
           z.targetId = st.id;
           continue;

@@ -2,16 +2,27 @@ import { BALANCE } from '../../config/balance';
 import { UNITS } from '../../config/units';
 import type { World } from '../World';
 
+/**
+ * Secured districts paying income, weighted by how much of each is still really ours: dead loose inside
+ * (STATUS #11) cut a district's share, down to nothing at the roaming cap.
+ */
+export function securedShare(w: World): number {
+  let n = 0;
+  for (const d of w.districts.values())
+    if (d.secured && d.def.id !== 'base') n += Math.max(0, 1 - d.infestation / BALANCE.roaming.securedCap);
+  return n;
+}
+
 /** Current income rates per minute, for the HUD. */
 export function incomeRates(w: World): { money: number; supplies: number } {
   const E = BALANCE.economy;
-  const secured = [...w.districts.values()].filter((d) => d.secured && d.def.id !== 'base').length;
-  return { money: secured * E.securedDistrictMoneyPerMin, supplies: E.baseSuppliesPerMin + secured * E.securedDistrictSuppliesPerMin };
+  const secured = securedShare(w);
+  return { money: Math.round(secured * E.securedDistrictMoneyPerMin), supplies: Math.round(E.baseSuppliesPerMin + secured * E.securedDistrictSuppliesPerMin) };
 }
 
 export function updateEconomy(w: World, dt: number): void {
   const E = BALANCE.economy;
-  const securedCount = [...w.districts.values()].filter((d) => d.secured && d.def.id !== 'base').length;
+  const securedCount = securedShare(w);
   w.money += (securedCount * E.securedDistrictMoneyPerMin * dt) / 60;
   w.addSupplies(((E.baseSuppliesPerMin + securedCount * E.securedDistrictSuppliesPerMin) * dt) / 60);
 

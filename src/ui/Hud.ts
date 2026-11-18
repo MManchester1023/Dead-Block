@@ -1,4 +1,5 @@
 import { BALANCE } from '../config/balance';
+import { SAVE_VERSION, SLOTS, deleteSlot, latestSlot, requestLoad, slotMeta, writeSlot, type SlotId } from '../sim/save';
 import { FEATURES } from '../config/features';
 import { ABILITIES, STRUCTURES, UNITS } from '../config/units';
 import { isEnabled } from '../config/features';
@@ -60,7 +61,10 @@ const ICON: Record<string, string> = {
   lock: svg('<rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'),
 };
 
-type MenuPage = 'main' | 'controls' | 'settings' | 'restart';
+/** Autosave interval, seconds of game time (STATUS #16). */
+const AUTOSAVE_SEC = 180;
+
+type MenuPage = 'main' | 'controls' | 'settings' | 'restart' | 'saves';
 
 /** Every keybind, grouped, for the pause menu's Controls page (round 10 #105). */
 const K = (...keys: string[]) => keys.map((k) => `<kbd>${k}</kbd>`).join('+');
@@ -176,8 +180,52 @@ export class Hud {
     game.world.events.on('civiliansEvacuated', (e) => this.toast(`${e.count} survivor${e.count === 1 ? '' : 's'} evacuated: +$${e.money}, +${e.supplies} supplies`));
     game.world.events.on('victory', (e) => this.showEnd(true, e.reason));
     game.world.events.on('defeat', (e) => this.showEnd(false, e.reason));
-    this.showIntro();
+    // autosave when a district is secured (and every few minutes, see update)
+    game.world.events.on('districtSecured', () => void this.autosave());
+    this.lastAutosave = game.world.time;
+    if (game.loadedFrom) {
+      const s = game.loadedFrom.summary;
+      game.paused = true;
+      this.toast(`Loaded: day ${s.day}, ${s.region}. Paused: press Space to carry on.`);
+    } else this.showIntro();
   }
+
+  // ---------------------------------------------------------------- save / load (STATUS #16)
+  private lastAutosave = 0;
+  private saving = false;
+
+  /** Save into the autosave slot (quietly; only a failure is reported). */
+  private async autosave(): Promise<void> {
+    if (this.saving || this.game.world.over) return;
+    this.saving = true;
+    this.lastAutosave = this.game.world.time;
+    const err = await writeSlot('auto', this.game.snapshot());
+    this.saving = false;
+    if (err) this.toast(`Autosave failed: ${err}`);
+  }
+
+  private async saveTo(slot: SlotId): Promise<void> {
+    if (this.saving) return;
+    this.saving = true;
+    const err = await writeSlot(slot, this.game.snapshot());
+    this.saving = false;
+    this.toast(err ?? `Saved to slot ${slot}.`);
+    if (this.game.menuOpen) this.showMenu('saves');
+  }
+
+  /** One slot's line in the Save / Load page. */
+  private slotRow(slot: SlotId, confirm: string | null): string {
+    const m = slotMeta(slot);
+    const name = slot === 'auto' ? 'Autosave' : `Slot ${slot}`;
+    const old = m && m.v !== SAVE_VERSION;
+    const when = m ? new Date(m.savedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+    const desc = !m ? '<i>empty</i>' : old ? '<i>from an older version (can\'t be loaded)</i>' : `Day ${m.summary.day} · ${esc(m.summary.region)} · $${m.summary.money} <small>${when}</small>`;
+    const load = m && !old ? (confirm === `load:${slot}` ? `<button class="warn" data-act="load-go:${slot}">Confirm load</button>` : `<button data-act="load-ask:${slot}">Load</button>`) : '';
+    const save = slot === 'auto' ? '' : `<button data-act="save-to:${slot}">${m ? 'Overwrite' : 'Save'}</button>`;
+    const del = m ? (confirm === `del:${slot}` ? `<button class="warn" data-act="del-go:${slot}">Confirm delete</button>` : `<button class="ghost" data-act="del-ask:${slot}">Delete</button>`) : '';
+    return `<tr><td><b>${name}</b><br>${desc}</td><td class="slot-btns">${save}${load}${del}</td></tr>`;
+  }
+  private slotConfirm: string | null = null;
 
   private cache = new WeakMap<HTMLElement, string>();
   /** Only touch the DOM when a panel's content actually changed (keeps buttons, scroll and <details> stable). */
@@ -243,6 +291,25 @@ export class Hud {
       case 'restart-confirm':
         this.showMenu('restart');
         break;
+      case 'save-to':
+        void this.saveTo(arg as SlotId);
+        break;
+      case 'load-ask':
+      case 'del-ask':
+        this.slotConfirm = `${act === 'load-ask' ? 'load' : 'del'}:${arg}`;
+        this.showMenu('saves');
+        break;
+      case 'load-go':
+        requestLoad(arg as SlotId);
+        break;
+      case 'continue-save':
+        requestLoad(arg as SlotId);
+        break;
+      case 'del-go':
+        deleteSlot(arg as SlotId);
+        this.slotConfirm = null;
+        this.showMenu('saves');
+        break;
       case 'uiscale': {
         const i = UI_SCALES.indexOf(this.uiScale);
         this.uiScale = UI_SCALES[(i + 1) % UI_SCALES.length];
@@ -281,6 +348,7 @@ export class Hud {
 
   update(dt: number): void {
     this.tutorial?.update();
+    if (!this.game.paused && this.game.world.time - this.lastAutosave >= AUTOSAVE_SEC) void this.autosave();
     if (this.toastTimer > 0) {
       this.toastTimer -= dt;
       if (this.toastTimer <= 0) this.toastEl.classList.remove('show');
@@ -333,7 +401,7 @@ export class Hud {
         continue;
       }
       const hive = w.hives.filter((h) => h.alive && h.districtId === d.def.id);
-      const status = d.secured ? '<span class="good">SECURED</span>' : d.cleared ? '<span class="warn">CLEAR — build outpost</span>' : '<span class="bad">INFESTED</span>';
+      const status = d.secured && d.contested ? '<span class="warn">CONTESTED</span>' : d.secured ? '<span class="good">SECURED</span>' : d.cleared ? '<span class="warn">CLEAR — build outpost</span>' : '<span class="bad">INFESTED</span>';
       html += `<div class="district">
         <div class="row"><b>${d.def.name}</b>${status}</div>
         <label>Infestation ${Math.ceil(d.infestation)}%</label><div class="bar red"><i style="width:${d.infestation}%"></i></div>
@@ -543,6 +611,11 @@ export class Hud {
       </div>
       <p class="hint">Press <kbd>Esc</kbd> (or <b>MENU</b>, top right) any time for the controls, settings and restart.</p>
       <details class="roadmap"><summary>Build roadmap: what's in this MVP vs. coming next</summary>${tiers}</details>
+      ${(() => {
+        const s = latestSlot();
+        const m = s ? slotMeta(s) : null;
+        return s && m ? `<button class="big" data-act="continue-save:${s}">CONTINUE <small>day ${m.summary.day} · ${esc(m.summary.region)}</small></button>` : '';
+      })()}
       <button class="big" data-act="start:training">DEPLOY WITH TRAINING</button>
       <button class="big ghost" data-act="start">DEPLOY (skip training)</button>
     </div>`;
@@ -574,7 +647,10 @@ export class Hud {
     if (page === 'main') {
       body = `<p class="tag">PAUSED</p>
         <button class="big" data-act="resume">RESUME</button>
-        <div class="menu-row">${tab('controls', 'Controls')}${tab('settings', 'Settings')}<button data-act="restart-confirm">Restart</button></div>`;
+        <div class="menu-row">${tab('saves', 'Save / Load')}${tab('controls', 'Controls')}${tab('settings', 'Settings')}<button data-act="restart-confirm">Restart</button></div>`;
+    } else if (page === 'saves') {
+      body = `<table class="settings saves">${SLOTS.map((s) => this.slotRow(s, this.slotConfirm)).join('')}</table>
+        <p class="hint">Saves live in this browser. The game also autosaves every ${AUTOSAVE_SEC / 60} minutes and whenever a district is secured. Loading reloads the page.</p>`;
     } else if (page === 'controls') {
       body = `<div class="keys">${CONTROLS.map(([group, rows]) => `<h3>${group}</h3><table>${rows.map(([k, what]) => `<tr><td>${k}</td><td>${what}</td></tr>`).join('')}</table>`).join('')}</div>`;
     } else if (page === 'settings') {
@@ -584,10 +660,11 @@ export class Hud {
         <tr><td>Interface size</td><td><button data-act="uiscale">${Math.round(this.uiScale * 100)}%</button></td></tr>
       </table><p class="hint">Both are remembered in this browser.</p>`;
     } else {
-      body = `<p>Restart the campaign from the beginning? Everything in this session is lost (there's no saving yet).</p>
+      body = `<p>Restart the campaign from the beginning? Anything since your last save is lost.</p>
         <button class="big" data-act="restart">YES, RESTART</button> <button class="big ghost" data-act="menu-page:main">CANCEL</button>`;
     }
-    const nav = page === 'main' ? '' : `<div class="menu-row">${tab('main', '‹ Back')}${tab('controls', 'Controls')}${tab('settings', 'Settings')}<button data-act="resume">Resume</button></div>`;
+    if (page !== 'saves') this.slotConfirm = null;
+    const nav = page === 'main' ? '' : `<div class="menu-row">${tab('main', '‹ Back')}${tab('saves', 'Save / Load')}${tab('controls', 'Controls')}${tab('settings', 'Settings')}<button data-act="resume">Resume</button></div>`;
     this.modal.innerHTML = `<div class="dialog small menu"><h1>DEAD BLOCK <span>COMMAND</span></h1>${nav}${body}</div>`;
     this.modal.classList.add('open');
   }

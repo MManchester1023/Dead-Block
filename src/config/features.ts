@@ -35,6 +35,7 @@ export const FEATURES = [
   { id: 'knockback', name: 'Explosion knockback (friend & foe)', tier: 1, enabled: true, docRef: '§5' },
   { id: 'powerStations', name: 'Power restoration & base unlocks', tier: 1, enabled: false, docRef: '§2, §12' },
   { id: 'regionTakeover', name: 'Lost outpost becomes a hive', tier: 1, enabled: true, docRef: '§19' },
+  { id: 'roaming', name: 'Roaming packs drift between districts and hit outposts', tier: 1, enabled: true, docRef: '§22 #88' },
   { id: 'tutorial', name: 'Paused-prompt tutorial (mission 1 of 7 scripted)', tier: 1, enabled: true, docRef: '§17, §18' },
 
   // Tier 2 — escalation and spectacle

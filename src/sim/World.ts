@@ -17,6 +17,7 @@ import { pickMedium, updateHives } from './systems/hives';
 import { updateEconomy, updateMedical } from './systems/economy';
 import { updateDistricts } from './systems/districts';
 import { updateNoise } from './systems/noise';
+import { updateRoaming } from './systems/roaming';
 import { updateCivilians } from './systems/civilians';
 import { updateSupport, type PendingImpact, type SupplyCrate } from './systems/support';
 
@@ -33,6 +34,10 @@ export interface DistrictState {
   locked: boolean;
   /** Until this sim time a just-opened region's dead ignore distant noise (v4.15 #77). */
   quietUntil: number;
+  /** Seconds until the next roaming pack leaves (STATUS #11). */
+  roamTimer: number;
+  /** Dead loose inside while secured (STATUS #11): set while it's contested, for the one-off warning. */
+  contested: boolean;
 }
 
 export interface NoiseEvent {
@@ -95,7 +100,7 @@ export class World {
     }
     for (const p of this.map.props) this.grid.setRect(p.cells.x, p.cells.y, p.cells.w, p.cells.h, true, p.id);
     for (const d of this.map.districts)
-      this.districts.set(d.id, { def: d, infestation: d.initialInfestation, noise: 0, noiseHold: 0, secured: d.id === 'base', outpostId: null, cleared: d.initialInfestation === 0, locked: !!d.locked, quietUntil: 0 });
+      this.districts.set(d.id, { def: d, infestation: d.initialInfestation, noise: 0, noiseHold: 0, secured: d.id === 'base', outpostId: null, cleared: d.initialInfestation === 0, locked: !!d.locked, quietUntil: 0, roamTimer: 0, contested: false });
     // locked tutorial regions are fenced off until they open
     for (const d of this.map.districts) if (d.locked && d.borders) this.setBorder(d, true);
 
@@ -142,7 +147,16 @@ export class World {
     this.spawnSquad('engineer', { x: 54, y: 108 });
 
     // hives and the starting dead, for every district that's open (locked ones seed when they open)
-    for (const d of this.districts.values()) if (!d.locked) this.seedDistrict(d);
+    for (const d of this.districts.values()) if (!d.locked) {
+      this.seedDistrict(d);
+      this.firstRoam(d);
+    }
+  }
+
+  /** The first pack leaves a full interval after a district opens (none in the opening minutes). */
+  firstRoam(d: DistrictState): void {
+    const T = this.tier(d.def.id).roam;
+    d.roamTimer = T ? T.everySec[1] : 0;
   }
 
   /** Hives plus the district's own starting population mix. */
@@ -192,7 +206,7 @@ export class World {
       }
   }
 
-  private setBorder(d: DistrictDef, closed: boolean): void {
+  setBorder(d: DistrictDef, closed: boolean): void {
     const c = this.grid.cell;
     for (const b of d.borders ?? []) this.grid.setRect(Math.round(b.x / c), Math.round(b.y / c), Math.round(b.w / c), Math.round(b.h / c), closed);
   }
@@ -207,6 +221,7 @@ export class World {
     // the region's power station(s), offline until restored (v4.17)
     for (const ps of d.def.powerStations ?? []) this.addStructure('powerStation', ps, false);
     d.quietUntil = this.time + BALANCE.noise.openingQuietSec;
+    this.firstRoam(d);
     const unlocks = d.def.unlocksOnOpen ?? [];
     for (const u of unlocks) this.unlocked.add(u);
     this.events.emit('districtUnlocked', { districtId: id, name: d.def.name, unlocks });
@@ -221,6 +236,25 @@ export class World {
     if (defId === 'civilians') return `Survivors ${++this.survivorGroups}`;
     const n = SQUAD_NAMES[this.nameCounter++ % SQUAD_NAMES.length];
     return defId === 'engineer' ? `Sapper ${n}` : n;
+  }
+
+  /** Name counters, for save/load. */
+  counters(): { names: number; survivors: number } {
+    return { names: this.nameCounter, survivors: this.survivorGroups };
+  }
+  setCounters(c: { names: number; survivors: number }): void {
+    this.nameCounter = c.names;
+    this.survivorGroups = c.survivors;
+  }
+
+  /** Put an already-made squad / zombie into the world (save/load). */
+  adoptSquad(sq: Squad): void {
+    this.squads.push(sq);
+    this.byId.set(sq.id, sq);
+  }
+  adoptZombie(z: Zombie): void {
+    this.zombies.push(z);
+    this.byId.set(z.id, z);
   }
 
   spawnSquad(defId: string, pos: Vec2, name?: string, members?: number): Squad {
@@ -581,6 +615,17 @@ export class World {
   }
 
   /** Changes whenever routes may need re-planning: walls built/removed, or gas clouds appearing/clearing. */
+  /** Nav bookkeeping for save/load: a loaded game keeps its squads' planned routes valid. */
+  navState(): { grid: number; hazard: number; key: string } {
+    return { grid: this.grid.version, hazard: this.hazardVersion, key: this.hazardKey };
+  }
+  restoreNav(n: { grid: number; hazard: number; key: string }): void {
+    this.refreshHazards(); // rebuild the hazard cells from the loaded clouds
+    this.grid.version = n.grid;
+    this.hazardVersion = n.hazard;
+    this.hazardKey = n.key;
+  }
+
   get navVersion(): number {
     return this.grid.version * 4096 + this.hazardVersion;
   }
@@ -825,6 +870,7 @@ export class World {
     updateMedical(this, dt);
     updateSupport(this);
     updateCivilians(this);
+    updateRoaming(this, dt);
 
     this.refreshHazards();
 

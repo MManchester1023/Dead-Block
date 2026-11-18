@@ -5,6 +5,7 @@ import { Hud } from './ui/Hud';
 import { models } from './render/ModelLibrary';
 import { loadCast } from './render/characters';
 import { Sound } from './audio/Sound';
+import { takePendingLoad } from './sim/save';
 
 const view = document.getElementById('view')!;
 const labels = document.getElementById('labels')!;
@@ -16,11 +17,23 @@ async function boot(): Promise<void> {
   const [, cast] = await Promise.all([models.preload(), loadCast()]);
   loading?.remove();
 
-  const game = new Game(view, labels, cast);
+  // a save the player chose to load (the page reloads to rebuild the scene from it)
+  const pending = await takePendingLoad();
+  let game: Game;
+  let loadError: string | null = pending && !pending.data ? 'That save could not be read.' : null;
+  try {
+    game = new Game(view, labels, cast, pending?.data ?? null);
+  } catch (err) {
+    loadError = err instanceof Error ? err.message : 'That save could not be loaded.';
+    view.innerHTML = '';
+    labels.innerHTML = '';
+    game = new Game(view, labels, cast);
+  }
   const input = new Input(game, view);
   const hud = new Hud(game, hudRoot);
   const sound = new Sound(game);
   hud.sound = sound;
+  if (loadError) hud.toast(`Load failed: ${loadError} Starting a new game.`);
 
   let last = performance.now();
   game.start(() => {

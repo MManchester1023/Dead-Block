@@ -2,6 +2,7 @@ import { BALANCE } from './config/balance';
 import { STRUCTURES } from './config/units';
 import { dist, type Vec2 } from './core/math';
 import { World } from './sim/World';
+import { loadWorld, saveWorld, type SaveData } from './sim/save';
 import { Squad } from './sim/entities';
 import { Renderer } from './render/Renderer';
 import type { Flipbook } from './render/characters';
@@ -75,11 +76,28 @@ export class Game {
   private listeners: (() => void)[] = [];
   toast: (msg: string) => void = () => {};
 
-  constructor(container: HTMLElement, overlay: HTMLElement, cast: Record<string, Flipbook> | null = null) {
-    this.world = new World({ seed: 1337 });
+  /** Set when this session started from a save (STATUS #16): the HUD skips the intro. */
+  loadedFrom: SaveData | null = null;
+
+  constructor(container: HTMLElement, overlay: HTMLElement, cast: Record<string, Flipbook> | null = null, save: SaveData | null = null) {
+    this.world = save ? loadWorld(save, 1337) : new World({ seed: 1337 });
+    this.loadedFrom = save;
     this.renderer = new Renderer(container, overlay, this.world, cast);
     this.renderer.rig.focus({ x: 102, y: 108 });
+    if (save?.view) {
+      const r = this.renderer.rig;
+      r.target.set(save.view.x, 0, save.view.z);
+      r.zoom = save.view.zoom;
+      r.yaw = save.view.yaw;
+      this.speed = save.view.speed;
+    }
     this.world.events.on('squadWiped', (e) => this.selected.delete(e.squadId));
+  }
+
+  /** Everything needed to pick this game up again (STATUS #16). */
+  snapshot(): SaveData {
+    const r = this.renderer.rig;
+    return saveWorld(this.world, { x: r.target.x, z: r.target.z, zoom: r.zoom, yaw: r.yaw, speed: this.speed });
   }
 
   onChange(fn: () => void): void {

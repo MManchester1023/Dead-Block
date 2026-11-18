@@ -36,6 +36,10 @@ export interface GameEvents {
   /** Survivors found in a house (STATUS #10); the first time, the HUD explains what to do with them. */
   civiliansFound: { squadId: number; count: number; pos: Vec2; first: boolean };
   civiliansEvacuated: { count: number; money: number; supplies: number; pos: Vec2 };
+  /** A roaming pack set off (STATUS #11). */
+  roamers: { from: string; to: string; count: number; outpostId: number | null; pos: Vec2 };
+  /** Dead got inside a secured district (STATUS #11). */
+  districtContested: { districtId: string; name: string };
   nestBurst: { buildingId: number; pos: Vec2; count: number };
   victory: { reason: string };
   defeat: { reason: string };

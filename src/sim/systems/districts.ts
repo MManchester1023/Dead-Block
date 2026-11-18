@@ -76,12 +76,30 @@ export function updateDistricts(w: World, dt: number): void {
           w.events.emit('victory', { reason: `${d.def.name} is secured. The first block is ours.` });
       }
     } else if (d.outpostId) {
+      // STATUS #11: dead loose inside a secured district (roamers, stragglers) raise its infestation,
+      // which cuts its income (economy.ts); cleared out, it falls back to 0
+      const R = BALANCE.roaming;
+      const r = d.def.rect;
+      let inside = 0;
+      for (const z of w.zombies) if (z.alive && z.pos.x >= r.x && z.pos.y >= r.y && z.pos.x < r.x + r.w && z.pos.y < r.y + r.h) inside++;
+      if (inside) {
+        d.infestation = Math.min(R.securedCap, d.infestation + (inside * R.securedCreepPerZombiePerMin * dt) / 60);
+        if (!d.contested) {
+          d.contested = true;
+          w.events.emit('districtContested', { districtId: d.def.id, name: d.def.name });
+          w.events.emit('radio', { speaker: 'Overwatch', text: `Dead inside ${d.def.name}. Clear them out before they eat into the income.`, tone: 'warn' });
+        }
+      } else {
+        d.infestation = Math.max(0, d.infestation - (R.securedRecoverPerMin * dt) / 60);
+        if (d.infestation <= 0) d.contested = false;
+      }
       const op = w.get(d.outpostId);
       if (!(op instanceof Structure) || !op.alive) {
         // doc §19: a retaken region gets a hive where the outpost stood
         const pos = op ? { ...op.pos } : { x: d.def.rect.x + d.def.rect.w / 2, y: d.def.rect.y + d.def.rect.h / 2 };
         d.secured = false;
         d.cleared = false;
+        d.contested = false;
         d.outpostId = null;
         d.infestation = 40;
         w.commandCap -= BALANCE.economy.commandPerSecuredDistrict;

@@ -126,7 +126,7 @@ export class Squad implements Targetable {
   }
 }
 
-export type ZombieState = 'idle' | 'wander' | 'investigate' | 'chase' | 'attack' | 'pulse';
+export type ZombieState = 'idle' | 'wander' | 'investigate' | 'chase' | 'attack' | 'pulse' | 'roam';
 
 export class Zombie implements Targetable {
   readonly id = newId();

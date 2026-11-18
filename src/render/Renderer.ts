@@ -247,7 +247,7 @@ export class Renderer {
 
     // fences closing off tutorial regions that haven't opened yet (doc §17)
     for (const d of m.districts) {
-      if (!d.locked || !d.borders) continue;
+      if (!this.world.districts.get(d.id)?.locked || !d.borders) continue; // (a loaded game may have opened it)
       const fence = new THREE.Group();
       for (const b of d.borders) fence.add(makeBorder(m, b));
       this.scene.add(fence);
