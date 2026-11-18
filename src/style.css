@@ -235,3 +235,7 @@ h3.collapsible:hover { color: #fff; }
 .hive-label .bar.grow i { background: var(--warn); }
 /* round 14 #176: waypoint numbers */
 .wp-num { position: absolute; left: 0; top: 0; pointer-events: none; font: 700 11px/1 var(--mono, monospace); color: #0d0f0c; background: #9fe07a; border-radius: 8px; padding: 1px 5px; }
+/* round 14 #177: formation shape buttons */
+.formations { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; width: 100%; margin-top: 4px; }
+.formations small { color: #999; margin-right: 4px; }
+.formations .cmd { padding: 2px 7px; }

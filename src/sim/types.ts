@@ -33,6 +33,17 @@ export interface Order {
   /** Patrol (round 14 #174): the loop of points, and which one it's heading for. */
   route?: Vec2[];
   leg?: number;
+  /** Face this way (radians) on arrival (round 14 #177: formations dragged with right-click). */
+  face?: number;
+}
+
+/** Formation shapes for moving several squads together (round 14 #177). */
+export type FormationShape = 'line' | 'column' | 'wedge' | 'box' | 'spread';
+/** How a group move is laid out: the shape, which way it faces (radians; default: the way it's going), and the front's width (m). */
+export interface Formation {
+  shape: FormationShape;
+  facing?: number;
+  width?: number;
 }
 
 /** Anything that can be shot at. */

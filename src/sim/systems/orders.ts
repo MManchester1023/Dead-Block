@@ -99,6 +99,10 @@ export function updateOrders(w: World, dt: number): void {
           if (moveToward(w, s, o.pos, dt, ARRIVE)) {
             s.orders.shift();
             s.path = [];
+            if (o.face !== undefined) {
+              s.facing = o.face; // round 14 #177: the facing dragged out with right-click
+              s.formFacing = o.face;
+            }
             if (o.type === 'cover') {
               s.holding = true;
               s.seekCover = true; // round 11 #126: no room behind it → crouch here

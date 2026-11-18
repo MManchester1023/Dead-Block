@@ -8,7 +8,7 @@ import { NavGrid } from './grid';
 import { FlowFields } from './flowfield';
 import { SpatialHash } from './spatial';
 import { Hive, Squad, Structure, Zombie, type DemoCharge, type ToxicCloud } from './entities';
-import type { DamageType, Order, Targetable } from './types';
+import type { DamageType, Formation, Order, Targetable } from './types';
 import * as Campaign from './rules/campaign';
 import * as Commands from './rules/commands';
 import * as Damage from './rules/damage';
@@ -323,8 +323,8 @@ export class World {
 
   // ---------- commands (called by input/UI) ----------
 
-  issueOrder(squads: Squad[], order: Order, queue = false): void {
-    Commands.issueOrder(this, squads, order, queue);
+  issueOrder(squads: Squad[], order: Order, queue = false, formation?: Formation): void {
+    Commands.issueOrder(this, squads, order, queue, formation);
   }
   stop(squads: Squad[]): void {
     Commands.stop(squads);

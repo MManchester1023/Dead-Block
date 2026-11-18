@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { World } from '../src/sim/World';
 import { BALANCE } from '../src/config/balance';
 import { ABILITIES, ZOMBIES } from '../src/config/units';
+import { formationSlots } from '../src/sim/rules/commands';
 
 describe('round 14 playtest (v4.51)', () => {
   it('Runners 9.5 m/s, demo charges plant in 2 s (#162, #171)', () => {
@@ -98,5 +99,30 @@ describe('round 14 playtest (v4.51)', () => {
       }
     }
     expect(spots.size).toBeGreaterThan(8); // different places in different games
+  });
+
+  it('formation shapes: one distinct spot per squad, the shape as named (#177)', () => {
+    for (const shape of ['line', 'column', 'wedge', 'box', 'spread'] as const)
+      for (const n of [2, 3, 5, 8]) {
+        const sl = formationSlots(n, shape);
+        expect(sl.length).toBe(n);
+        expect(new Set(sl.map((p) => `${p.right},${p.back}`)).size).toBe(n);
+      }
+    expect(formationSlots(4, 'column').every((p) => p.right === 0)).toBe(true);
+    expect(formationSlots(4, 'line').every((p) => p.back === 0)).toBe(true);
+    const wedge = formationSlots(5, 'wedge');
+    expect(wedge[0]).toEqual({ right: 0, back: 0 }); // the point of the V in front
+    expect(Math.max(...formationSlots(4, 'spread').map((p) => p.right))).toBeGreaterThan(Math.max(...formationSlots(4, 'line').map((p) => p.right)));
+  });
+
+  it('a dragged formation move ends with the squads in the shape, facing the dragged way (#177)', () => {
+    const w = new World({ populate: false });
+    const squads = [0, 1, 2].map((i) => w.spawnSquad('rifle', { x: 60 + i * 6, y: 108 }));
+    const face = Math.PI / 2; // south (+y)
+    w.issueOrder(squads, { type: 'move', pos: { x: 75, y: 130 } }, false, { shape: 'column', facing: face });
+    for (let i = 0; i < 30 * 15; i++) w.step(1 / 30);
+    for (const s of squads) expect(Math.abs(s.facing - face)).toBeLessThan(0.05);
+    const xs = squads.map((s) => s.pos.x);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeLessThan(3); // a column runs north–south here
   });
 });

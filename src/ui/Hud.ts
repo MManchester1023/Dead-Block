@@ -3,6 +3,7 @@ import { SAVE_VERSION, SLOTS, deleteSlot, latestSlot, requestLoad, slotMeta, wri
 import { ABILITIES, STRUCTURES, UNITS } from '../config/units';
 import { isEnabled } from '../config/features';
 import type { Game } from '../Game';
+import type { FormationShape } from '../sim/types';
 import { Radio } from './Radio';
 import { ROADSIDE_MOTEL_TUTORIAL, Tutorial } from '../tutorial/Tutorial';
 import { squadStatus } from './status';
@@ -86,6 +87,7 @@ const CONTROLS: [string, [string, string][]][] = [
     ['Right-click a guard tower', 'Man it'],
     [`${K('Shift')} + right-click`, 'Waypoints: queue moves (they go to each and stop at the last)'],
     [K('P'), 'Patrol: click points of a loop (Shift+click to add more)'],
+    ['Right-drag (squads selected)', 'Move into the chosen formation, facing across the drag (line/spread: as wide as the drag)'],
     [`${K('Ctrl')}+${K('A')}`, 'Attack-move'],
     [K('H'), 'Hold position'],
     [K('G'), 'Crouch / stand (half cover anywhere, slower on the move)'],
@@ -266,6 +268,7 @@ export class Hud {
       case 'hold': g.hold(); break;
       case 'crouch': g.crouch(); break;
       case 'patrol': g.setMode({ kind: 'patrol', started: false }); break;
+      case 'formation': g.setFormation(arg as FormationShape); break;
       case 'stop': g.stop(); break;
       case 'disband': g.disband(); break;
       case 'upgrade': g.upgradeSelected(); break;
@@ -530,6 +533,11 @@ export class Hud {
     const mode = g.mode;
     const civOnly = sq.every((s) => s.def.category === 'civilian');
     let cmds = civOnly ? btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'Ctrl+S') : btn('attackMove', 'Attack-move', 'Ctrl+A', undefined, mode.kind === 'attackMove') + btn('patrol', 'Patrol', 'P', undefined, mode.kind === 'patrol') + btn('hold', 'Hold', 'H') + btn('crouch', sq.every((s) => s.crouched) ? 'Stand' : 'Crouch', 'G', undefined, sq.every((s) => s.crouched)) + btn('stop', 'Stop', 'Ctrl+S') + `<button class="cmd" data-act="disband" title="Walk back to the Barracks and stand down: frees command and upkeep, refunds ${BALANCE.economy.disbandRefund * 100}% of the cost">Disband</button>`;
+    // round 14 #177: formation shapes for moving several squads (right-drag places it and sets its facing)
+    if (!civOnly && sq.length > 1)
+      cmds += `<div class="formations"><small>Formation</small>${(['line', 'column', 'wedge', 'box', 'spread'] as const)
+        .map((f) => `<button class="cmd ${g.formation === f ? 'on' : ''}" data-act="formation:${f}" title="Right-drag on the map to place it and set its facing">${f[0].toUpperCase() + f.slice(1)}</button>`)
+        .join('')}</div>`;
     // engineers' build tools live in the bottom-centre build bar (round 9 #104; see renderBuildBar)
     void eng;
     const modeHint =

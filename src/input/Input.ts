@@ -1,3 +1,4 @@
+import type { Vec2 } from '../core/math';
 import { STRUCTURES } from '../config/units';
 import type { Game } from '../Game';
 
@@ -50,7 +51,8 @@ export class Input {
         g.setMode({ kind: 'normal' });
         return;
       }
-      g.commandAt(p, e.shiftKey);
+      // round 14 #177: act on release, so a right-drag can lay out a formation instead
+      this.rightDrag = { p, x: e.clientX, y: e.clientY, dragging: false };
       return;
     }
     if (e.button !== 0) return;
@@ -104,6 +106,11 @@ export class Input {
       this.game.changed();
       return;
     }
+    if (this.rightDrag) {
+      const d = this.rightDrag;
+      if (!d.dragging && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 18 && this.game.selectedSquads.length) d.dragging = true;
+      if (d.dragging) this.game.renderer.formationPreview = this.game.formationPreview(d.p, this.ground(e));
+    }
     if (this.mouse.inside) {
       this.game.renderer.hovered = this.pick(e.clientX, e.clientY);
       this.game.renderer.hoveredSquads = this.squadsUnder(e.clientX, e.clientY);
@@ -124,6 +131,9 @@ export class Input {
 
   /** Squad under a screen point: its name label first (#39), else the nearest body within 28 px. */
   /** Every squad under the cursor, nearest first (round 14 #178). */
+  /** A right-button press in progress (round 14 #177): a click commands, a drag places a formation. */
+  private rightDrag: { p: Vec2; x: number; y: number; dragging: boolean } | null = null;
+
   private squadsUnder(x: number, y: number): number[] {
     const r = this.game.renderer;
     const out: { id: number; d: number }[] = [];
@@ -181,6 +191,14 @@ export class Input {
   private up(e: MouseEvent): void {
     if (e.button === 1) {
       this.panning = null;
+      return;
+    }
+    if (e.button === 2 && this.rightDrag) {
+      const d = this.rightDrag;
+      this.rightDrag = null;
+      this.game.renderer.formationPreview = [];
+      if (d.dragging) this.game.formationMoveAt(d.p, this.ground(e), e.shiftKey);
+      else this.game.commandAt(d.p, e.shiftKey);
       return;
     }
     if (e.button !== 0 || !this.dragStart) return;

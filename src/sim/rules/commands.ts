@@ -4,7 +4,7 @@ import { isEnabled } from '../../config/features';
 import { STRUCTURES, UNITS } from '../../config/units';
 import type { Hive, Squad, Structure } from '../entities';
 import type { BuildingDef } from '../map';
-import type { Order, Targetable } from '../types';
+import type { Formation, FormationShape, Order, Targetable } from '../types';
 import type { World } from '../World';
 
 /**
@@ -12,32 +12,66 @@ import type { World } from '../World';
  * checks behind them. Each returns an error message for the HUD, or null when it went through.
  */
 
-export function issueOrder(w: World, squads: Squad[], order: Order, queue = false): void {
+/**
+ * Where each squad of a group stands, relative to the point (round 14 #177): `right` along the front,
+ * `back` behind it, in metres. Fighters take the front slots, support (engineers) the rear ones.
+ */
+export function formationSlots(n: number, shape: FormationShape, width?: number): { right: number; back: number }[] {
+  const sp = 6; // metres between squads
+  const out: { right: number; back: number }[] = [];
+  if (shape === 'line' || shape === 'spread') {
+    const gap = width && n > 1 ? Math.max(4, Math.min(shape === 'spread' ? 24 : 14, width / (n - 1))) : shape === 'spread' ? sp * 2 : sp;
+    for (let i = 0; i < n; i++) out.push({ right: (i - (n - 1) / 2) * gap, back: 0 });
+  } else if (shape === 'column') {
+    for (let i = 0; i < n; i++) out.push({ right: 0, back: i * sp });
+  } else if (shape === 'wedge') {
+    for (let i = 0; i < n; i++) {
+      const row = Math.ceil(i / 2);
+      const side = i === 0 ? 0 : i % 2 ? -1 : 1;
+      out.push({ right: side * row * sp, back: row * sp });
+    }
+  } else {
+    const cols = Math.ceil(Math.sqrt(n));
+    const rows = Math.ceil(n / cols);
+    for (let i = 0; i < n; i++) out.push({ right: ((i % cols) - (cols - 1) / 2) * sp, back: Math.floor(i / cols) * sp - ((rows - 1) * sp) / 2 });
+  }
+  return out;
+}
+
+export function issueOrder(w: World, squads: Squad[], order: Order, queue = false, formation?: Formation): void {
   for (const s of squads) {
     if (!queue) {
       s.autoCrouch = false;
       s.seekCover = false;
     }
   }
-  // line formation for multi-squad moves (doc §4): fighters in the front rank, support one rank behind
+  // formations for multi-squad moves (doc §4; round 14 #177 adds shapes and a dragged facing): fighters in
+  // front, support behind; default a line facing the way the group is going
   const n = squads.length;
   const center = squads.reduce((a, s) => ({ x: a.x + s.pos.x / n, y: a.y + s.pos.y / n }), { x: 0, y: 0 });
-  const dir = norm(sub(order.pos, center));
+  const toward = norm(sub(order.pos, center));
+  const ang = formation?.facing ?? Math.atan2(toward.y, toward.x);
+  const dir = { x: Math.cos(ang), y: Math.sin(ang) };
   const perp = { x: -dir.y, y: dir.x };
-  const spacing = 6; // metres between squads in a line
   const isSupport = (s: Squad) => !!s.def.canBuild?.length;
-  const front = squads.filter((s) => !isSupport(s));
-  const back = squads.filter(isSupport);
-  const slot = new Map<Squad, { k: number; rank: number }>();
-  const ranks = front.length ? [front, back] : [back];
-  ranks.forEach((rank, r) => rank.forEach((s, i) => slot.set(s, { k: (i - (rank.length - 1) / 2) * spacing, rank: r })));
+  const ordered = [...squads.filter((s) => !isSupport(s)), ...squads.filter(isSupport)];
+  const shape = formation?.shape ?? 'line';
+  const slots = formationSlots(n, shape, formation?.width).sort((a, b) => a.back - b.back);
+  const slot = new Map<Squad, { k: number; back: number }>();
+  if (shape === 'line' && !formation?.width) {
+    // the original layout: a line of fighters, support one rank (7 m) behind
+    const front = ordered.filter((s) => !isSupport(s));
+    const rear = ordered.filter(isSupport);
+    const ranks = front.length ? [front, rear] : [rear];
+    ranks.forEach((rank, r) => rank.forEach((s, i) => slot.set(s, { k: (i - (rank.length - 1) / 2) * 6, back: r * 7 })));
+  } else ordered.forEach((s, i) => slot.set(s, { k: slots[i].right, back: slots[i].back }));
   squads.forEach((s) => {
     const o: Order = { ...order, pos: { ...order.pos } };
     if (n > 1 && (order.type === 'move' || order.type === 'attackMove')) {
-      const { k, rank } = slot.get(s)!;
-      const back = rank * 7;
+      const { k, back } = slot.get(s)!;
       o.pos = w.grid.nearestFree({ x: order.pos.x + perp.x * k - dir.x * back, y: order.pos.y + perp.y * k - dir.y * back });
     }
+    if (formation?.facing !== undefined) o.face = formation.facing;
     if (!queue) {
       s.orders = [];
       s.path = [];

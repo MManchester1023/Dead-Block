@@ -5,6 +5,7 @@ import type { FrameState, RenderCtx } from './context';
 const MAX_SEG = 1024;
 const WAY = new THREE.Color(0x9fe07a);
 const PATROL = new THREE.Color(0xe0b24a);
+const PREVIEW = new THREE.Color(0x7ab0e0);
 /** Orders that lead somewhere (their `pos` is drawn as a waypoint). */
 const GOES = new Set(['move', 'attackMove', 'cover', 'search', 'garrison', 'build', 'repair', 'deconstruct', 'charge', 'upgrade', 'disband']);
 
@@ -29,7 +30,7 @@ export class RouteLayer {
     ctx.scene.add(lines);
   }
 
-  update(f: FrameState): void {
+  update(f: FrameState, preview: Vec2[] = []): void {
     const { world: w, scene, labels, overlay } = this.ctx;
     let n = 0;
     let m = 0;
@@ -79,6 +80,8 @@ export class RouteLayer {
         from = o.pos;
       }
     }
+    // a right-drag formation being laid out (round 14 #177): a ring where each squad will stand
+    for (const p of preview) mark(p, PREVIEW, '');
     for (let i = m; i < this.markers.length; i++) {
       this.markers[i].visible = false;
       this.nums[i].style.display = 'none';

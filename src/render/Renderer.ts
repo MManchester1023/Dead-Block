@@ -41,6 +41,8 @@ export class Renderer {
   /** Entity under the mouse (squad, structure or hive id): health bars only show on hover or selection (#35). */
   hovered: number | null = null;
   hoveredSquads: number[] = [];
+  /** Where a right-drag formation would put the selected squads (round 14 #177). */
+  formationPreview: { x: number; y: number }[] = [];
   /** Selected base building, so its bar shows too. */
   selectedStructure: number | null = null;
 
@@ -217,7 +219,7 @@ export class Renderer {
     this.hives.update(f);
     this.drops.update();
     this.popups.update(realDt);
-    this.routes.update(f);
+    this.routes.update(f, this.formationPreview);
     this.city.updateDistricts();
     this.fx.update(this.time, realDt, simDt);
     if (isEnabled('dayNight')) this.applyTimeOfDay(w.dayTimer / BALANCE.economy.dayLengthSec);

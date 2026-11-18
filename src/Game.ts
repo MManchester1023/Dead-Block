@@ -7,6 +7,8 @@ import { Squad } from './sim/entities';
 import { Renderer } from './render/Renderer';
 import type { Flipbook } from './render/characters';
 import { callSupport } from './sim/systems/support';
+import { formationSlots } from './sim/rules/commands';
+import type { Formation, FormationShape } from './sim/types';
 import type { Targetable } from './sim/types';
 
 export type Mode =
@@ -71,6 +73,8 @@ export class Game {
   openMenu: (() => void) | null = null;
   menuOpen = false;
   mode: Mode = { kind: 'normal' };
+  /** The shape several squads move in (round 14 #177); set from the squad panel, remembered. */
+  formation: FormationShape = 'line';
   paused = true;
   speed = 1;
   private acc = 0;
@@ -260,7 +264,7 @@ export class Game {
       return;
     }
 
-    w.issueOrder(sq, { type: 'move', pos: w.grid.nearestFree(p) }, queue);
+    w.issueOrder(sq, { type: 'move', pos: w.grid.nearestFree(p) }, queue, { shape: this.formation });
     this.renderer.marker(p, 0x9fe07a);
   }
 
@@ -326,6 +330,51 @@ export class Game {
     this.world.orderPatrol(sq, this.world.grid.nearestFree(p), this.mode.started);
     this.mode = { kind: 'patrol', started: true };
     this.renderer.marker(p, 0xe0b24a);
+    this.changed();
+  }
+
+  /** The formation a right-drag from `a` to `b` would make (facing a → b; line/spread as wide as the drag). */
+  private dragFormation(a: Vec2, b: Vec2): Formation {
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    const along = Math.atan2(b.y - a.y, b.x - a.x);
+    const wide = this.formation === 'line' || this.formation === 'spread';
+    if (!wide) return { shape: this.formation, facing: along };
+    // line / spread: the drag is the front, and the group faces across it, away from where it's coming from
+    const sq = this.selectedSquads;
+    const c = sq.reduce((o, s) => ({ x: o.x + s.pos.x / sq.length, y: o.y + s.pos.y / sq.length }), { x: 0, y: 0 });
+    const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const f1 = along - Math.PI / 2;
+    const away = Math.cos(f1) * (mid.x - c.x) + Math.sin(f1) * (mid.y - c.y) >= 0;
+    return { shape: this.formation, facing: away ? f1 : along + Math.PI / 2, width: len };
+  }
+
+  /** Where each selected squad would stand for a right-drag (the preview while dragging). */
+  formationPreview(a: Vec2, b: Vec2): Vec2[] {
+    const sq = this.selectedSquads.filter((s) => s.def.category !== 'civilian');
+    if (!sq.length) return [];
+    const f = this.dragFormation(a, b);
+    const wide = f.width !== undefined;
+    const centre = wide ? { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } : a;
+    const slots = formationSlots(sq.length, f.shape, f.width).sort((x, y) => x.back - y.back);
+    const dir = { x: Math.cos(f.facing!), y: Math.sin(f.facing!) };
+    const perp = { x: -dir.y, y: dir.x };
+    return slots.map((s) => ({ x: centre.x + perp.x * s.right - dir.x * s.back, y: centre.y + perp.y * s.right - dir.y * s.back }));
+  }
+
+  /** Round 14 #177: right-drag from `a` to `b`: move into the chosen formation there, facing as dragged. */
+  formationMoveAt(a: Vec2, b: Vec2, queue: boolean): void {
+    const sq = this.selectedSquads.filter((s) => s.def.category !== 'civilian');
+    if (!sq.length) return;
+    const f = this.dragFormation(a, b);
+    const centre = f.width !== undefined ? { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } : a;
+    this.world.issueOrder(sq, { type: 'move', pos: this.world.grid.nearestFree(centre) }, queue, f);
+    this.renderer.marker(centre, 0x9fe07a);
+    this.changed();
+  }
+
+  setFormation(shape: FormationShape): void {
+    this.formation = shape;
+    this.toast(`Formation: ${shape} (right-drag to place it and set its facing)`);
     this.changed();
   }
 
