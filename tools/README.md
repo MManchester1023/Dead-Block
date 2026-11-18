@@ -48,6 +48,7 @@ Slow runs that print results instead of passing or failing. Not part of `npm tes
 | `export-gun.cjs "<query>" [out.glb]` | Cut a character's own gun out into a weapon GLB in the game's rifle frame (then fit it in `dev-rifle.html`) |
 | `resize-texture.cjs in out 512` | Downscale a texture exactly the way the game samples it (no dev server needed) |
 | `trim_glb.py …` | Keep only a GLB's used animations and colour texture (Python, no dependencies; ffmpeg only if resizing without the PNG above) |
+| `export-cars.cjs [pack.glb]` | The owner's car pack → one small GLB per car in `public/models/cars/` (wheels merged, textures baked to colours, ~1,500 triangles, 4.6 m), listed in the model manifest as car1…carN (needs the dev server) |
 | `bake-cast.cjs` | **Re-run after any character change** (model, clip, texture, gun model, gun fit, or the specs in `src/render/characters.ts`): bakes the cast into `public/models/baked/cast.bin` (needs the dev server). `npm test` fails while it's out of date |
 | `simplify-glb.mjs in.glb out.glb [tris] [lengthM]` | Shrink a static, untextured model to be repeated many times: bakes transforms, merges meshes, simplifies with meshoptimizer, puts its long side along X at `lengthM` metres (v4.39 barbed wire: 245k → 3.5k triangles) |
 

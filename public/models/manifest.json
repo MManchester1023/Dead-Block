@@ -2,5 +2,35 @@
   "_readme": "Optional glTF/GLB overrides for procedural models. Put the .glb next to this file and add an entry, e.g. \"palm\": { \"url\": \"palm.glb\", \"scale\": 1, \"rotY\": 0 }. Keys: car, palm, tree, shrub, streetlight, hydrant, wire (barbed wire: one coil 1 m long along X, stretched to the wire's length). Models are in metres, +Y up, facing +Z. Only use models whose licence allows it (CC0 recommended).",
   "wire": {
     "url": "barbed_wire.glb"
+  },
+  "car1": {
+    "url": "cars/compact.glb"
+  },
+  "car2": {
+    "url": "cars/coupe.glb"
+  },
+  "car3": {
+    "url": "cars/hatchback.glb"
+  },
+  "car4": {
+    "url": "cars/minivan.glb"
+  },
+  "car5": {
+    "url": "cars/offroad.glb"
+  },
+  "car6": {
+    "url": "cars/pickup.glb"
+  },
+  "car7": {
+    "url": "cars/sedan.glb"
+  },
+  "car8": {
+    "url": "cars/sport.glb"
+  },
+  "car9": {
+    "url": "cars/suv.glb"
+  },
+  "car10": {
+    "url": "cars/wagon.glb"
   }
 }

@@ -104,3 +104,12 @@ v4.39 (uploaded by the owner; authors to fill in where blank):
 ## Barbed wire model (v4.39)
 
 "[Barbed Wire](https://sketchfab.com/3d-models/barbed-wire-55ecdba178e94003856fb2aad45d7a31)" by [CliffUnderside](https://sketchfab.com/CliffUnderside), licensed under [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). **Changed:** merged into one mesh and simplified from 244,636 to 3,496 triangles (`tools/assets/simplify-glb.mjs`), scaled and recoloured in the game. Original in `assets-src/models/originals/barbed_wire.glb`, game copy `public/models/barbed_wire.glb`.
+
+## Parked cars (v4.56)
+
+"[Generic passenger car pack](https://sketchfab.com/3d-models/generic-passenger-car-pack-20f9af9b8a404d5cb022ac6fe87f21f5)" by [Comrade1280](https://sketchfab.com/comrade1280), licensed under [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). **Changed:** each of the ten cars merged with its wheels, its textures baked into vertex colours, simplified to ~1,500 triangles and scaled to 4.6 m (`src/dev/carExport.ts`, `tools/assets/export-cars.cjs`). Original in `assets-src/models/mixamo/generic_passenger_car_pack.glb`, game copies in `public/models/cars/`.
+
+## Civilian models (not in the game yet)
+
+"Casual LowPoly Male Rig T-pose" and the female version by [Denys Almaral](https://sketchfab.com/denysalmaral), **Sketchfab Standard licence** (use in a game is allowed; check the terms before redistributing the raw files, e.g. in a public repository). Uploaded by the owner to `assets-src/models/`; skeleton-free OBJ exports for Mixamo's auto-rigger in `assets-src/models/mixamo/to-rig/civilian_*_for_mixamo.zip`.
+

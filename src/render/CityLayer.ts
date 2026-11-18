@@ -9,6 +9,16 @@ import { models } from './ModelLibrary';
 import { PAL } from './palette';
 import type { RenderCtx } from './context';
 
+/** The car models the manifest lists (car1, car2, …), in order. */
+let carKindsCache: string[] | null = null;
+function carKinds(): string[] {
+  if (!carKindsCache) {
+    carKindsCache = [];
+    for (let i = 1; models.has(`car${i}`); i++) carKindsCache.push(`car${i}`);
+  }
+  return carKindsCache;
+}
+
 /** Chunk size (metres): 64 nav cells. STATUS #14, v4.46. */
 const CHUNK = 192;
 /** Ground texels per metre far away / on the ops map (full detail is GROUND_PX). */
@@ -227,10 +237,13 @@ export class CityLayer {
         grp.add(makePumpIsland(p));
         continue;
       }
-      const model = models.instance('car');
+      // v4.56: the owner's car pack (car1…car10 in the model manifest); each car picks one by its id,
+      // and half face the other way
+      const kinds = carKinds();
+      const model = models.instance(kinds.length ? kinds[p.id % kinds.length] : 'car');
       if (model) {
         model.position.set(p.pos.x, 0, p.pos.y);
-        model.rotation.y += (p.h > p.w ? Math.PI / 2 : 0) + ((p.id % 7) - 3) * 0.05;
+        model.rotation.y += (p.h > p.w ? Math.PI / 2 : 0) + ((p.id % 7) - 3) * 0.05 + (Math.floor(p.id / 3) % 2 ? Math.PI : 0);
         model.userData.shared = true;
         grp.add(model);
       } else grp.add(makeCar(p));
