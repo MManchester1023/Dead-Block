@@ -102,6 +102,8 @@ export interface CityMap {
   baseGate: Rect;
   /** Gas-station canopies (metres): roofs on posts, purely visual, walkable underneath. */
   canopies: Rect[];
+  /** Railway lines (metres, 2 cells high), drawn over roads at level crossings. */
+  rails: Rect[];
   rally: Vec2;
 }
 
@@ -153,10 +155,13 @@ export function buildStarterMap(seed = 7): CityMap {
   }
   // ---- tutorial region 3: Rail Siding (doc §2: boxcars and a small depot; Walkers and Runners) ----
   // its own main road, a rail line across the whole region, level crossings on the avenues
-  fill({ x: 38, y: 95, w: width - 38, h: 1 }, Tile.Sidewalk);
-  fill({ x: 38, y: 96, w: width - 38, h: 4 }, Tile.Road);
-  fill({ x: 38, y: 100, w: width - 38, h: 1 }, Tile.Sidewalk);
-  for (let x = 38; x < width; x++) for (const y of [120, 121]) if (tiles[y * width + x] !== Tile.Road) set(x, y, Tile.Rail);
+  // round 10 #116: both run from the west map edge to the east one (through the region's fence line)
+  fill({ x: 0, y: 95, w: width, h: 1 }, Tile.Sidewalk);
+  fill({ x: 0, y: 96, w: width, h: 4 }, Tile.Road);
+  fill({ x: 0, y: 100, w: width, h: 1 }, Tile.Sidewalk);
+  // the rail bed; level crossings keep road tiles (drivable) and get rails painted over them (#117)
+  for (let x = 0; x < width; x++) for (const y of [120, 121]) if (tiles[y * width + x] !== Tile.Road) set(x, y, Tile.Rail);
+  const railCells: Rect[] = [{ x: 0, y: 120, w: width, h: 2 }];
 
   // motel parking + other lots
   const lots: Rect[] = [
@@ -334,7 +339,7 @@ export function buildStarterMap(seed = 7): CityMap {
     { rect: m({ x: 56, y: 0, w: 4, h: height }), axis: 'v' },
     { rect: m({ x: 86, y: 0, w: 4, h: height }), axis: 'v' },
     { rect: m({ x: 132, y: 0, w: 4, h: height }), axis: 'v' },
-    { rect: m({ x: 38, y: 96, w: width - 38, h: 4 }), axis: 'h' },
+    { rect: m({ x: 0, y: 96, w: width, h: 4 }), axis: 'h' },
   ];
 
   return {
@@ -352,6 +357,7 @@ export function buildStarterMap(seed = 7): CityMap {
     baseRect: m(baseRect),
     baseGate: m({ x: 29, y: 33, w: 1, h: 6 }),
     canopies: canopyCells.map(m),
+    rails: railCells.map(m),
     rally: mv({ x: 25, y: 36 }),
   };
 }

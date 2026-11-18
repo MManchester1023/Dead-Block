@@ -464,7 +464,9 @@ function updateMembers(w: World, s: Squad, dt: number): void {
   const c = Math.cos(s.facing + Math.PI / 2);
   const si = Math.sin(s.facing + Math.PI / 2);
   const resting = !s.moving;
-  const amp = resting ? (s.holding || s.inCover ? 0.5 : 1.3) : 0.6;
+  // round 10 #106: resting soldiers stand still (the drift read as gliding with a still idle pose);
+  // bring back a small sway once there's an idle animation with weight shifts. Moving squads stay loose.
+  const amp = resting ? 0 : 0.6;
   for (const m of s.members) {
     if (!m.alive) continue;
     const ph = s.id * 1.7 + m.index * 2.3;

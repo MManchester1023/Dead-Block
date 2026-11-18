@@ -25,6 +25,7 @@ const FORMATION_SLOTS: Vec2[] = [
   { x: 1.2, y: -1.2 },
   { x: -1.2, y: 1.2 },
   { x: 1.2, y: 1.2 },
+  { x: 0, y: 0 }, // a fifth soldier (Elite, round 10 #118) takes the middle
 ];
 
 let nextId = 1;
@@ -82,10 +83,20 @@ export class Squad implements Targetable {
       alive: true,
       cooldown: (i / def.members) * def.weapon.cooldown, // staggered volleys
       offset: FORMATION_SLOTS[i % FORMATION_SLOTS.length],
-      pos: { x: pos.x + FORMATION_SLOTS[i % 4].x, y: pos.y + FORMATION_SLOTS[i % 4].y },
+      pos: { x: pos.x + FORMATION_SLOTS[i % FORMATION_SLOTS.length].x, y: pos.y + FORMATION_SLOTS[i % FORMATION_SLOTS.length].y },
       facing: 0,
       lastShot: -99,
     }));
+  }
+
+  /** A new soldier joins (Elite promotion, round 10 #118): one more member, and their share of health. */
+  addMember(): void {
+    const share = this.poolMax / this.members.length;
+    const i = this.members.length;
+    const slot = FORMATION_SLOTS[i % FORMATION_SLOTS.length];
+    this.members.push({ index: i, alive: true, cooldown: this.def.weapon.cooldown * 0.5, offset: slot, pos: { x: this.pos.x + slot.x, y: this.pos.y + slot.y }, facing: this.facing, lastShot: -99 });
+    this.poolMax += share;
+    this.pool += share;
   }
 
   get alive(): boolean {

@@ -161,18 +161,18 @@ export function buildGroundTexture(map: CityMap): THREE.CanvasTexture {
     fill('#dcdad2', box.x + box.w + 4.8, box.y, 0.4, box.h / 2);
   }
 
-  // 4b) railway: sleepers and two rails along every run of rail tiles (v4.17, Rail Siding)
-  for (let cy = 0; cy < map.rows; cy++)
-    for (let cx = 0; cx < map.cols; cx++) {
-      if (map.tiles[cy * map.cols + cx] !== Tile.Rail) continue;
-      // a 2-tile-high track bed: draw the track once, on its upper tile
-      if (cy > 0 && map.tiles[(cy - 1) * map.cols + cx] === Tile.Rail) continue;
-      const x0 = cx * map.cell;
-      const yMid = cy * map.cell + map.cell; // centre of the 2-cell bed
-      for (let s = 0.4; s < map.cell; s += 0.65) fill('#5a4636', x0 + s, yMid - 1.4, 0.28, 2.8); // sleepers
+  // 4b) railway: sleepers and two rails along each line (v4.17, Rail Siding). Round 10 #117: the rails run
+  // on over the roads at level crossings (no sleepers there, just a crossing panel), on top of the markings.
+  for (const r of map.rails ?? []) {
+    const yMid = r.y + r.h / 2;
+    for (let x0 = r.x; x0 < r.x + r.w; x0 += map.cell) {
+      const tile = map.tiles[Math.floor(yMid / map.cell) * map.cols + Math.floor(x0 / map.cell)];
+      if (tile === Tile.Road) fill('#4a4a48', x0, yMid - 1.2, map.cell, 2.4); // crossing panel
+      else for (let s = 0.4; s < map.cell; s += 0.65) fill('#5a4636', x0 + s, yMid - 1.4, 0.28, 2.8); // sleepers
       fill('#8a8a86', x0, yMid - 0.78, map.cell, 0.12); // rails
       fill('#8a8a86', x0, yMid + 0.66, map.cell, 0.12);
     }
+  }
 
   // 5) a painted helipad and vehicle lane in the base
   const b = map.baseRect;

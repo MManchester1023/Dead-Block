@@ -860,6 +860,7 @@ export class Renderer {
       v.ring.visible = selected.has(s.id);
       if (!this.crowds) s.members.forEach((m, i) => {
         const g = v.members[i];
+        if (!g) return; // placeholder figures were made before an Elite's fifth soldier joined
         g.visible = m.alive;
         if (!m.alive) return;
         const bob = s.moving ? Math.abs(Math.sin(this.time * 10 + i)) * 0.1 : 0;

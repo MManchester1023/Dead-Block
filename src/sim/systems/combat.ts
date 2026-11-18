@@ -144,6 +144,11 @@ export function gainXp(w: World, s: Squad, amount: number): void {
     const next = levels[s.level];
     // tougher, but a promotion is not a heal (v4.9 #48): only the cap grows
     s.poolMax = (s.poolMax / prev.hp) * next.hp;
+    // round 10 #118: Elite squads get a fifth soldier
+    if (next.extraMember && s.def.category === 'infantry') {
+      s.addMember();
+      w.events.emit('radio', { speaker: s.name, text: 'Elite now. Command sent us one more gun.', tone: 'good' });
+    }
     w.events.emit('levelUp', { squadId: s.id, squadName: s.name, level: next.name });
   }
 }

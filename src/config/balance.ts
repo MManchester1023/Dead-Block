@@ -93,10 +93,10 @@ export const BALANCE = {
     dangerCloseRadius: 6.4, // metres
     xpPerKill: 1,
     levels: [
-      { name: 'Recruit', xp: 0, hp: 1, dmg: 1 },
-      { name: 'Regular', xp: 25, hp: 1.15, dmg: 1.1 },
-      { name: 'Veteran', xp: 70, hp: 1.3, dmg: 1.2 },
-      { name: 'Elite', xp: 150, hp: 1.3, dmg: 1.2 }, // Elite path choice is Tier 1+
+      { name: 'Recruit', xp: 0, hp: 1, dmg: 1, extraMember: false },
+      { name: 'Regular', xp: 25, hp: 1.15, dmg: 1.1, extraMember: false },
+      { name: 'Veteran', xp: 70, hp: 1.3, dmg: 1.2, extraMember: false },
+      { name: 'Elite', xp: 150, hp: 1.3, dmg: 1.2, extraMember: true }, // +1 soldier (round 10 #118); Elite path choice is Tier 1+
     ],
   },
 } as const;

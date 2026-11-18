@@ -60,7 +60,7 @@ describe('v4.9 playtest round 5', () => {
     w.damageSquad(sq, 30, 'melee');
     const hp = sq.hp;
     const max = sq.maxHp;
-    gainXp(w, sq, 1000);
+    gainXp(w, sq, 80); // Veteran (Elite also adds a soldier, round 10 #118)
     expect(sq.maxHp).toBeGreaterThan(max);
     expect(sq.hp).toBe(hp);
   });
