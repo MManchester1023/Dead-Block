@@ -344,6 +344,10 @@ export class World {
     return Commands.upgradeStructure(this, st);
   }
 
+  orderPatrol(squads: Squad[], p: Vec2, add = false): void {
+    Commands.orderPatrol(this, squads, p, add);
+  }
+
   toggleCrouch(squads: Squad[]): boolean {
     return Commands.toggleCrouch(squads);
   }

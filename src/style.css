@@ -233,3 +233,5 @@ h3.collapsible:hover { color: #fff; }
 /* round 11 #135: a hive's growth toward its next stage (on hover) */
 .hive-label .hive-next { font-size: 9px; color: #e8c890; margin-top: 2px; }
 .hive-label .bar.grow i { background: var(--warn); }
+/* round 14 #176: waypoint numbers */
+.wp-num { position: absolute; left: 0; top: 0; pointer-events: none; font: 700 11px/1 var(--mono, monospace); color: #0d0f0c; background: #9fe07a; border-radius: 8px; padding: 1px 5px; }

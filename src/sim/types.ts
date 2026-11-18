@@ -30,6 +30,9 @@ export interface Order {
   /** cover prop/structure id, structure def to build, hive id for charge */
   targetId?: number;
   buildDef?: string;
+  /** Patrol (round 14 #174): the loop of points, and which one it's heading for. */
+  route?: Vec2[];
+  leg?: number;
 }
 
 /** Anything that can be shot at. */

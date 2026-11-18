@@ -1,4 +1,4 @@
-import { norm, sub } from '../../core/math';
+import { norm, sub, type Vec2 } from '../../core/math';
 import { BALANCE } from '../../config/balance';
 import { isEnabled } from '../../config/features';
 import { STRUCTURES, UNITS } from '../../config/units';
@@ -52,6 +52,33 @@ export function issueOrder(w: World, squads: Squad[], order: Order, queue = fals
     }
     s.orders.push(o);
   });
+}
+
+/**
+ * Patrol (round 14 #174): loop from where each squad stands through the given point(s), fighting what it
+ * meets, until given another order. With `add`, a squad already patrolling gets the point appended to its
+ * loop. Several squads keep their spacing (each one's loop is shifted by its offset from the group centre).
+ */
+export function orderPatrol(w: World, squads: Squad[], p: Vec2, add = false): void {
+  const n = squads.length;
+  if (!n) return;
+  const center = squads.reduce((a, s) => ({ x: a.x + s.pos.x / n, y: a.y + s.pos.y / n }), { x: 0, y: 0 });
+  for (const s of squads) {
+    const off = { x: s.pos.x - center.x, y: s.pos.y - center.y };
+    const k = Math.min(1, 8 / (Math.hypot(off.x, off.y) || 1)); // keep the group within ~8 m of each point
+    const at = w.grid.nearestFree({ x: p.x + off.x * k, y: p.y + off.y * k });
+    const cur = s.currentOrder;
+    if (add && cur?.type === 'patrol' && cur.route) {
+      cur.route.push(at);
+      continue;
+    }
+    s.orders = [{ type: 'patrol', pos: at, route: [{ ...s.pos }, at], leg: 1 }];
+    s.path = [];
+    s.holding = false;
+    s.buildProgress = 0;
+    s.autoCrouch = false;
+    s.seekCover = false;
+  }
 }
 
 export function stop(squads: Squad[]): void {

@@ -62,6 +62,39 @@ const ok = (cond, what) => console.log(`${cond ? 'ok  ' : 'FAIL'} ${what}`);
   });
   ok(/Horde wave/.test(said), `radio: "${said}"`);
 
+  // patrol (#174) with P and clicks, drawn as an amber loop (#176); waypoints drawn green and numbered
+  await p.mouse.move(400, 300);
+  await p.evaluate(() => {
+    const g = window.game;
+    g.select([window.__a]);
+    g.renderer.rig.focus(g.world.squads.find((s) => s.id === window.__a).pos);
+  });
+  await p.waitForTimeout(400);
+  await p.keyboard.press('p');
+  const mode = await p.evaluate(() => window.game.mode.kind);
+  await p.keyboard.down('Shift');
+  await p.mouse.click(600, 300);
+  await p.keyboard.up('Shift');
+  await p.mouse.click(800, 450);
+  await p.waitForTimeout(400);
+  const pat = await p.evaluate(() => {
+    const s = window.game.world.squads.find((q) => q.id === window.__a);
+    const o = s.orders[0];
+    return { mode: window.game.mode.kind, type: o?.type, points: o?.route?.length, segs: window.game.renderer.routes.geo.drawRange.count / 2, markers: window.game.renderer.routes.markers.filter((m) => m.visible).length };
+  });
+  ok(mode === 'patrol' && pat.type === 'patrol' && pat.points === 3 && pat.mode === 'normal', `P + two clicks: a 3-point patrol loop (${JSON.stringify(pat)})`);
+  ok(pat.segs >= 3 && pat.markers === 3, 'the loop is drawn for the selected squad');
+  await p.evaluate(() => {
+    const g = window.game, w = g.world;
+    const s = w.squads.find((q) => q.id === window.__a);
+    w.issueOrder([s], { type: 'move', pos: { x: s.pos.x + 20, y: s.pos.y } });
+    w.issueOrder([s], { type: 'move', pos: { x: s.pos.x + 20, y: s.pos.y + 20 } }, true);
+    w.issueOrder([s], { type: 'move', pos: { x: s.pos.x, y: s.pos.y + 20 } }, true);
+  });
+  await p.waitForTimeout(400);
+  const nums = await p.evaluate(() => [...document.querySelectorAll('.wp-num')].filter((e) => e.style.display !== 'none').map((e) => e.textContent).join(','));
+  ok(nums === '1,2,3', `waypoints numbered 1–3 (${nums})`);
+
   console.log(errs.join('\n') || 'no page errors');
   await b.close();
 })();

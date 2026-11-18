@@ -105,6 +105,19 @@ export function updateOrders(w: World, dt: number): void {
             }
           }
           break;
+        case 'patrol': {
+          // round 14 #174: walk the loop, stopping to fight whatever turns up
+          const t = w.get(s.targetId);
+          if (t && t.alive) break;
+          const route = o.route ?? [o.pos];
+          const leg = (o.leg ?? 0) % route.length;
+          o.pos = route[leg];
+          if (moveToward(w, s, route[leg], dt, ARRIVE)) {
+            o.leg = (leg + 1) % route.length;
+            s.path = [];
+          }
+          break;
+        }
         case 'attackMove': {
           const t = w.get(s.targetId);
           if (t && t.alive) break; // stop and fight, resume when clear

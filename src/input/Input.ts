@@ -58,6 +58,12 @@ export class Input {
       g.placeBuild(p, e.shiftKey);
       return;
     }
+    if (g.mode.kind === 'patrol') {
+      // round 14 #174: Shift+click keeps adding points; a plain click places the last one
+      g.patrolAt(p);
+      if (!e.shiftKey) g.setMode({ kind: 'normal' });
+      return;
+    }
     if (g.mode.kind === 'attackMove') {
       g.attackMoveAt(p, e.shiftKey);
       if (!e.shiftKey) g.setMode({ kind: 'normal' });
@@ -262,6 +268,13 @@ export class Input {
         break;
       case 'm':
         g.renderer.rig.toggleStrategic();
+        break;
+      case 'p':
+        // round 14 #174: patrol
+        if (g.selectedSquads.some((s) => s.def.category !== 'civilian')) {
+          g.setMode({ kind: 'patrol', started: false });
+          g.toast('Patrol: click the points of the loop (Shift+click to keep adding; it starts from where they stand)');
+        }
         break;
       case 'q':
         g.renderer.rig.rotate(-1);

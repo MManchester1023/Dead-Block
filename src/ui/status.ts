@@ -18,6 +18,8 @@ export function squadStatus(s: Squad, w: World): { text: string; tone: StatusTon
       return { text: firing ? 'MOVING · FIRING' : 'MOVING', tone: 'move' };
     case 'attackMove':
       return firing ? { text: 'ENGAGING', tone: 'fight' } : { text: 'ADVANCING', tone: 'move' };
+    case 'patrol':
+      return firing ? { text: 'PATROL · ENGAGING', tone: 'fight' } : { text: 'PATROLLING', tone: 'move' };
     case 'cover':
       return { text: 'TAKING COVER', tone: 'move' };
     case 'attack':

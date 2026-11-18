@@ -43,4 +43,39 @@ describe('round 14 playtest (v4.51)', () => {
     const piled = crowd.filter((z) => z.alive && z.pos.y < base.y).length;
     expect(piled).toBeLessThanOrEqual(3);
   });
+
+  it('patrol: the squad loops from where it stood through the points, again and again (#174)', () => {
+    const w = new World({ populate: false });
+    const sq = w.spawnSquad('rifle', { x: 60, y: 108 });
+    const start = { ...sq.pos };
+    w.orderPatrol([sq], { x: 60, y: 140 });
+    w.orderPatrol([sq], { x: 90, y: 140 }, true);
+    expect(sq.currentOrder?.type).toBe('patrol');
+    expect(sq.currentOrder?.route?.length).toBe(3);
+    let nearStart = 0;
+    let wasAway = false;
+    for (let i = 0; i < 30 * 90; i++) {
+      w.step(1 / 30);
+      const d = Math.hypot(sq.pos.x - start.x, sq.pos.y - start.y);
+      if (d > 20) wasAway = true;
+      if (wasAway && d < 4) {
+        nearStart++;
+        wasAway = false;
+      }
+    }
+    expect(nearStart).toBeGreaterThanOrEqual(2); // back at the start at least twice: it loops
+    expect(sq.currentOrder?.type).toBe('patrol'); // and keeps going
+  });
+
+  it('a new order ends the patrol; Shift+right-click waypoints stop at the last one (#174, #175)', () => {
+    const w = new World({ populate: false });
+    const sq = w.spawnSquad('rifle', { x: 60, y: 108 });
+    w.orderPatrol([sq], { x: 60, y: 140 });
+    w.issueOrder([sq], { type: 'move', pos: { x: 70, y: 108 } });
+    w.issueOrder([sq], { type: 'move', pos: { x: 70, y: 125 } }, true);
+    expect(sq.orders.map((o) => o.type)).toEqual(['move', 'move']);
+    for (let i = 0; i < 30 * 20; i++) w.step(1 / 30);
+    expect(sq.orders.length).toBe(0);
+    expect(Math.hypot(sq.pos.x - 70, sq.pos.y - 125)).toBeLessThan(4);
+  });
 });

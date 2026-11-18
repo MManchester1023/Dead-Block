@@ -16,7 +16,9 @@ export type Mode =
   | { kind: 'charge' }
   | { kind: 'deconstruct' }
   | { kind: 'support'; id: string }
-  | { kind: 'rally' };
+  | { kind: 'rally' }
+  /** Round 14 #174: clicking patrol points; `started` once the first point is down (later clicks add to the loop). */
+  | { kind: 'patrol'; started: boolean };
 
 /**
  * Owns the fixed-step loop, pause/speed (doc §2), the current selection and the
@@ -125,7 +127,7 @@ export class Game {
     if (!add) this.selected.clear();
     if (ids.length || !add) this.selectedStructure = null;
     for (const id of ids) this.selected.add(id);
-    if (this.mode.kind !== 'normal' && !this.selectedEngineers.length && this.mode.kind !== 'attackMove' && this.mode.kind !== 'rally' && this.mode.kind !== 'support') this.mode = { kind: 'normal' };
+    if (this.mode.kind !== 'normal' && !this.selectedEngineers.length && this.mode.kind !== 'attackMove' && this.mode.kind !== 'patrol' && this.mode.kind !== 'rally' && this.mode.kind !== 'support') this.mode = { kind: 'normal' };
     this.changed();
   }
 
@@ -314,6 +316,17 @@ export class Game {
     const err = this.world.orderDeconstruct(this.selectedEngineers, st, queue);
     if (err) this.toast(err);
     else this.renderer.marker(st.pos, 0xd0c070);
+  }
+
+  /** Round 14 #174: a patrol point for the selected squads (the first starts a new loop, later ones extend it). */
+  patrolAt(p: Vec2): void {
+    if (this.mode.kind !== 'patrol') return;
+    const sq = this.selectedSquads.filter((s) => s.def.category !== 'civilian');
+    if (!sq.length) return;
+    this.world.orderPatrol(sq, this.world.grid.nearestFree(p), this.mode.started);
+    this.mode = { kind: 'patrol', started: true };
+    this.renderer.marker(p, 0xe0b24a);
+    this.changed();
   }
 
   attackMoveAt(p: Vec2, queue: boolean): void {

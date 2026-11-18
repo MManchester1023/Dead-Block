@@ -84,7 +84,8 @@ const CONTROLS: [string, [string, string][]][] = [
     ['Right-click a car / sandbags', 'Take cover (two squads per car, three per sandbag wall; the rest crouch beside it)'],
     ['Right-click a building', 'Search it (supplies, sometimes zombies)'],
     ['Right-click a guard tower', 'Man it'],
-    [`${K('Shift')} + right-click`, 'Queue orders'],
+    [`${K('Shift')} + right-click`, 'Waypoints: queue moves (they go to each and stop at the last)'],
+    [K('P'), 'Patrol: click points of a loop (Shift+click to add more)'],
     [`${K('Ctrl')}+${K('A')}`, 'Attack-move'],
     [K('H'), 'Hold position'],
     [K('G'), 'Crouch / stand (half cover anywhere, slower on the move)'],
@@ -264,6 +265,7 @@ export class Hud {
       case 'attackMove': g.setMode({ kind: 'attackMove' }); break;
       case 'hold': g.hold(); break;
       case 'crouch': g.crouch(); break;
+      case 'patrol': g.setMode({ kind: 'patrol', started: false }); break;
       case 'stop': g.stop(); break;
       case 'disband': g.disband(); break;
       case 'upgrade': g.upgradeSelected(); break;
@@ -527,11 +529,12 @@ export class Hud {
     };
     const mode = g.mode;
     const civOnly = sq.every((s) => s.def.category === 'civilian');
-    let cmds = civOnly ? btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'Ctrl+S') : btn('attackMove', 'Attack-move', 'Ctrl+A', undefined, mode.kind === 'attackMove') + btn('hold', 'Hold', 'H') + btn('crouch', sq.every((s) => s.crouched) ? 'Stand' : 'Crouch', 'G', undefined, sq.every((s) => s.crouched)) + btn('stop', 'Stop', 'Ctrl+S') + `<button class="cmd" data-act="disband" title="Walk back to the Barracks and stand down: frees command and upkeep, refunds ${BALANCE.economy.disbandRefund * 100}% of the cost">Disband</button>`;
+    let cmds = civOnly ? btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'Ctrl+S') : btn('attackMove', 'Attack-move', 'Ctrl+A', undefined, mode.kind === 'attackMove') + btn('patrol', 'Patrol', 'P', undefined, mode.kind === 'patrol') + btn('hold', 'Hold', 'H') + btn('crouch', sq.every((s) => s.crouched) ? 'Stand' : 'Crouch', 'G', undefined, sq.every((s) => s.crouched)) + btn('stop', 'Stop', 'Ctrl+S') + `<button class="cmd" data-act="disband" title="Walk back to the Barracks and stand down: frees command and upkeep, refunds ${BALANCE.economy.disbandRefund * 100}% of the cost">Disband</button>`;
     // engineers' build tools live in the bottom-centre build bar (round 9 #104; see renderBuildBar)
     void eng;
     const modeHint =
       mode.kind === 'build' ? `Placing ${STRUCTURES[mode.defId].name} — click to place · R ${STRUCTURES[mode.defId].arc ? `turns its ${STRUCTURES[mode.defId].arc}° field of fire` : 'rotate'} · Shift to keep placing · right-click cancel`
+      : mode.kind === 'patrol' ? 'Patrol: click the points of the loop · Shift+click to keep adding · right-click to cancel'
       : mode.kind === 'attackMove' ? 'Attack-move: click a destination'
       : mode.kind === 'charge' ? 'Click a hive to plant a demo charge'
       : mode.kind === 'deconstruct' ? 'Click something your engineers built to take it down (unstarted: full refund, built: half)'
