@@ -61,7 +61,12 @@ export class SquadLayer {
         g.rotation.y = -m.facing;
         g.scale.y = SOLDIER_SCALE * (s.inCover && !s.moving ? 0.82 : 1); // crouch behind cover
       });
-      labels.place(v.label, s.pos, s.garrisonedIn != null ? 9.5 : 3.4, () => this.labelHtml(s, f.selected.has(s.id), f.hovered === s.id));
+      // round 13 #158: a squad's label (name, status, health) only shows while the mouse is over it
+      if (f.hovered !== s.id) {
+        v.label.style.display = 'none';
+        continue;
+      }
+      labels.place(v.label, s.pos, s.garrisonedIn != null ? 9.5 : 3.4, () => this.labelHtml(s, f.selected.has(s.id), true));
     }
     for (const [id, v] of this.views)
       if (!seen.has(id)) {
@@ -114,6 +119,8 @@ export class StructureLayer {
       if (!o) {
         o = buildStructureMesh(s);
         o.position.set(s.pos.x, 0, s.pos.y);
+        // round 13 #160: an emplacement faces its field of fire (the sandbag opening ends up at the back)
+        if (s.def.arc) o.rotation.y = -s.aim;
         scene.add(o);
         this.views.set(s.id, o);
       }
@@ -133,7 +140,7 @@ export class StructureLayer {
         (lamp.material as THREE.MeshLambertMaterial).emissive.set(on ? 0x2a7a32 : 0x5a1a12);
       }
       const turret = o.getObjectByName('turret');
-      if (turret) turret.rotation.y = -s.facing;
+      if (turret) turret.rotation.y = -(s.facing - (s.def.arc ? s.aim : 0)); // relative to the nest's own turn (#160)
       // progress bar while unfinished, health bar while damaged (v4.4: resume / repair)
       // build progress always shows; health only on hover / selection (#35)
       const focus = f.hovered === s.id || f.selectedStructure === s.id;

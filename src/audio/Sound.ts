@@ -66,8 +66,8 @@ const LIMITS: Record<Bank, { voices: number; gap: number; volume: number }> = {
 
 /** Looping beds: ambience everywhere (volume), and the engineers' work loop (placed at each crew). */
 const AMBIENCE: { file: string; volume: number }[] = [
-  { file: 'amb_suburb', volume: 0.3 },
-  { file: 'amb_horror', volume: 0.05 }, // very quiet: felt more than heard
+  { file: 'amb_suburb', volume: 0.2 }, // round 13 #151: was 0.3
+  { file: 'amb_horror', volume: 0.12 }, // quiet but there (round 13 #152: 0.05 was inaudible)
 ];
 const BUILD_LOOP = 'build_loop';
 const BUILD_VOLUME = 0.5;

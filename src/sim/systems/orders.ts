@@ -267,6 +267,7 @@ function doBuild(w: World, s: Squad, dt: number): void {
       w.unlocked.add('power');
       w.unlocked.add('medBay');
       w.events.emit('powerRestored', { id: site.id, first });
+      w.makeNoise(site.pos, BALANCE.noise.powerOnLoudness); // round 13 #156: generators roaring to life draw the dead
       w.events.emit('radio', { speaker: s.name, text: first ? "Power's on! Lights, pumps, the lot. Tell the doc the Med Bay's a go." : 'Station is back online.', tone: 'good' });
     }
     s.orders.shift();
@@ -553,10 +554,22 @@ function updateMembers(w: World, s: Squad, dt: number): void {
     if (d > 0.001 && pace > 0) {
       const nx = m.pos.x + (dx / d) * step;
       const ny = m.pos.y + (dy / d) * step;
-      // round 12 #147: soldiers don't step into walls, sandbags or cars (they can always step out of one)
-      if (!w.grid.isBlockedXY(nx, ny) || w.grid.isBlockedXY(m.pos.x, m.pos.y)) {
+      // round 12 #147: soldiers don't step into walls, sandbags or cars (they can always step out of one).
+      // Round 13 #154: blocked, they slide along the wall; still stuck after a second (or far behind),
+      // they step to a free spot beside the squad instead of standing at the wall while it walks off
+      const inWall = w.grid.isBlockedXY(m.pos.x, m.pos.y);
+      if (!w.grid.isBlockedXY(nx, ny) || inWall) {
         m.pos.x = nx;
         m.pos.y = ny;
+        m.stuckFor = 0;
+      } else if (!w.grid.isBlockedXY(nx, m.pos.y)) m.pos.x = nx;
+      else if (!w.grid.isBlockedXY(m.pos.x, ny)) m.pos.y = ny;
+      else m.stuckFor = (m.stuckFor ?? 0) + dt;
+      if ((m.stuckFor ?? 0) > 1 || (d > 6 && !w.grid.lineClear(m.pos, s.pos))) {
+        const f = w.grid.nearestFree({ x: s.pos.x + (tx - s.pos.x) * 0.5, y: s.pos.y + (ty - s.pos.y) * 0.5 });
+        m.pos.x = f.x;
+        m.pos.y = f.y;
+        m.stuckFor = 0;
       }
     }
     const glance = Math.sin(t * 0.3 + ph * 2.1) * 0.5;

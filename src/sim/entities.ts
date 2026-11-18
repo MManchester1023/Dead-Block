@@ -17,6 +17,8 @@ export interface Member {
   lastShot: number;
   /** At rest, walking back to their spot (round 12 #137); otherwise standing still. */
   settling?: boolean;
+  /** Seconds this soldier has been blocked by a wall on the way to their spot (round 13 #154). */
+  stuckFor?: number;
   /** Per-member loadout/cosmetics hook for Armory customization (doc §7, Tier 4). */
   loadout?: { weapon?: string; attachments?: string[]; cosmetics?: Record<string, string> };
 }

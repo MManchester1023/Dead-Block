@@ -26,6 +26,8 @@ export const BALANCE = {
     pulseThreshold: 100,
     /** Round 12 #149: after a noise pulse the meter stays empty this long (the fight against it used to set off the next). */
     pulseCooldownSec: 45,
+    /** Round 13 #156: the power station starting up is this loud (a demo charge is 30): the dead come to look. */
+    powerOnLoudness: 12,
     // Gunshots carry well beyond sight (zombie sight ~14 m). v4.15 (#76): a rifle (2.2) is heard ~60 m
     // away, a carbine (1.8) ~49 m, an MG (3.2) ~87 m; explosions further.
     hearingRadiusPerLoudness: 27.3, // metres per loudness point
