@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { castKey, decodeCast } from './castFile';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { HUMAN_HEIGHT } from '../config/world';
@@ -720,8 +721,53 @@ export const CHARACTER_SPECS: CharacterSpec[] = [
   },
 ];
 
-/** Load the whole cast. Returns null (and the game keeps its box placeholders) if anything fails. */
+/** Bump when the baking code changes in a way that changes the poses (invalidates public/models/baked/cast.bin). */
+export const BAKE_VERSION = 1;
+
+/** What the pre-baked cast must have been baked from: the specs, the gun fits, the bake settings. */
+export async function castBakeKey(): Promise<string> {
+  const fits: Record<string, RifleFit> = {};
+  for (const s of CHARACTER_SPECS) if (s.rifleModel) fits[s.rifleModel] = await loadRifleFit(s.rifleModel);
+  return castKey({ BAKE_VERSION, POSES_PER_SEC, POSE_CAP, CLIP_SOURCES, specs: CHARACTER_SPECS, fits });
+}
+
+/** Every file a bake reads (for the bake tool's asset fingerprint). */
+export function castSourceFiles(): string[] {
+  const files = new Set<string>();
+  for (const s of CHARACTER_SPECS) {
+    files.add(s.url);
+    if (s.texture) files.add(s.texture);
+    for (const f of Object.values(s.textureByMesh ?? {})) files.add(f);
+    for (const f of Object.values(s.clipFiles ?? {})) if (f) files.add(f);
+    if (s.rifleModel) {
+      files.add(s.rifleModel);
+      files.add(s.rifleModel.replace(/\.glb$/i, '.json'));
+    }
+  }
+  return [...files].sort();
+}
+
+/**
+ * The cast as the game uses it (STATUS #15, v4.47): from the pre-baked file when it matches the current
+ * settings (fast), else baked live from the models (~5 s). Returns null (and the game keeps its box
+ * placeholders) if both fail.
+ */
 export async function loadCast(): Promise<Record<string, Flipbook> | null> {
+  try {
+    const [key, res] = await Promise.all([castBakeKey(), fetch('models/baked/cast.bin')]);
+    if (res.ok) {
+      const books = await decodeCast(new Uint8Array(await res.arrayBuffer()), key);
+      if (books && CHARACTER_SPECS.every((s) => books[s.key])) return books;
+      console.info('[characters] the pre-baked cast is out of date (run tools/assets/bake-cast.cjs): baking live');
+    }
+  } catch (err) {
+    console.info('[characters] no usable pre-baked cast, baking live:', err);
+  }
+  return bakeLive();
+}
+
+/** Bake every character from its model and animation files, as the game did before v4.47. */
+export async function bakeLive(): Promise<Record<string, Flipbook> | null> {
   // FBXLoader warns (harmlessly) about >4 skin weights per vertex on these models; keep the console clean
   const warn = console.warn;
   console.warn = (...a: unknown[]) => {

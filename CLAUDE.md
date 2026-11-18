@@ -50,6 +50,9 @@ assets are free-licence downloads, credited in `CREDITS.md`.
 - **Characters** are Mixamo-rigged: export the model to an OBJ zip **without its gun**
   (`tools/assets/export-obj.cjs`); on Mixamo use the Standard Skeleton and download **FBX Binary, T-pose,
   With Skin**. Mixamo renames materials to `<name>mat` (relevant for `recolor`).
+- **After any character change** (model, clip, texture, gun, gun fit from `dev-rifle.html`, or the specs in
+  `characters.ts`): re-bake with `node tools/assets/bake-cast.cjs` (dev server up) and commit
+  `public/models/baked/cast.bin`; `npm test` fails until you do, and the game bakes live (slow start) meanwhile.
 - **Animations**: Mixamo FBX (animation-only "Without Skin" is fine for clips), then convert to
   `.clip.json` (`tools/assets/convert-clips.cjs`); originals go to `assets-src/models/mixamo/clips/`.
 - **Guns** are separate GLBs in the rifle frame (barrel +X, magazine −Z), placed in the hand by a fit file

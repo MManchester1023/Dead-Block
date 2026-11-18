@@ -30,6 +30,7 @@ Slow runs that print results instead of passing or failing. Not part of `npm tes
 | `round13.cjs` | Round 13 in the real game: squad labels hidden until hovered, MG nests turned to their aim |
 | `mapeditor.cjs` | Map editor (`dev-map.html`): no problems in the starter map, Save with no edits gives exactly the repo file, dragging moves a building, Play starts the game on the edit |
 | `chunks.cjs` | City streaming on a 1.8 km test map (100 chunks): only chunks near the camera are built, memory stays within budget while crossing the map, the ops map uses low detail |
+| `castcheck.cjs` | Pre-baked cast: matches a live bake pose for pose, loads much faster; prints load times and memory |
 | `smoke.cjs` | End to end in the real game: survivors evacuated, save to slot 1, load it back after a change, Continue on the start screen. Prints ok/FAIL per check |
 | `screens.cjs <tag>` + `pngdiff.py a b` | Screenshots of a fixed paused scene (street and wide; waits for city streaming to finish). Compare before/after a visual refactor; two runs of the same code differ by ~0.001–0.05% (things that sway on real time) |
 | `bakecheck.cjs <tag> [--compare <tag>]` | Bakes every character as the game does and fingerprints every pose; with `--compare`, says which clips changed. Use around asset or loader changes |
@@ -45,6 +46,7 @@ Slow runs that print results instead of passing or failing. Not part of `npm tes
 | `export-gun.cjs "<query>" [out.glb]` | Cut a character's own gun out into a weapon GLB in the game's rifle frame (then fit it in `dev-rifle.html`) |
 | `resize-texture.cjs in out 512` | Downscale a texture exactly the way the game samples it (no dev server needed) |
 | `trim_glb.py …` | Keep only a GLB's used animations and colour texture (Python, no dependencies; ffmpeg only if resizing without the PNG above) |
+| `bake-cast.cjs` | **Re-run after any character change** (model, clip, texture, gun model, gun fit, or the specs in `src/render/characters.ts`): bakes the cast into `public/models/baked/cast.bin` (needs the dev server). `npm test` fails while it's out of date |
 | `simplify-glb.mjs in.glb out.glb [tris] [lengthM]` | Shrink a static, untextured model to be repeated many times: bakes transforms, merges meshes, simplifies with meshoptimizer, puts its long side along X at `lengthM` metres (v4.39 barbed wire: 245k → 3.5k triangles) |
 
 The dev pages these drive (`dev-*.html` in the repo root) also work by hand in the browser with the dev server running.
