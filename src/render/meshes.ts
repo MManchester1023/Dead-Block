@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { CELL } from '../config/world';
 import type { Structure } from '../sim/entities';
 import { PAL } from './palette';
+import { models } from './ModelLibrary';
 
 /**
  * Procedural meshes for things the simulation places at run time: structures, hives, and the box
@@ -38,13 +39,27 @@ export function buildStructureMesh(s: Structure): THREE.Group {
         add(geo.clone().scale(0.9, 1, 0.9), new THREE.Color(PAL.sandbag).offsetHSL(0, 0, -0.06).getHex(), 0.62, w > h ? along + 0.25 : 0, w > h ? 0 : along + 0.25);
       }
       break;
-    case 'wire':
+    case 'wire': {
+      // v4.39: the owner's barbed wire model (CliffUnderside, CC-BY 4.0), one coil stretched along the
+      // whole run; its geometry is shared, each wire gets its own material (opacity while it's built)
+      const coil = models.instance('wire');
+      let geo: THREE.BufferGeometry | undefined;
+      coil?.traverse((o) => {
+        if (!geo && (o as THREE.Mesh).isMesh) geo = (o as THREE.Mesh).geometry;
+      });
+      if (geo) {
+        const m = add(geo, PAL.wire, 0);
+        m.scale.setScalar(Math.max(w, h));
+        m.rotation.y = w > h ? 0 : Math.PI / 2;
+        break;
+      }
       for (let i = 0; i < Math.max(w, h); i++) {
         const along = i - (Math.max(w, h) - 1) / 2;
         const m = add(new THREE.TorusGeometry(0.5, 0.04, 4, 8), PAL.wire, 0.5, w > h ? along : 0, w > h ? 0 : along);
         m.rotation.y = w > h ? 0 : Math.PI / 2;
       }
       break;
+    }
     case 'mgNest': {
       // sandbag ring (two courses, gap at the back for the crew), roof on four posts (v4.5)
       for (let i = 0; i < 14; i++) {

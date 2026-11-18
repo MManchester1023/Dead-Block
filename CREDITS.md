@@ -86,3 +86,16 @@ v4.38 (in `assets-src/audio/`, uploaded by the owner; authors to fill in):
 | `cinematic-horror-intense-overdrive-drone-02.wav` (also zipped) | Very quiet horror drone under the ambience, seamless 52 s loop (`amb_horror`) |
 | `u_wxn5lzrjy3-military-radio-communication-222904.mp3` (Pixabay, user u_wxn5lzrjy3) | Radio chatter, cut at its pauses into 8 transmissions and level-matched (`radio_1–8`) |
 
+v4.39 (uploaded by the owner; authors to fill in where blank):
+
+| File | Used as |
+|---|---|
+| `muddy-explosion-gfx-sounds-wet-mud-explosion-4-4-0m06s.mp3` (GFX Sounds) | Hive destroyed (`hive_death`) |
+| `freesound_community-commercial-jet-flies-overhead-53746.mp3` (Pixabay, freesound_community) | Supply plane fly-by, 26 s cut around the loudest pass (`plane_flyby`) |
+| `foley-cloth-parachute-open-slide-impact-03.wav` | Supply crate's chute opening (`parachute`) |
+| `freesound_community-fighter-jets-passing-overhead-30115.mp3` | Not used yet (kept for air support later) |
+| `2026-11-18 11-19-32.mp4` | Meant for the new Bloater burst, but all four of its audio tracks are silent; the old layered burst stays until a version with sound arrives |
+
+## Barbed wire model (v4.39)
+
+"[Barbed Wire](https://sketchfab.com/3d-models/barbed-wire-55ecdba178e94003856fb2aad45d7a31)" by [CliffUnderside](https://sketchfab.com/CliffUnderside), licensed under [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). **Changed:** merged into one mesh and simplified from 244,636 to 3,496 triangles (`tools/assets/simplify-glb.mjs`), scaled and recoloured in the game. Original in `assets-src/models/originals/barbed_wire.glb`, game copy `public/models/barbed_wire.glb`.

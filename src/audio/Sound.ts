@@ -20,12 +20,18 @@ import type { Vec2 } from '../core/math';
  *   amb_horror    a horror drone under everything, very quiet (v4.38)
  *   amb_suburb    suburban ambience bed (v4.38)
  *   radio_1–8     military radio chatter, cut from one recording at its pauses (v4.38)
+ *   hive_death    a wet mud explosion when a hive is destroyed (v4.39, round 10 #110)
+ *   plane_flyby   a jet passing overhead, timed to peak as the supply plane's shadow crosses the drop (v4.39, #113)
+ *   parachute     the crate's chute opening (v4.39, #113)
  */
 
-type Bank = 'rifle' | 'carbine' | 'death' | 'groan' | 'scream' | 'explosion' | 'bloater' | 'human' | 'click' | 'radio';
+type Bank = 'rifle' | 'carbine' | 'death' | 'groan' | 'scream' | 'explosion' | 'bloater' | 'human' | 'click' | 'radio' | 'hive' | 'flyby' | 'chute';
 const FILES: Record<Bank, string[]> = {
   human: ['human_death_1', 'human_death_2', 'human_death_3'],
   click: ['ui_click'],
+  hive: ['hive_death'],
+  flyby: ['plane_flyby'],
+  chute: ['parachute'],
   radio: ['radio_1', 'radio_2', 'radio_3', 'radio_4', 'radio_5', 'radio_6', 'radio_7', 'radio_8'],
   rifle: ['rifle_1', 'rifle_2', 'rifle_3'],
   carbine: ['carbine_1'],
@@ -47,6 +53,9 @@ const LIMITS: Record<Bank, { voices: number; gap: number; volume: number }> = {
   human: { voices: 3, gap: 0.15, volume: 0.6 },
   click: { voices: 2, gap: 0.03, volume: 0.3 },
   radio: { voices: 1, gap: 4, volume: 0.32 },
+  hive: { voices: 2, gap: 0.2, volume: 0.9 },
+  flyby: { voices: 2, gap: 1, volume: 0.45 },
+  chute: { voices: 2, gap: 0.3, volume: 0.6 },
 };
 
 /** Looping beds: ambience everywhere (volume), and the engineers' work loop (placed at each crew). */
@@ -57,6 +66,9 @@ const AMBIENCE: { file: string; volume: number }[] = [
 const BUILD_LOOP = 'build_loop';
 const BUILD_VOLUME = 0.5;
 /** Orders that mean "engineers hammering away" once they're standing at the job. */
+/** Seconds into plane_flyby where the jet is loudest (directly overhead); crates fall for 6 s after that. */
+const FLYBY_PEAK = 11;
+const CRATE_FALL_SEC = 6;
 const WORK_ORDERS = new Set(['build', 'repair', 'upgrade', 'deconstruct']);
 /** Radio traffic from these speakers gets a burst of chatter (squads' own lines don't). */
 const RADIO_SPEAKERS = new Set(['Command', 'Overwatch', 'Intel', 'Quartermaster', 'Engineers', 'Command Post']);
@@ -92,6 +104,9 @@ export class Sound {
   private groanTimer = 2;
   /** Seconds until the next bit of background radio chatter. */
   private chatterTimer = 30;
+  /** Supply crates already given their flyby / parachute sounds. */
+  private crateFlyby = new Set<number>();
+  private crateChute = new Set<number>();
   private loops: Record<string, AudioBuffer | undefined> = {};
   private ambience: GainNode[] = [];
   /** One looping work sound per crew at a job (squad id → its nodes). */
@@ -123,6 +138,10 @@ export class Sound {
     ev.on('explosion', (e) => {
       if (e.type === 'toxic') this.play('bloater', e.pos, { rate: 0.9 + Math.random() * 0.2 });
       else this.play('explosion', e.pos, { rate: 0.9 + Math.random() * 0.15, gain: Math.min(1.3, 0.6 + e.radius / 8) });
+    });
+    ev.on('hiveDestroyed', (e) => {
+      const h = game.world.hives.find((x) => x.id === e.hiveId);
+      this.play('hive', h ? h.pos : null, { rate: 0.95 + Math.random() * 0.1 });
     });
     ev.on('memberKilled', (e) => this.play('human', e.pos, { rate: 0.92 + Math.random() * 0.16 }));
     ev.on('radio', (e) => {
@@ -239,6 +258,7 @@ export class Sound {
     if (!this.ctx) return;
     this.updateWork();
     if (this.game.paused) return;
+    this.updateCrates();
     // now and then, quieter chatter from somewhere on the net
     this.chatterTimer -= dt;
     if (this.chatterTimer <= 0) {
@@ -255,8 +275,24 @@ export class Sound {
     this.play('groan', z.pos, { rate: 0.85 + Math.random() * 0.3 });
   }
 
+  /** Supply drops: the plane passes over (peaking above the drop), then the chute opens. */
+  private updateCrates(): void {
+    const w = this.game.world;
+    for (const c of w.crates) {
+      const toOverhead = c.landsAt - CRATE_FALL_SEC - w.time;
+      if (!this.crateFlyby.has(c.id) && !c.landed && toOverhead <= FLYBY_PEAK && toOverhead > -FLYBY_PEAK) {
+        this.crateFlyby.add(c.id);
+        this.play('flyby', null, { offset: Math.max(0, FLYBY_PEAK - toOverhead) });
+      }
+      if (!this.crateChute.has(c.id) && !c.landed && toOverhead <= 0) {
+        this.crateChute.add(c.id);
+        this.play('chute', c.pos, { rate: 0.95 + Math.random() * 0.1 });
+      }
+    }
+  }
+
   /** Play a clip from a bank at a world position (null = everywhere, e.g. a distant scream). */
-  private play(bank: Bank, pos: Vec2 | null, opt: { rate?: number; gain?: number } = {}): void {
+  private play(bank: Bank, pos: Vec2 | null, opt: { rate?: number; gain?: number; offset?: number } = {}): void {
     const ctx = this.ctx;
     const bufs = this.buffers[bank];
     if (!ctx || !this.master || !bufs?.length || this.volume === 0) return;
@@ -284,6 +320,6 @@ export class Sound {
     this.playing[bank]++;
     this.lastStart[bank] = now;
     src.onended = () => this.playing[bank]--;
-    src.start();
+    src.start(0, opt.offset ?? 0);
   }
 }

@@ -26,7 +26,7 @@ Slow runs that print results instead of passing or failing. Not part of `npm tes
 | `round11.cjs` | Round 11 in the real game: the cargo plane's shadow is removed after an instant crate pickup, supplies show no cap, the outpost panel offers the Garrison |
 | `round12.cjs` | Round 12 in the real game: search pop-up over the house and the neighbour left unsearched, the outpost panel sends engineers to install the Garrison, district names move the camera; screenshots in `tools/out/round12-*.png` |
 | `crouch.cjs` | Crouch and cover in the real game: three squads sent to one car, G crouches and the button flips to Stand, muzzle flashes are made when they shoot, a hive's hover shows its next-stage timer |
-| `sound.cjs` | Sound wiring in the real game: every clip decodes, both ambience beds start, a working engineer crew gets its construction loop and loses it when done, HUD buttons click, soldier deaths play, Command's radio lines play chatter (checks the audio graph; it can't listen) |
+| `sound.cjs` | Sound wiring in the real game: every clip decodes, both ambience beds start, a working engineer crew gets its construction loop and loses it when done, HUD buttons click, soldier deaths play, Command's radio lines play chatter, the supply plane's fly-by and parachute, the hive's blast, and that barbed wire uses the model (checks the audio graph; it can't listen) |
 | `smoke.cjs` | End to end in the real game: survivors evacuated, save to slot 1, load it back after a change, Continue on the start screen. Prints ok/FAIL per check |
 | `screens.cjs <tag>` + `pngdiff.py a b` | Screenshots of a fixed paused scene (street and wide). Compare before/after a visual refactor; two runs of the same code differ by ~0.001–0.05% (things that sway on real time) |
 | `bakecheck.cjs <tag> [--compare <tag>]` | Bakes every character as the game does and fingerprints every pose; with `--compare`, says which clips changed. Use around asset or loader changes |
@@ -42,5 +42,6 @@ Slow runs that print results instead of passing or failing. Not part of `npm tes
 | `export-gun.cjs "<query>" [out.glb]` | Cut a character's own gun out into a weapon GLB in the game's rifle frame (then fit it in `dev-rifle.html`) |
 | `resize-texture.cjs in out 512` | Downscale a texture exactly the way the game samples it (no dev server needed) |
 | `trim_glb.py …` | Keep only a GLB's used animations and colour texture (Python, no dependencies; ffmpeg only if resizing without the PNG above) |
+| `simplify-glb.mjs in.glb out.glb [tris] [lengthM]` | Shrink a static, untextured model to be repeated many times: bakes transforms, merges meshes, simplifies with meshoptimizer, puts its long side along X at `lengthM` metres (v4.39 barbed wire: 245k → 3.5k triangles) |
 
 The dev pages these drive (`dev-*.html` in the repo root) also work by hand in the browser with the dev server running.

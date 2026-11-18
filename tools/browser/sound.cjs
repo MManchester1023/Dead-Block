@@ -63,6 +63,43 @@ const ok = (cond, what) => console.log(`${cond ? 'ok  ' : 'FAIL'} ${what}`);
   await p.evaluate(() => window.game.world.events.emit('radio', { speaker: 'Command', text: 'test', tone: 'info' }));
   ok((await p.evaluate(() => window.__played)).includes('radio'), 'a Command radio line plays chatter');
 
+  // supply drop: the jet passes over, the chute opens; a hive dies with a wet blast (v4.39)
+  await p.evaluate(() => {
+    const g = window.game, w = g.world;
+    g.paused = false;
+    g.speed = 4;
+    w.money = 9999;
+    w.supplies = 9999;
+    const s = w.squads[0];
+    g.renderer.rig.focus(s.pos);
+    g.setMode({ kind: 'support', id: 'supplyDrop' });
+    g.callSupportAt({ x: s.pos.x + 20, y: s.pos.y });
+  });
+  await p.waitForFunction(() => window.__played.includes('chute'), null, { timeout: 120000 }).catch(() => {});
+  const drop = await p.evaluate(() => window.__played);
+  ok(drop.includes('flyby'), 'the supply plane plays its fly-by');
+  ok(drop.includes('chute'), "the crate's parachute opens with a sound");
+  await p.evaluate(() => {
+    const w = window.game.world;
+    const h = w.hives.find((x) => x.alive);
+    window.game.renderer.rig.focus(h.pos);
+    w.damageHive(h, 99999, 'explosive');
+  });
+  await p.waitForTimeout(300);
+  ok((await p.evaluate(() => window.__played)).includes('hive'), 'a destroyed hive plays the mud blast');
+
+  // the barbed wire model replaces the procedural wire
+  const tris = await p.evaluate(async () => {
+    const g = window.game, w = g.world;
+    const st = w.addStructure('wire', { x: 20, y: 12 }, true);
+    await new Promise((r) => setTimeout(r, 400));
+    const view = g.renderer.structures.views.get(st.id);
+    let n = 0;
+    view?.traverse((o) => { if (o.isMesh) n += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
+    return n;
+  });
+  ok(tris > 3000 && tris < 4000, `barbed wire drawn with the model (${tris} triangles)`);
+
   console.log(errs.join('\n') || 'no page errors');
   await b.close();
 })();
