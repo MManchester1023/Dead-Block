@@ -32,6 +32,7 @@ Slow runs that print results instead of passing or failing. Not part of `npm tes
 | `chunks.cjs` | City streaming on a 1.8 km test map (100 chunks): only chunks near the camera are built, memory stays within budget while crossing the map, the ops map uses low detail |
 | `castcheck.cjs` | Pre-baked cast: matches a live bake pose for pose, loads much faster; prints load times and memory |
 | `round14.cjs` | Round 14 in the real game: overlapping squads' labels stack on hover, the Barracks queue groups "×3", no pulse countdown or cooling-down text, "Horde wave" on the radio, P + clicks make a patrol loop, routes drawn (amber loop, numbered waypoints), formation buttons, a right-drag preview and the formation move, plain right-click unchanged |
+| `anims.cjs` | Which animation plays when: crouch walk, kneeling fire, stand-up, crouched death, tower climb, survivors' idle and run; and the MG emplacement's burst loop |
 | `smoke.cjs` | End to end in the real game: survivors evacuated, save to slot 1, load it back after a change, Continue on the start screen. Prints ok/FAIL per check |
 | `screens.cjs <tag>` + `pngdiff.py a b` | Screenshots of a fixed paused scene (street and wide; waits for city streaming to finish). Compare before/after a visual refactor; two runs of the same code differ by ~0.001–0.05% (things that sway on real time) |
 | `bakecheck.cjs <tag> [--compare <tag>]` | Bakes every character as the game does and fingerprints every pose; with `--compare`, says which clips changed. Use around asset or loader changes |

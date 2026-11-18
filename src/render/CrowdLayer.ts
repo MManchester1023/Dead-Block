@@ -25,7 +25,10 @@ export class CrowdLayer {
   private crowds: Record<string, Crowd>;
   private prevPos = new Map<number, { x: number; y: number; v: number }>();
   private gaits = new Map<number, 0 | 1 | 2>();
-  private corpses: { key: string; x: number; z: number; facing: number; t0: number; sx: number; sy: number; tint?: number }[] = [];
+  private corpses: { key: string; x: number; z: number; facing: number; t0: number; sx: number; sy: number; tint?: number; clip?: Clip }[] = [];
+  /** v4.55: soldiers getting up from a crouch (key → when they started), and who was low last frame. */
+  private standing = new Map<number, number>();
+  private wasLow = new Set<number>();
   /** Animation time: sim seconds, so pausing freezes everyone mid-stride. */
   private clock = 0;
   private anim = new Map<number, { clip: Clip; t: number; rate: number; seen: number }>();
@@ -53,8 +56,9 @@ export class CrowdLayer {
   }
 
   /** A soldier (or civilian) died. */
-  memberDied(e: { unitId: string; pos: { x: number; y: number }; facing: number }): void {
-    this.corpses.push({ key: squadCrowd(e.unitId), x: e.pos.x, z: e.pos.y, facing: e.facing, t0: this.clock, sx: 1, sy: 1 });
+  memberDied(e: { unitId: string; pos: { x: number; y: number }; facing: number; low?: boolean }): void {
+    // v4.55: shot while crouched or in cover: the crouched death
+    this.corpses.push({ key: squadCrowd(e.unitId), x: e.pos.x, z: e.pos.y, facing: e.facing, t0: this.clock, sx: 1, sy: 1, clip: e.low ? 'deathCrouch' : undefined });
   }
 
   update(simDt: number): void {
@@ -103,7 +107,18 @@ export class CrowdLayer {
       const engaged = !!tgt && tgt.alive;
       // up a guard tower: stand on the platform (v4.13)
       const tower = s.garrisonedIn != null ? w.structures.find((x) => x.id === s.garrisonedIn) : undefined;
-      const lift = tower?.def.garrison ? tower.def.garrison.height + 0.15 : 0;
+      let lift = tower?.def.garrison ? tower.def.garrison.height + 0.15 : 0;
+      // v4.55: climbing the ladder: rise (or sink) over the climb, with the climbing clips
+      let climbing: Clip | null = null;
+      if (s.climb) {
+        const ct = w.structures.find((x) => x.id === s.climb!.towerId);
+        const g = ct?.def.garrison;
+        if (g) {
+          const k = Math.max(0, Math.min(1, s.climb.t / g.climbSec));
+          lift = (g.height + 0.15) * (s.climb.up ? 1 - k : k);
+          climbing = s.climb.up ? 'climbUp' : 'climbDown';
+        }
+      }
       // round 10 #107: what the squad is hiding behind, so each soldier can tell if they're up against it
       const prop = s.inCover > 0 && s.coverPropId != null ? w.map.props.find((p) => p.id === s.coverPropId) : undefined;
       const coverSt = s.inCover > 0 && s.coverPropId != null && !prop ? w.structures.find((x) => x.id === s.coverPropId) : undefined;
@@ -130,12 +145,13 @@ export class CrowdLayer {
         const firing = engaged && w.time - m.lastShot < s.def.weapon.cooldown * 2.5;
         const inCover = s.inCover > 0 && !s.moving && !walking && !working && s.garrisonedIn == null;
         if (!inCover) this.coverSince.delete(key);
-        if (working && crowd.has('work')) clip = 'work';
+        if (climbing && crowd.has(climbing)) clip = climbing;
+        else if (working && crowd.has('work')) clip = 'work';
         else if (walking) {
-          // v4.24 (#95): moving while engaged = walking while firing
-          clip = firing && crowd.has('walkShoot') ? 'walkShoot' : 'walk';
-          rate = Math.min(3, Math.max(0.7, v / 2.2));
-        } else if (s.openCover && crowd.has('crouch') && s.garrisonedIn == null) clip = 'crouch'; // round 11 #125: crouched in the open (its aiming pose fires too)
+          // v4.24 (#95): moving while engaged = walking while firing; v4.55: crouched squads crouch-walk
+          clip = s.crouched && crowd.has('crouchWalk') ? 'crouchWalk' : firing && crowd.has('walkShoot') ? 'walkShoot' : 'walk';
+          rate = Math.min(3, Math.max(0.7, v / (clip === 'crouchWalk' ? 1.5 : 2.2)));
+        } else if (s.openCover && crowd.has('crouch') && s.garrisonedIn == null) clip = firing && crowd.has('crouchShoot') ? 'crouchShoot' : 'crouch'; // round 11 #125 (v4.55: kneeling fire)
         else if (firing) clip = 'shoot'; // stand up and fire, cover or not
         else if (inCover && crowd.has('crouch') && offCover(m.pos)) clip = 'crouch'; // too far out to lean on it
         else if (inCover && crowd.has('cover')) {
@@ -144,6 +160,17 @@ export class CrowdLayer {
           const dIn = crowd.book.durations.coverIn ?? 0;
           clip = this.clock - since < dIn && crowd.has('coverIn') ? 'coverIn' : 'cover';
         }
+        // v4.55: getting up from a crouch (or from behind cover) to stand still or fire: the stand-up clip first
+        const low = clip === 'crouch' || clip === 'crouchShoot' || clip === 'cover' || clip === 'coverIn';
+        if (low) this.standing.delete(key);
+        else if (this.wasLow.has(key) && (clip === 'idle' || clip === 'shoot') && crowd.has('standUp')) this.standing.set(key, this.clock);
+        const since = this.standing.get(key);
+        if (since !== undefined && !low && (clip === 'idle' || clip === 'shoot')) {
+          if (this.clock - since < (crowd.book.durations.standUp ?? 0)) clip = 'standUp';
+          else this.standing.delete(key);
+        } else if (since !== undefined) this.standing.delete(key);
+        if (low) this.wasLow.add(key);
+        else this.wasLow.delete(key);
         crowd.add(clip, this.animTime(key, clip, rate, simDt), m.pos.x, m.pos.y, m.facing, 1, undefined, -lift);
       });
     }
@@ -187,7 +214,7 @@ export class CrowdLayer {
         tilt = k * k * (Math.PI / 2) * 0.96; // accelerate into the fall
         sink -= k * 0.14; // keep the back on the asphalt, not half under it
       }
-      crowd.add('death', age, c.x, c.z, c.facing, c.sx, c.tint, sink, c.sy, tilt);
+      crowd.add(c.clip && crowd.has(c.clip) ? c.clip : 'death', age, c.x, c.z, c.facing, c.sx, c.tint, sink, c.sy, tilt);
     }
     for (const c of Object.values(C)) c.end();
   }

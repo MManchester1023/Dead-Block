@@ -53,7 +53,7 @@ Everything else in the city (buildings, vehicles, trees, street furniture, groun
 
 ## Mixamo (`assets-src/models/mixamo/`)
 
-Rigs and animations from [Mixamo](https://www.mixamo.com) (Adobe), downloaded by the project owner. **In the game:** riflemen and engineers (since round 10: Kolos Studios' and MadTrollStudio's soldiers, rigged on Mixamo) with Rifle Idle, Walking, Firing Rifle, Dying and Working On Device; soldiers also use Shoot Rifle (walking while firing), Taking Cover, Taking Cover Idle and Idle Crouching Aiming; female zombies use Zombie Idle, Walking, Zombie Run, Zombie Attack and Zombie Dying (Zombie Punching kept in `assets-src/models/` as an alternative). Mixamo's terms allow royalty-free use in games; the raw files may not be redistributed as a standalone asset pack.
+Rigs and animations from [Mixamo](https://www.mixamo.com) (Adobe), downloaded by the project owner. **In the game:** riflemen and engineers (since round 10: Kolos Studios' and MadTrollStudio's soldiers, rigged on Mixamo) with Rifle Idle, Walking, Firing Rifle, Dying and Working On Device; soldiers also use Shoot Rifle (walking while firing), Taking Cover, Taking Cover Idle and Idle Crouching Aiming, and since v4.55 Fire Rifle (kneeling), Walk Crouching Forward Right, Crouch To Standing With Rifle, Death Crouching Headshot Front, Freehang Climb and Climbing Down; civilians (still the stand-in soldier model) use Breathing Idle and Slow Run; female zombies use Zombie Idle, Walking, Zombie Run, Zombie Attack and Zombie Dying (Zombie Punching kept in `assets-src/models/` as an alternative). Mixamo's terms allow royalty-free use in games; the raw files may not be redistributed as a standalone asset pack.
 
 ## Sound effects (`public/audio/`, originals in `assets-src/audio/soundfx.zip`)
 
@@ -98,6 +98,7 @@ v4.39 (uploaded by the owner; authors to fill in where blank):
 | `2026-11-18 11-34-14.mp4` (owner's recording) | Bloater bursting, cut from its audio (`bloater_death`, v4.40) |
 | `2026-11-18 11-39-23.mp4` (owner's recording) | Power station starting up, cut from its audio (`power_on`, v4.41) |
 | `impact-drop-wood-crate-dropped-02.wav` | Supply crate landing (`crate_land`, v4.41) |
+| `freesound_community-50-cal-mg-104736.mp3` (Pixabay, freesound_community) | MG emplacement firing: a seamless 1.3 s stretch of the burst, looped while it fires (`mg_loop`, v4.55) |
 | `freesound_community-boots-on-gravel-67143.mp3` (Pixabay, freesound_community) | Footsteps (v4.44), removed in v4.48 at the owner's request; kept here as a source |
 
 ## Barbed wire model (v4.39)

@@ -9,7 +9,7 @@ import type { DamageType } from '../sim/types';
 export interface GameEvents {
   shot: { from: Vec2; to: Vec2; faction: string; heavy?: boolean; weapon?: string };
   explosion: { pos: Vec2; radius: number; type: DamageType };
-  memberKilled: { squadId: number; squadName: string; pos: Vec2; facing: number; unitId: string };
+  memberKilled: { squadId: number; squadName: string; pos: Vec2; facing: number; unitId: string; low?: boolean };
   squadWiped: { squadId: number; squadName: string };
   zombieKilled: { id: number; defId: string; pos: Vec2; facing: number; districtId: string | null };
   hiveStage: { hiveId: number; stage: number; districtId: string };

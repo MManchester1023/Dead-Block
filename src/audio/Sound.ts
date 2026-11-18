@@ -24,6 +24,7 @@ import type { Vec2 } from '../core/math';
  *   plane_flyby   a jet passing overhead, timed to peak as the supply plane's shadow crosses the drop (v4.39, #113)
  *   parachute     the crate's chute opening (v4.39, #113)
  *   crate_land    the supply crate hitting the ground (v4.41, #113)
+ *   mg_loop       the MG emplacement firing: a seamless 1.3 s stretch of a 50-cal burst, looped while it shoots (v4.55)
  *   power_on      the power station starting up (v4.41, round 10 #112; from the owner's recording)
  */
 
@@ -71,6 +72,10 @@ const AMBIENCE: { file: string; volume: number }[] = [
 ];
 const BUILD_LOOP = 'build_loop';
 const BUILD_VOLUME = 0.5;
+/** MG emplacements (v4.55): their burst loops while they fire, fading out this long after the last shot. */
+const MG_LOOP = 'mg_loop';
+const MG_VOLUME = 0.7;
+const MG_HOLD = 0.35;
 /** Orders that mean "engineers hammering away" once they're standing at the job. */
 /** Seconds into plane_flyby where the jet is loudest (directly overhead); crates fall for 6 s after that. */
 const FLYBY_PEAK = 11;
@@ -118,6 +123,8 @@ export class Sound {
   private ambience: GainNode[] = [];
   /** One looping work sound per crew at a job (squad id → its nodes). */
   private work = new Map<number, { src: AudioBufferSourceNode; g: GainNode; p: StereoPannerNode }>();
+  /** Firing MG emplacements: their loop, where they are, and when they last fired (v4.55). */
+  private mgs = new Map<string, { src: AudioBufferSourceNode; g: GainNode; p: StereoPannerNode; pos: Vec2; last: number }>();
   /** Master volume, one of VOLUMES (remembered per browser). */
   volume = 1;
 
@@ -136,6 +143,7 @@ export class Sound {
     const ev = game.world.events;
     ev.on('shot', (e) => {
       if (e.weapon === 'Carbine') this.play('carbine', e.from, { rate: 0.93 + Math.random() * 0.14 });
+      else if (e.weapon === 'Mounted HMG') this.mgFiring(e.from); // v4.55: a continuous 50-cal burst, not single shots
       else this.play('rifle', e.from, e.heavy ? { rate: 0.82, gain: 1.35 } : { rate: 0.94 + Math.random() * 0.12 });
     });
     ev.on('zombieKilled', (e) => {
@@ -197,7 +205,7 @@ export class Sound {
         });
     }
     const load = async (n: string) => this.ctx!.decodeAudioData(await (await fetch(`audio/${n}.mp3`)).arrayBuffer());
-    for (const n of [BUILD_LOOP])
+    for (const n of [BUILD_LOOP, MG_LOOP])
       load(n)
         .then((b) => (this.loops[n] = b))
         .catch(() => {});
@@ -227,6 +235,43 @@ export class Sound {
     gain *= rig.strategic ? 0.35 : 1; // zoomed far out (ops map), the battlefield is quieter
     const sp = this.game.renderer.worldToScreen(pos);
     return { gain, pan: Math.max(-0.9, Math.min(0.9, (sp.x / innerWidth) * 2 - 1)) };
+  }
+
+  /** An MG emplacement fired (a shot from it): start or keep its burst loop going. */
+  private mgFiring(pos: Vec2): void {
+    const ctx = this.ctx;
+    const buf = this.loops[MG_LOOP];
+    if (!ctx || !this.master || !buf || this.volume === 0) return;
+    const key = `${Math.round(pos.x)},${Math.round(pos.y)}`;
+    let m = this.mgs.get(key);
+    if (!m) {
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const g = ctx.createGain();
+      g.gain.value = 0;
+      const p = ctx.createStereoPanner();
+      src.connect(g).connect(p).connect(this.master);
+      src.start(0, Math.random() * buf.duration);
+      m = { src, g, p, pos: { ...pos }, last: 0 };
+      this.mgs.set(key, m);
+    }
+    m.last = ctx.currentTime;
+  }
+
+  private updateMgs(): void {
+    const ctx = this.ctx!;
+    const now = ctx.currentTime;
+    for (const [key, m] of this.mgs) {
+      const at = this.place(m.pos);
+      const on = !this.game.paused && now - m.last < MG_HOLD;
+      m.g.gain.setTargetAtTime(on ? MG_VOLUME * at.gain : 0, now, on ? 0.02 : 0.08);
+      m.p.pan.setTargetAtTime(at.pan, now, 0.1);
+      if (now - m.last > 3) {
+        m.src.stop(now + 0.3);
+        this.mgs.delete(key);
+      }
+    }
   }
 
   /** Engineers at a job get a looping construction sound, placed at them; it fades out when they stop. */
@@ -270,6 +315,7 @@ export class Sound {
   update(dt: number): void {
     if (!this.ctx) return;
     this.updateWork();
+    this.updateMgs();
     if (this.game.paused) return;
     this.updateCrates();
     // now and then, quieter chatter from somewhere on the net

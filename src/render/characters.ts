@@ -19,7 +19,8 @@ import { loadClipFile } from './clipFile';
  * baked into vertex colours so each pose is a single draw call (the source meshes have ~120 groups).
  */
 
-export type Clip = 'idle' | 'walk' | 'run' | 'shoot' | 'punch' | 'death' | 'work' | 'walkShoot' | 'coverIn' | 'cover' | 'crouch';
+export type Clip = 'idle' | 'walk' | 'run' | 'shoot' | 'punch' | 'death' | 'work' | 'walkShoot' | 'coverIn' | 'cover' | 'crouch'
+  | 'crouchShoot' | 'crouchWalk' | 'standUp' | 'deathCrouch' | 'climbUp' | 'climbDown';
 
 /** Poses baked per second of animation (round 9 #96), and the most any one clip gets. */
 const POSES_PER_SEC = 10;
@@ -40,6 +41,14 @@ const CLIP_SOURCES: Record<Clip, { name: string; frames: number; loop: boolean }
   cover: { name: 'cover', frames: 12, loop: true },
   // round 10 #107: soldiers of a squad in cover who are too far from the cover itself to lean on it
   crouch: { name: 'crouch', frames: 12, loop: true },
+  // v4.55 (round 14 uploads): kneeling fire, crouch walk, standing up from a crouch, a crouched death,
+  // and climbing a guard tower's ladder up and down
+  crouchShoot: { name: 'crouchShoot', frames: 10, loop: true },
+  crouchWalk: { name: 'crouchWalk', frames: 12, loop: true },
+  standUp: { name: 'standUp', frames: 12, loop: false },
+  deathCrouch: { name: 'deathCrouch', frames: 14, loop: false },
+  climbUp: { name: 'climbUp', frames: 16, loop: true },
+  climbDown: { name: 'climbDown', frames: 16, loop: true },
 };
 
 export interface CharacterSpec {
@@ -74,6 +83,8 @@ export interface CharacterSpec {
   rifleRot?: [number, number, number];
   /** Pin the hips' horizontal position (Mixamo clips downloaded without "In Place" walk forward). */
   inPlace?: boolean;
+  /** Clips whose hip height is pinned too (v4.55: the climbs; the game lifts the squad up the tower itself). */
+  pinHipsY?: Clip[];
   /** Multiply every baked colour (e.g. engineers: a warmer, dustier version of the same soldier). */
   tint?: number;
   /** Clips baked as a single held pose at this fraction of the clip (e.g. an idle from a firing clip). */
@@ -249,6 +260,7 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
         // the clip's hip height is in its own skeleton's units: rescale to this model's
         const fy = fileHipsY[clip];
         if (fy) hips.position.y = hipsRest.y * (hips.position.y / fy);
+        if (spec.pinHipsY?.includes(clip)) hips.position.y = hipsRest.y;
       }
       obj.updateMatrixWorld(true);
       const pos = new Float32Array(n * 3);
@@ -644,7 +656,16 @@ export const SOLDIER_CLIPS: Partial<Record<Clip, string>> = {
   cover: 'models/characters/soldier/cover.clip.json',
   // round 10 #107: Mixamo "Idle Crouching Aiming"
   crouch: 'models/characters/soldier/crouch.clip.json',
+  // v4.55 (round 14 uploads): Mixamo "Fire Rifle" (kneeling), "Walk Crouching Forward Right", "Crouch To
+  // Standing With Rifle", "Death Crouching Headshot Front", "Freehang Climb", "Climbing Down"
+  crouchShoot: 'models/characters/soldier/crouchshoot.clip.json',
+  crouchWalk: 'models/characters/soldier/crouchwalk.clip.json',
+  standUp: 'models/characters/soldier/standup.clip.json',
+  deathCrouch: 'models/characters/soldier/deathcrouch.clip.json',
+  climbUp: 'models/characters/soldier/climbup.clip.json',
+  climbDown: 'models/characters/soldier/climbdown.clip.json',
 };
+const SOLDIER_EXTRA: Clip[] = ['crouchShoot', 'crouchWalk', 'standUp', 'deathCrouch', 'climbUp', 'climbDown'];
 
 export const CHARACTER_SPECS: CharacterSpec[] = [
   // v4.18: "Military RTS Character 1" (britdawgmasterfunk, CC-BY 4.0), rigged on Mixamo, with Mixamo
@@ -653,9 +674,10 @@ export const CHARACTER_SPECS: CharacterSpec[] = [
     // round 10: "low poly soldier" (Kolos Studios, CC-BY 4.0), re-rigged on Mixamo, with its own M4
     key: 'soldier',
     url: 'models/characters/rifleman/rifleman.fbx',
-    clips: ['idle', 'walk', 'shoot', 'death', 'walkShoot', 'coverIn', 'cover', 'crouch'],
+    clips: ['idle', 'walk', 'shoot', 'death', 'walkShoot', 'coverIn', 'cover', 'crouch', ...SOLDIER_EXTRA],
     clipFiles: SOLDIER_CLIPS,
     inPlace: true,
+    pinHipsY: ['climbUp', 'climbDown'],
     deathFalls: true,
     rifle: true,
     rifleBone: 'mixamorigRightHand',
@@ -667,9 +689,10 @@ export const CHARACTER_SPECS: CharacterSpec[] = [
     key: 'engineer',
     url: 'models/characters/engineer/engineer.fbx',
     texture: 'models/characters/engineer/engineer.png',
-    clips: ['idle', 'walk', 'shoot', 'death', 'work', 'walkShoot', 'coverIn', 'cover', 'crouch'],
+    clips: ['idle', 'walk', 'shoot', 'death', 'work', 'walkShoot', 'coverIn', 'cover', 'crouch', ...SOLDIER_EXTRA],
     clipFiles: { ...SOLDIER_CLIPS, work: 'models/characters/soldier/work.clip.json' },
     inPlace: true,
+    pinHipsY: ['climbUp', 'climbDown'],
     deathFalls: true,
     rifle: true,
     rifleBone: 'mixamorigRightHand',
@@ -685,7 +708,8 @@ export const CHARACTER_SPECS: CharacterSpec[] = [
     url: 'models/characters/rifleman/rifleman.fbx',
     recolor: { mat0mat: 0x4f6f9a, mat1mat: 0x4a4038, mat2mat: 0x6a5a48, mat3mat: 0x8a8a84 },
     clips: ['idle', 'walk', 'death'],
-    clipFiles: { idle: SOLDIER_CLIPS.idle, walk: SOLDIER_CLIPS.walk, death: SOLDIER_CLIPS.death },
+    // v4.55: Mixamo "Breathing Idle" and "Slow Run" (survivors hurry to the Command Post)
+    clipFiles: { idle: 'models/characters/civilian/idle.clip.json', walk: 'models/characters/civilian/run.clip.json', death: SOLDIER_CLIPS.death },
     inPlace: true,
     deathFalls: true,
     simplify: 0.03,
