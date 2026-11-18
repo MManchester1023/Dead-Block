@@ -6,12 +6,22 @@ import { models } from './render/ModelLibrary';
 import { loadCast } from './render/characters';
 import { Sound } from './audio/Sound';
 import { takePendingLoad } from './sim/save';
+import { useMapData } from './sim/map';
 
 const view = document.getElementById('view')!;
 const labels = document.getElementById('labels')!;
 const hudRoot = document.getElementById('hud')!;
 
 async function boot(): Promise<void> {
+  // the map editor's Play button (dev-map.html) opens the game with ?map=edited on its edit
+  if (new URLSearchParams(location.search).get('map') === 'edited') {
+    try {
+      const raw = localStorage.getItem('dbc.mapOverride');
+      if (raw) useMapData(JSON.parse(raw));
+    } catch {
+      /* no storage: the normal map */
+    }
+  }
   // optional glTF overrides first (public/models/manifest.json); everything else is procedural
   const loading = document.getElementById('loading');
   const [, cast] = await Promise.all([models.preload(), loadCast()]);

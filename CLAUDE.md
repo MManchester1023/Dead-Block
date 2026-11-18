@@ -7,13 +7,14 @@ assets are free-licence downloads, credited in `CREDITS.md`.
 
 - **`docs/Dead_Block_Command_Design_Doc_v4.md`** is the source of truth: version table at the top (one row
   per change, newest first), §21 roadmap, **§22 playtest log** (rounds of numbered notes, #1–#118 so far).
-- **`STATUS.md`** is the short, ranked to-do list ("work on #N" means item N there) plus what's done.
+- **`STATUS.md`** is the short, ranked to-do list plus what's done. **Item numbers are fixed** ("work on #13" always means
+  item **#13**): never renumber; new items take the next free number and go where they rank.
 - `CREDITS.md` (every model, animation, sound), `assets-src/README.md` (source assets, how to add a Mixamo
   clip), `tools/README.md` (probes, browser checks, asset scripts).
 - Code: `src/sim/` is the deterministic simulation (World = state + registry + step loop; `rules/` =
   campaign, commands, damage, buildings; `systems/` = what runs each tick); it never touches the DOM.
   `src/render/` is the 3D view (Renderer coordinates layers: City, Crowd, Unit, SupplyDrops, Effects,
-  PlacementGhost; `characters.ts` bakes animations into flipbook poses). `src/ui/Hud.ts`, `src/audio/`,
+  PlacementGhost; `characters.ts` bakes animations into flipbook poses). `src/ui/Hud.ts`, `src/audio/`, `src/data/maps/` (the city as data, edited in `dev-map.html`),
   `src/config/` (balance.ts, units.ts, features.ts: tune numbers there). `dev-*.html` are developer pages.
 
 ## Working with Mat
@@ -22,6 +23,8 @@ assets are free-licence downloads, credited in `CREDITS.md`.
   numbers are until a playtest) and when you didn't check something.
 - **No screenshots for Mat** (he asked): don't send or describe screenshots; check visuals with the scripted
   browser checks and say what was checked. Screenshot only if something can't be checked any other way.
+- **Mat's long-term plans stay** (vehicles, air support, bosses, human faction, the whole roadmap). Don't suggest
+  dropping or parking them; when asked for opinions, suggest additions, changes and order, not cuts.
 - **Mat decides difficulty from his own playtests.** The balance bots don't build or think, so don't run
   probes to judge or retune difficulty, and don't propose difficulty changes based on them. Make the
   change asked for and let Mat playtest it. Probes are still fine as a quick "nothing broke" check
