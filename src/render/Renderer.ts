@@ -83,6 +83,8 @@ export class Renderer {
   private corpses: { key: string; x: number; z: number; facing: number; t0: number; sx: number; sy: number; tint?: number }[] = [];
   private animClock = 0;
   private anim = new Map<number, { clip: Clip; t: number; rate: number; seen: number }>();
+  /** When each soldier settled into cover (animation clock), to play "taking cover" once first. */
+  private coverSince = new Map<number, number>();
   private animFrame = 0;
   private rallyFlag: THREE.Group;
   private borders = new Map<string, THREE.Object3D>();
@@ -1119,11 +1121,21 @@ export class Renderer {
         const walking = gait(key, v, s.moving ? 0.6 : 1.6, s.moving ? 0.3 : 1.2) > 0;
         let clip: Clip = 'idle';
         let rate = 1;
+        const firing = engaged && w.time - m.lastShot < s.def.weapon.cooldown * 2.5;
+        const inCover = s.inCover > 0 && !s.moving && !walking && !working && s.garrisonedIn == null;
+        if (!inCover) this.coverSince.delete(key);
         if (working && crowd.has('work')) clip = 'work';
         else if (walking) {
-          clip = 'walk';
+          // v4.24 (#95): moving while engaged = walking while firing
+          clip = firing && crowd.has('walkShoot') ? 'walkShoot' : 'walk';
           rate = Math.min(3, Math.max(0.7, v / 2.2));
-        } else if (engaged && w.time - m.lastShot < s.def.weapon.cooldown * 2.5) clip = 'shoot';
+        } else if (firing) clip = 'shoot'; // stand up and fire, cover or not
+        else if (inCover && crowd.has('cover')) {
+          // v4.24: get into cover once, then hold the cover pose
+          const since = this.coverSince.get(key) ?? (this.coverSince.set(key, this.animClock), this.animClock);
+          const dIn = crowd.book.durations.coverIn ?? 0;
+          clip = this.animClock - since < dIn && crowd.has('coverIn') ? 'coverIn' : 'cover';
+        }
         crowd.add(clip, this.animTime(key, clip, rate, simDt), m.pos.x, m.pos.y, m.facing, 1, undefined, -lift);
       });
     }

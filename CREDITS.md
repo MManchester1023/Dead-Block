@@ -51,5 +51,17 @@ Everything else in the city (buildings, vehicles, trees, street furniture, groun
 
 ## Mixamo (`assets-src/models/mixamo/`)
 
-Rigs and animations from [Mixamo](https://www.mixamo.com) (Adobe), downloaded by the project owner. **In the game:** riflemen and engineers (Military RTS Character 1, rigged on Mixamo) with Rifle Idle, Walking, Firing Rifle, Dying and Working On Device; female zombies with Zombie Idle, Walking, Zombie Run, Zombie Attack and Zombie Dying (Zombie Punching kept in `assets-src/models/` as an alternative). Mixamo's terms allow royalty-free use in games; the raw files may not be redistributed as a standalone asset pack.
+Rigs and animations from [Mixamo](https://www.mixamo.com) (Adobe), downloaded by the project owner. **In the game:** riflemen and engineers (Military RTS Character 1, rigged on Mixamo) with Rifle Idle, Walking, Firing Rifle, Dying and Working On Device; soldiers also use Shoot Rifle (walking while firing), Taking Cover and Taking Cover Idle; female zombies use Zombie Idle, Walking, Zombie Run, Zombie Attack and Zombie Dying (Zombie Punching kept in `assets-src/models/` as an alternative). Mixamo's terms allow royalty-free use in games; the raw files may not be redistributed as a standalone asset pack.
+
+## Sound effects (`public/audio/`, originals in `assets-src/audio/soundfx.zip`)
+
+From [Pixabay](https://pixabay.com/sound-effects/) (Pixabay Content License: free to use, no attribution required; credited anyway), cut into single sounds:
+
+| Sound | Author | Used as |
+|---|---|---|
+| AK-47 sound effect | sovetsky_rastov72 | Rifle and MG shots (`rifle_1–3`) |
+| Female zombie screams | DRAGON-STUDIO | Horde wave / noise alert (`scream_1–4`) |
+| Zombie sound | DRAGON-STUDIO | Ambient groans (`groan_1–4`) |
+| Zombie | vilches86 | Ambient groan (`groan_5`) |
+| Zombie death 2 | freesound_community | Zombie deaths (`zombie_death`) |
 

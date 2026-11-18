@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.24** | First sound pass (owner's Pixabay clips: gunfire, zombie deaths, groans, screams; positional, volume button), shooting-while-moving and cover animations (#95), owner-set rifle fit via the rifle fitter. |
 | **v4.23** | Round 9 fixes (#93, #96–#99) and the engineer build menu (#104) built. |
 | **v4.22** | Playtest round 9 logged (§22, #93–104): rifle orientation, shooting animations, choppy long clips, tower climb time, 0% infestation with zombies alive, lower command cap; walking fix and real-hardware FPS confirmed; drone (recon only, 30 s fog-clearing orbit), Medic Team design, engineer build menu. No code changes. |
 | **v4.21** | Longer sight (#86, #87): rifle 24 → 30 m, carbine 18 → 22 m, MG emplacement 22 → 35 m. |
@@ -798,7 +799,7 @@ Every feature, ranked by importance to the game being fun and shippable. **Work 
 ### Technical track (v4.20) — groundwork the open world depends on
 These get more expensive the longer they wait, so they're scheduled *before* the open-world unlock (ranked together with the features in `STATUS.md`).
 - **T1. ✔ Real-hardware performance check** (v4.22, round 9 #100): frame rate fine with a lot of zombies on the owner's machine. Web Worker not needed for now.
-- **T2. Sound.** Gunfire per weapon, zombie groans/attacks, explosions, UI, ambience (CC0 packs). Noise is a core mechanic and the game is silent. The radio lines are ready for voice later.
+- **T2. Sound** (first pass ✔ v4.24: gunfire, deaths, groans, screams). Still to add: explosions, building, footsteps, UI, ambience. Originally: gunfire per weapon, zombie groans/attacks, explosions, UI, ambience (CC0 packs). Noise is a core mechanic and the game is silent. The radio lines are ready for voice later.
 - **T3. Split the oversized code**: the renderer (~1,200 lines) and the World class into focused modules. No behaviour change.
 - **T4. Map data format** (+ simple editor or an existing tile editor). The layout is hand-typed coordinates in code today; a city needs data files.
 - **T5. Chunked ground and streaming.** One ground texture (2,550 × 2,280 px) won't survive a growing city; chunks that load near the camera.

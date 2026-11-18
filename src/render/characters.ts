@@ -17,7 +17,7 @@ import { HUMAN_HEIGHT } from '../config/world';
  * baked into vertex colours so each pose is a single draw call (the source meshes have ~120 groups).
  */
 
-export type Clip = 'idle' | 'walk' | 'run' | 'shoot' | 'punch' | 'death' | 'work';
+export type Clip = 'idle' | 'walk' | 'run' | 'shoot' | 'punch' | 'death' | 'work' | 'walkShoot' | 'coverIn' | 'cover';
 
 /** Poses baked per second of animation (round 9 #96), and the most any one clip gets. */
 const POSES_PER_SEC = 10;
@@ -32,6 +32,10 @@ const CLIP_SOURCES: Record<Clip, { name: string; frames: number; loop: boolean }
   punch: { name: 'Punch', frames: 10, loop: true },
   death: { name: 'Defeat', frames: 14, loop: false },
   work: { name: 'PickUp', frames: 10, loop: true },
+  // v4.24: Mixamo clips for soldiers (by file, so the names don't matter)
+  walkShoot: { name: 'walkShoot', frames: 12, loop: true },
+  coverIn: { name: 'coverIn', frames: 14, loop: false },
+  cover: { name: 'cover', frames: 12, loop: true },
 };
 
 export interface CharacterSpec {
@@ -615,6 +619,10 @@ export const SOLDIER_CLIPS: Partial<Record<Clip, string>> = {
   walk: 'models/characters/soldier/walk.fbx',
   shoot: 'models/characters/soldier/shoot.fbx',
   death: 'models/characters/soldier/death.fbx',
+  // v4.24 (round 9 #95 + cover): Mixamo "Shoot Rifle" (walking while firing), "Taking Cover", "Taking Cover Idle"
+  walkShoot: 'models/characters/soldier/walkshoot.fbx',
+  coverIn: 'models/characters/soldier/cover_in.fbx',
+  cover: 'models/characters/soldier/cover.fbx',
 };
 
 export const CHARACTER_SPECS: CharacterSpec[] = [
@@ -624,7 +632,7 @@ export const CHARACTER_SPECS: CharacterSpec[] = [
     key: 'soldier',
     url: 'models/characters/soldier/soldier_rts.fbx',
     texture: 'models/characters/soldier/soldier_rts.png',
-    clips: ['idle', 'walk', 'shoot', 'death'],
+    clips: ['idle', 'walk', 'shoot', 'death', 'walkShoot', 'coverIn', 'cover'],
     clipFiles: SOLDIER_CLIPS,
     inPlace: true,
     deathFalls: true,
@@ -637,7 +645,7 @@ export const CHARACTER_SPECS: CharacterSpec[] = [
     key: 'engineer',
     url: 'models/characters/soldier/soldier_rts.fbx',
     texture: 'models/characters/soldier/soldier_rts.png',
-    clips: ['idle', 'walk', 'shoot', 'death', 'work'],
+    clips: ['idle', 'walk', 'shoot', 'death', 'work', 'walkShoot', 'coverIn', 'cover'],
     clipFiles: { ...SOLDIER_CLIPS, work: 'models/characters/soldier/work.fbx' },
     inPlace: true,
     deathFalls: true,

@@ -72,6 +72,8 @@ export class Hud {
   private modal!: HTMLElement;
   private radio: Radio;
   tutorial: Tutorial | null = null;
+  /** Set by main.ts; drives the volume button. */
+  sound: { volume: number; cycleVolume(): void } | null = null;
   private root: HTMLElement;
   private dirty = true;
   private last = 0;
@@ -178,6 +180,9 @@ export class Hud {
         break;
       }
       case 'ops': g.renderer.rig.toggleStrategic(); break;
+      case 'volume':
+        this.sound?.cycleVolume();
+        break;
       case 'uiscale': {
         const i = UI_SCALES.indexOf(this.uiScale);
         this.uiScale = UI_SCALES[(i + 1) % UI_SCALES.length];
@@ -250,6 +255,7 @@ export class Hud {
         <button class="${g.paused ? 'on warn' : ''}" data-act="pause">${g.paused ? '▶ PAUSED' : '❚❚'}</button>${speeds}
         <button data-act="rot:-1" title="Rotate camera (Q)">⟲</button><span class="compass" title="Camera heading">VIEW ${Math.round(g.renderer.rig.headingDeg)}° ${g.renderer.rig.headingLabel}</span><button data-act="rot:1" title="Rotate camera (E)">⟳</button>
         <button data-act="ops" title="Operations map (M)">${g.renderer.rig.strategic ? 'STREET' : 'OPS MAP'}</button>
+        <button data-act="volume" title="Sound volume (click to cycle)">SOUND ${this.sound ? (this.sound.volume ? `${Math.round(this.sound.volume * 100)}%` : 'OFF') : ''}</button>
         <button data-act="uiscale" title="Interface size (click to cycle)">UI ${Math.round(this.uiScale * 100)}%</button>`);
   }
 

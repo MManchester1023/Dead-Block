@@ -5,10 +5,10 @@ Short version of the roadmap (design doc §21). Ranked by importance in my opini
 ## Next, in order
 
 1. ✔ **Round 9 fixes** (v4.23): rifle rolled upright in the hand; long animations sampled by length (10 poses/s), with crowd memory kept to ~99 MB; 2 s to climb in/out of a guard tower; no 0% infestation while zombies remain; command cap 14 (+3 per secured district).
-2. **Shooting animations** (#95): needs two Mixamo clips on the soldier from you, a longer firing loop and a walk-while-shooting.
+2. ✔ **Shooting and cover animations** (v4.24): walking while firing (Mixamo Shoot Rifle); squads in cover play Taking Cover once, then Taking Cover Idle, and stand to fire. Rifle fit set by you with the rifle fitter.
 3. ✔ **Engineer build menu** (v4.23): pops up bottom-centre for an engineers-only selection, with icon, hotkey and cost; locked items show how to unlock them.
 4. ✔ **Longer sight** (v4.21): rifles 24 → 30 m, carbines (engineers) 18 → 22 m, MG emplacements 22 → 35 m (still a 120° arc); squads in a guard tower now reach ~42 m.
-5. **Sound.** The biggest gap: noise is a core mechanic and the game is silent. Gunfire per weapon, zombie groans and attack sounds, explosions, UI clicks, ambient city wind; free CC0 packs. The radio lines are already written for voice later.
+5. **Sound** (first pass ✔ v4.24): gunfire (3 shot variants; MG lower and louder), zombie deaths, ambient groans near the camera, a scream when a horde wave starts or the noise meter fills; quieter with distance from where you're looking, panned by screen position; SOUND button cycles 100/60/30%/off. **Still to add:** explosions, building/engineer sounds, footsteps, UI clicks, ambience, radio voice.
 6. **Civilians from house searches**, introduced in region 3: controllable, walk them back to HQ for money and supplies.
 7. **Zombies roam between districts and attack outposts**, so outposts have to be fortified and maintained.
 8. **Split the two oversized code files** before the open-world work: the renderer (~1,200 lines: crowds, structures, effects, labels, overlays in one class) and the World class (rules, spawning, damage, orders, unlocks). Pure restructuring, no behaviour change; makes everything after it cheaper.
