@@ -28,6 +28,10 @@ mesh; the clip alone is ~10x smaller). With the dev server running:
    `reload.clip.json` in the same folder (or ask Claude: it runs the converter).
 3. Point the character's `clipFiles` at the `.clip.json` (`src/render/characters.ts`) and move the FBX to
    `mixamo/clips/<who>/` here.
+4. **Re-bake the cast** (v4.47): with the dev server running, `node tools/assets/bake-cast.cjs`, and commit
+   `public/models/baked/cast.bin` (or ask Claude). The same after any change to a character model, texture,
+   gun or gun fit. Until then `npm test` fails and the game bakes the characters live at start-up (works,
+   just a slower start).
 
 FBX clips still load if you skip the conversion, just bigger. `dev-bakecheck.html` fingerprints every baked
 pose, to check that a conversion changed nothing. The originals of every shipped clip are in `mixamo/clips/`,
