@@ -56,7 +56,7 @@ export function updateOrders(w: World, dt: number): void {
         w.events.emit('radio', { speaker: s.name, text: "Tower's coming down! We're on the ground!", tone: 'bad' });
       } else if (next && next.type !== 'hold' && next.type !== 'garrison') {
         // climb down first; the order waits until they're on the ground
-        s.climb = { towerId: tower.id, t: tower.def.garrison!.climbSec, up: false };
+        s.climb = { towerId: tower.id, t: tower.def.garrison!.jumpSec, up: false }; // v4.62: they jump down
         manTower(w, s, tower);
         continue;
       } else {

@@ -53,11 +53,23 @@ describe('guard towers (v4.13, introduced by tutorial region 2)', () => {
     w.orderGarrison([sq], tower);
     for (let i = 0; i < 30 * 10 && sq.garrisonedIn == null; i++) w.step(1 / 30);
     w.issueOrder([sq], { type: 'move', pos: M(30, 50) });
-    // round 9 #97: ~2 s down the ladder first, then off they go
+    // round 9 #97: down first, then off they go (v4.62: they jump down, 2.5 s with the landing)
     for (let i = 0; i < 30; i++) w.step(1 / 30);
     expect(sq.garrisonedIn).toBe(tower.id);
     expect(sq.climb?.up).toBe(false);
-    for (let i = 0; i < 40; i++) w.step(1 / 30);
+    for (let i = 0; i < 30 * 1.6; i++) w.step(1 / 30);
     expect(sq.garrisonedIn).toBeNull();
+  });
+});
+
+describe('jumping down from a tower (v4.62)', () => {
+  it('stays up while crouching to jump, falls over the airborne stretch, is down by the landing', async () => {
+    const { jumpLift } = await import('../src/render/CrowdLayer');
+    const h = 5.15;
+    expect(jumpLift(0, h)).toBeCloseTo(h - 0.6);
+    expect(jumpLift(1.3, h)).toBeCloseTo(h - 0.6);
+    expect(jumpLift(1.6, h)).toBeLessThan(jumpLift(1.4, h));
+    expect(jumpLift(1.85, h)).toBe(0);
+    expect(jumpLift(2.4, h)).toBe(0);
   });
 });

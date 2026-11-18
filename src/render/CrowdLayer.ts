@@ -18,6 +18,20 @@ export function zombieLook(id: number, defId: string): { key: string; sx: number
 // STATUS #20 / v4.62: medics have their own crowd (pistol clips, healing animation) on the engineer body, tinted
 // red to tell them apart until their own model is rigged.
 const squadCrowd = (defId: string) => (defId === 'engineer' ? 'engineer' : defId === 'medic' ? 'medic' : defId === 'civilians' ? 'civilian' : 'soldier');
+/**
+ * v4.62: height above the ground while jumping off a tower of `height` m, `e` s into Mixamo's "Jumping Down".
+ * The clip itself drops 0.6 m (it starts on a ledge); the rest of the drop is a gravity fall over its
+ * airborne stretch (1.3–1.85 s), so the landing crouch at ~1.9 s meets the ground.
+ */
+const JUMP_CLIP_DROP = 0.6;
+export function jumpLift(e: number, height: number): number {
+  const extra = Math.max(0, height - JUMP_CLIP_DROP);
+  if (e <= 1.3) return extra;
+  if (e >= 1.85) return 0;
+  const k = (e - 1.3) / 0.55;
+  return extra * (1 - k * k);
+}
+
 /** v4.62: every other civilian is the female model. */
 const memberCrowd = (defId: string, i: number | undefined, base: string) => (defId === 'civilians' && (i ?? 0) % 2 === 1 ? 'civilianF' : base);
 const squadTint = (defId: string) => (defId === 'medic' ? 0xffa89c : undefined);
@@ -117,13 +131,21 @@ export class CrowdLayer {
       let lift = tower?.def.garrison ? tower.def.garrison.height + 0.15 : 0;
       // v4.55: climbing the ladder: rise (or sink) over the climb, with the climbing clips
       let climbing: Clip | null = null;
+      let jumpAt = -1;
+      let jumpHeight = 0;
       if (s.climb) {
         const ct = w.structures.find((x) => x.id === s.climb!.towerId);
         const g = ct?.def.garrison;
-        if (g) {
+        if (g && s.climb.up) {
           const k = Math.max(0, Math.min(1, s.climb.t / g.climbSec));
-          lift = (g.height + 0.15) * (s.climb.up ? 1 - k : k);
-          climbing = s.climb.up ? 'climbUp' : 'climbDown';
+          lift = (g.height + 0.15) * (1 - k);
+          climbing = 'climbUp';
+        } else if (g) {
+          // v4.62 (owner): they jump down. Timed per soldier from the start of the jump (see jumpLift)
+          jumpAt = g.jumpSec - s.climb.t;
+          lift = 0;
+          climbing = 'climbDown';
+          jumpHeight = g.height + 0.15;
         }
       }
       // round 10 #107: what the squad is hiding behind, so each soldier can tell if they're up against it
@@ -180,7 +202,11 @@ export class CrowdLayer {
         } else if (since !== undefined) this.standing.delete(key);
         if (low) this.wasLow.add(key);
         else this.wasLow.delete(key);
-        crowd.add(clip, this.animTime(key, clip, rate, simDt), m.pos.x, m.pos.y, m.facing, 1, squadTint(s.def.id), -lift);
+        if (clip === 'climbDown' && jumpAt >= 0) {
+          // one after another, 0.12 s apart; clip time and fall in step so they land when the clip does
+          const e = Math.max(0, jumpAt - i * 0.12);
+          crowd.add(clip, e, m.pos.x, m.pos.y, m.facing, 1, squadTint(s.def.id), -jumpLift(e, jumpHeight));
+        } else crowd.add(clip, this.animTime(key, clip, rate, simDt), m.pos.x, m.pos.y, m.facing, 1, squadTint(s.def.id), -lift);
       });
     }
 

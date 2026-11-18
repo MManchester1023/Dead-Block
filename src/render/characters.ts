@@ -48,7 +48,7 @@ const CLIP_SOURCES: Record<Clip, { name: string; frames: number; loop: boolean }
   standUp: { name: 'standUp', frames: 12, loop: false },
   deathCrouch: { name: 'deathCrouch', frames: 14, loop: false },
   climbUp: { name: 'climbUp', frames: 16, loop: true },
-  climbDown: { name: 'climbDown', frames: 16, loop: true },
+  climbDown: { name: 'climbDown', frames: 16, loop: false }, // v4.62: "Jumping Down" (owner), played once
 };
 
 export interface CharacterSpec {
@@ -671,7 +671,7 @@ export const SOLDIER_CLIPS: Partial<Record<Clip, string>> = {
   standUp: 'models/characters/soldier/standup.clip.json',
   deathCrouch: 'models/characters/soldier/deathcrouch.clip.json',
   climbUp: 'models/characters/soldier/climbup.clip.json',
-  climbDown: 'models/characters/soldier/climbdown.clip.json',
+  climbDown: 'models/characters/soldier/jumpdown.clip.json', // v4.62: Mixamo "Jumping Down" (owner): off the tower
 };
 const SOLDIER_EXTRA: Clip[] = ['crouchShoot', 'crouchWalk', 'standUp', 'deathCrouch', 'climbUp', 'climbDown'];
 
@@ -685,7 +685,7 @@ export const CHARACTER_SPECS: CharacterSpec[] = [
     clips: ['idle', 'walk', 'shoot', 'death', 'walkShoot', 'coverIn', 'cover', 'crouch', ...SOLDIER_EXTRA],
     clipFiles: SOLDIER_CLIPS,
     inPlace: true,
-    pinHipsY: ['climbUp', 'climbDown'],
+    pinHipsY: ['climbUp'],
     deathFalls: true,
     rifle: true,
     rifleBone: 'mixamorigRightHand',
@@ -700,7 +700,7 @@ export const CHARACTER_SPECS: CharacterSpec[] = [
     clips: ['idle', 'walk', 'shoot', 'death', 'work', 'walkShoot', 'coverIn', 'cover', 'crouch', ...SOLDIER_EXTRA],
     clipFiles: { ...SOLDIER_CLIPS, work: 'models/characters/soldier/work.clip.json' },
     inPlace: true,
-    pinHipsY: ['climbUp', 'climbDown'],
+    pinHipsY: ['climbUp'],
     deathFalls: true,
     rifle: true,
     rifleBone: 'mixamorigRightHand',
@@ -727,7 +727,7 @@ export const CHARACTER_SPECS: CharacterSpec[] = [
       standUp: 'models/characters/medic/standup.clip.json',
     },
     inPlace: true,
-    pinHipsY: ['climbUp', 'climbDown'],
+    pinHipsY: ['climbUp'],
     deathFalls: true,
     rifle: true,
     rifleBone: 'mixamorigRightHand',

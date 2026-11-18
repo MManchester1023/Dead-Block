@@ -1,5 +1,5 @@
 // Which animation the game plays in each situation (v4.55, round 14 uploads): crouch walk, kneeling fire,
-// standing up from a crouch, the crouched death, climbing a guard tower up and down, the civilians' idle
+// standing up from a crouch, the crouched death, climbing a guard tower up and jumping down, the civilians' idle
 // and run; plus the MG emplacement's firing loop. Records every clip the crowds draw. Prints checks.
 //   node tools/browser/anims.cjs
 const { launch, watchErrors, startGame } = require('./lib.cjs');
@@ -78,6 +78,14 @@ const ok = (cond, what) => console.log(`${cond ? 'ok  ' : 'FAIL'} ${what}`);
   });
   ok(climbed, 'a squad sent up a guard tower');
   ok(await waitFor('soldier:climbUp'), 'climbing up plays the climb');
+  // v4.62: any other order and they jump down (Mixamo "Jumping Down"), then carry on
+  await p.waitForFunction(() => window.game.world.squads.filter((q) => q.def.id === 'rifle')[1].garrisonedIn != null, null, { timeout: 60000 });
+  await p.evaluate(() => {
+    const w = window.game.world, s = w.squads.filter((q) => q.def.id === 'rifle')[1];
+    w.issueOrder([s], { type: 'move', pos: { x: s.pos.x - 15, y: s.pos.y } });
+  });
+  ok(await waitFor('soldier:climbDown'), 'leaving the tower plays the jump down');
+  ok(await p.waitForFunction(() => window.game.world.squads.filter((q) => q.def.id === 'rifle')[1].garrisonedIn == null, null, { timeout: 60000 }).then(() => true).catch(() => false), '…and they land and move off');
   // civilians: idle and run
   await p.evaluate(() => {
     const w = window.game.world, s = w.squads[0];

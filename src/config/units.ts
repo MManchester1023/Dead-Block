@@ -135,7 +135,8 @@ export interface StructureDef {
   /** Field of fire in degrees (v4.13, #71): the weapon only engages inside this arc around its aim. */
   arc?: number;
   /** One squad can man it (guard tower, v4.13): range multiplier, cover, platform height (m). */
-  garrison?: { rangeMult: number; cover: number; height: number; climbSec: number };
+  /** climbSec: up the ladder; jumpSec (v4.62, owner): jumping down, matched to the "Jumping Down" clip. */
+  garrison?: { rangeMult: number; cover: number; height: number; climbSec: number; jumpSec: number };
   /** Campaign unlock key; buildable once `World.unlocked` has it (e.g. opened by a tutorial region). */
   unlock?: string;
   /**
@@ -164,7 +165,7 @@ export const STRUCTURES: Record<string, StructureDef> = {
   medBay: { id: 'medBay', name: 'Med Bay', hp: 900, cost: { money: 150, supplies: 40 }, buildTime: 20, size: { w: 4, h: 3 }, blocksMovement: true, hotkey: 'N', unlock: 'medBay', baseOnly: true, needsPower: true,
     heal: { radius: 10, perSec: 0.025, suppliesPerHp: 0.12, restAfterHitSec: 5 } },
   // v4.13: introduced by tutorial region 2 (#54, #74)
-  guardTower: { id: 'guardTower', name: 'Guard Tower', hp: 900, cost: { money: 120, supplies: 40 }, buildTime: 18, size: { w: 2, h: 2 }, blocksMovement: true, hotkey: 'V', garrison: { rangeMult: 1.4, cover: 0.5, height: 5, climbSec: 2 }, unlock: 'guardTower' },
+  guardTower: { id: 'guardTower', name: 'Guard Tower', hp: 900, cost: { money: 120, supplies: 40 }, buildTime: 18, size: { w: 2, h: 2 }, blocksMovement: true, hotkey: 'V', garrison: { rangeMult: 1.4, cover: 0.5, height: 5, climbSec: 2, jumpSec: 2.5 }, unlock: 'guardTower' },
   // STATUS #11 gave every outpost a small all-round garrison; round 11 #129 made it a paid upgrade
   outpost: { id: 'outpost', name: 'Outpost', hp: 600, cost: { money: 100, supplies: 30 }, buildTime: 30, size: { w: 3, h: 3 }, blocksMovement: true, requiresSecured: true, hotkey: 'O',
     upgrade: { name: 'Garrison', desc: 'A few soldiers man the outpost: 26 m all-round fire, enough for strays, not for a roaming pack',
