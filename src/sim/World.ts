@@ -200,6 +200,19 @@ export class World {
     return s;
   }
 
+  private targetCache: { src: Structure[]; len: number; list: Structure[] } | null = null;
+  /**
+   * Structures the dead can go for: everything but the perimeter wall (~130 segments that zombies never
+   * target), in the same order as `structures`. Rebuilt only when structures are added or compacted.
+   */
+  get zombieTargets(): Structure[] {
+    const c = this.targetCache;
+    if (c && c.src === this.structures && c.len === this.structures.length) return c.list;
+    const list = this.structures.filter((s) => s.def.id !== 'baseWall');
+    this.targetCache = { src: this.structures, len: this.structures.length, list };
+    return list;
+  }
+
   /** Drop a dead / departed entity from the id registry. */
   forget(id: number): void {
     this.byId.delete(id);

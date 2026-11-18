@@ -13,10 +13,26 @@ Authors and licences for every file are in `../CREDITS.md`. Planned uses are in 
 | Bloater candidate (only an idle animation; 50k triangles, needs heavy simplifying) | `fat_zombie_idle_animated.glb` |
 | Power station (region 3, power system) | `emergency_power_station_ps1.glb` (38 triangles, low-poly; ready to use) |
 | Boss candidate | `tankzombie.glb` |
-| Soldiers (no animations; need retargeting) | `military_rts_character_1_cc0.glb`, `rts_mercenaries_1_cc0.glb`, `rts_mercenaries_2_cc0.glb` |
+| Soldiers (no rig; would need Mixamo rigging via `dev-objexport.html`) | `military_rts_character_1_cc0.glb`, `rts_mercenaries_1_cc0.glb`, `rts_mercenaries_2_cc0.glb` |
 | Aircraft (call-ins, flyovers) | `a-10_thunderbolt_ii.glb`, `bell_huey_helicopter.glb`, `boeing_ch-47_chinook.glb`, `eurocopter_tiger_attack_helicopter.glb`, `helicopter.glb`, `helicopter_military.glb`, `low-poly_fighter_jet.glb`, `mq-9_reaper_drone__game_ready_military_asset.glb` |
 | Ground vehicles | `m2_bradley_ifv.glb`, `fictional_lowpoly_pbr_tank_lowpole.glb`, `ural-4320.glb` |
 | Not planned | `fps_guns_4k_-_rifle_1.glb` (CC-BY-ND: can't be modified/compressed, and a gun is a few pixels at our camera distance) |
+
+## Adding a Mixamo animation to the game
+
+The game loads compact `.clip.json` files, not FBX (a Mixamo FBX carries the skeleton and often the whole
+mesh; the clip alone is ~10x smaller). With the dev server running:
+
+1. Put the FBX next to the others in `public/models/characters/<who>/` (e.g. `soldier/reload.fbx`).
+2. Open `dev-clips.html?files=models/characters/soldier/reload.fbx` and save `window.__out` as
+   `reload.clip.json` in the same folder (or ask Claude: it runs the converter).
+3. Point the character's `clipFiles` at the `.clip.json` (`src/render/characters.ts`) and move the FBX to
+   `mixamo/clips/<who>/` here.
+
+FBX clips still load if you skip the conversion, just bigger. `dev-bakecheck.html` fingerprints every baked
+pose, to check that a conversion changed nothing. The originals of every shipped clip are in `mixamo/clips/`,
+and `originals/zombieidle.glb` is the untrimmed main zombie (the shipped one keeps only its 5 used
+animations and its colour texture at the 512 px the game samples).
 
 ## Mixamo (`mixamo/`)
 

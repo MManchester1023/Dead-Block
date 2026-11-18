@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { loadClipFile } from '../render/clipFile';
 import { CHARACTER_SPECS, DEFAULT_FIT, loadRifleFit, loadRifleModel, rifleFitMatrix, type RifleFit } from '../render/characters';
 
 // round 10: pick the unit (any Mixamo-rigged character that holds a gun) and the gun, from the panel:
@@ -88,12 +89,8 @@ const hipsRest = hips!.position.clone();
 
 const clips: Record<string, { clip: THREE.AnimationClip; hipsY: number }> = {};
 for (const [k, url] of Object.entries(CLIPS)) {
-  const a = await fbx.loadAsync(url);
-  let hy = 0;
-  a.traverse((o) => {
-    if (!hy && (o as THREE.Bone).isBone && /hips$/i.test(o.name)) hy = o.position.y;
-  });
-  clips[k] = { clip: a.animations[0], hipsY: hy };
+  const c = await loadClipFile(url);
+  if (c) clips[k] = { clip: c.clip, hipsY: c.hipsY ?? 0 };
 }
 const mixer = new THREE.AnimationMixer(soldier);
 

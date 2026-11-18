@@ -185,8 +185,8 @@ function think(w: World, z: Zombie): void {
   if (!best && cur instanceof Structure && cur.alive && dist(z.pos, cur.pos) < cur.radius + 6) return;
   if (!best) {
     // v4.9 (#60): HQ buildings draw them from much further than sandbags and nests
-    for (const st of w.structures) {
-      if (!st.alive || st.def.id === 'baseWall' || (st.def.restore && !st.built)) continue;
+    for (const st of w.zombieTargets) {
+      if (!st.alive || (st.def.restore && !st.built)) continue;
       const hq = HQ.has(st.def.id);
       const d = dist(z.pos, st.pos) - st.radius - (hq ? 30 : 0);
       if (d < bestD * 0.6) {

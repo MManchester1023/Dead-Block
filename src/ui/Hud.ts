@@ -1,6 +1,5 @@
 import { BALANCE } from '../config/balance';
 import { SAVE_VERSION, SLOTS, deleteSlot, latestSlot, requestLoad, slotMeta, writeSlot, type SlotId } from '../sim/save';
-import { FEATURES } from '../config/features';
 import { ABILITIES, STRUCTURES, UNITS } from '../config/units';
 import { isEnabled } from '../config/features';
 import type { Game } from '../Game';
@@ -591,10 +590,6 @@ export class Hud {
   }
 
   private showIntro(): void {
-    const tiers = [0, 1, 2, 3, 4].map((t) => {
-      const fs = FEATURES.filter((f) => f.tier === t);
-      return `<div class="tier"><b>Tier ${t}</b> ${fs.map((f) => `<span class="feat ${f.enabled ? 'on' : ''}" title="${f.docRef}">${f.name}</span>`).join('')}</div>`;
-    }).join('');
     this.modal.innerHTML = `<div class="dialog">
       <h1>DEAD BLOCK <span>COMMAND</span></h1>
       <p class="tag">Reclaim it block by block.</p>
@@ -610,7 +605,6 @@ export class Hud {
           </ul></div>
       </div>
       <p class="hint">Press <kbd>Esc</kbd> (or <b>MENU</b>, top right) any time for the controls, settings and restart.</p>
-      <details class="roadmap"><summary>Build roadmap: what's in this MVP vs. coming next</summary>${tiers}</details>
       ${(() => {
         const s = latestSlot();
         const m = s ? slotMeta(s) : null;
