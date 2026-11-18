@@ -34,8 +34,9 @@ export interface UnitDef {
   tags?: string[];
 }
 
-const rifle: WeaponDef = { name: 'Service rifle', range: 24, damage: 9, cooldown: 0.9, accuracy: 0.62, type: 'bullet', loudness: 2.2 };
-const carbine: WeaponDef = { name: 'Carbine', range: 18, damage: 7, cooldown: 1.0, accuracy: 0.7, type: 'bullet', loudness: 1.8 };
+// v4.21 (#86): riflemen see/engage a little further (was 24 m; carbine was 18 m)
+const rifle: WeaponDef = { name: 'Service rifle', range: 30, damage: 9, cooldown: 0.9, accuracy: 0.62, type: 'bullet', loudness: 2.2 };
+const carbine: WeaponDef = { name: 'Carbine', range: 22, damage: 7, cooldown: 1.0, accuracy: 0.7, type: 'bullet', loudness: 1.8 };
 
 /**
  * Full roster from doc §7. Only units whose `requires` feature is on (or which have none)
@@ -147,7 +148,7 @@ export const STRUCTURES: Record<string, StructureDef> = {
   outpost: { id: 'outpost', name: 'Outpost', hp: 600, cost: { money: 100, supplies: 30 }, buildTime: 30, size: { w: 3, h: 3 }, blocksMovement: true, requiresSecured: true, hotkey: 'O' },
   sandbags: { id: 'sandbags', name: 'Sandbag Wall', hp: 260, cost: { money: 15, supplies: 10 }, buildTime: 6, size: { w: 3, h: 1 }, blocksMovement: true, cover: 0.55, climbable: true, hotkey: 'Q' },
   wire: { id: 'wire', name: 'Barbed Wire', hp: 120, cost: { money: 10, supplies: 5 }, buildTime: 4, size: { w: 3, h: 1 }, blocksMovement: false, slow: 0.35, hotkey: 'W' },
-  mgNest: { id: 'mgNest', name: 'MG Emplacement', hp: 380, cost: { money: 140, supplies: 45 }, buildTime: 12, size: { w: 2, h: 2 }, blocksMovement: true, cover: 0.5, hotkey: 'E', arc: 120, weapon: { name: 'Mounted HMG', range: 22, damage: 8, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 } },
+  mgNest: { id: 'mgNest', name: 'MG Emplacement', hp: 380, cost: { money: 140, supplies: 45 }, buildTime: 12, size: { w: 2, h: 2 }, blocksMovement: true, cover: 0.5, hotkey: 'E', arc: 120, weapon: { name: 'Mounted HMG', range: 35, damage: 8, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 } },
   tallWall: { id: 'tallWall', name: 'Tall Concrete Wall (40 ft)', hp: 4000, cost: { money: 400, supplies: 120 }, buildTime: 60, size: { w: 4, h: 1 }, blocksMovement: true, climbable: false, requires: 'tallWalls' },
   loudspeaker: { id: 'loudspeaker', name: 'Loudspeaker', hp: 80, cost: { money: 40, supplies: 10 }, buildTime: 8, size: { w: 1, h: 1 }, blocksMovement: false, lure: 6, requires: 'tallWalls' },
 };

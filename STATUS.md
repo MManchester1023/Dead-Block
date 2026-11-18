@@ -6,7 +6,7 @@ Short version of the roadmap (design doc §21). Ranked by importance in my opini
 
 1. **Playtest region 3, the power station and the Med Bay**, and tune region 3's difficulty from that (the bots say it's beatable with losses; that needs a human check). **While playing, note the frame rate with a big horde on screen**: performance has only ever been measured in a slow software browser, never on real hardware.
 2. **Confirm the walking-animation fix in a playtest** (round 7 #79). Fixed in code but not visually verified at full frame rate.
-3. **Longer sight**: riflemen 24 → ~30 m, MG emplacements 22 → ~35 m. Quick tuning.
+3. ✔ **Longer sight** (v4.21): rifles 24 → 30 m, carbines (engineers) 18 → 22 m, MG emplacements 22 → 35 m (still a 120° arc); squads in a guard tower now reach ~42 m.
 4. **Sound.** The biggest gap: noise is a core mechanic and the game is silent. Gunfire per weapon, zombie groans and attack sounds, explosions, UI clicks, ambient city wind; free CC0 packs. The radio lines are already written for voice later.
 5. **Civilians from house searches**, introduced in region 3: controllable, walk them back to HQ for money and supplies.
 6. **Zombies roam between districts and attack outposts**, so outposts have to be fortified and maintained.

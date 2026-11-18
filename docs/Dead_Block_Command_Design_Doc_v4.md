@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.21** | Longer sight (#86, #87): rifle 24 → 30 m, carbine 18 → 22 m, MG emplacement 22 → 35 m. |
 | **v4.20** | Sound and a technical track added to the roadmap (§21 T1–T7): code split, map data format, chunked world, pre-baked animations, save/load moved up, real-hardware performance check, repo size. No code changes. |
 | **v4.19** | Round 8 to-dos logged (§22, #85–92): longer sight for riflemen and MG emplacements, zombies roaming between districts and hitting outposts, police/fire station loot, civilians from house searches (introduced in region 3), an unlock-progress UI for the open world. Ranked into §21. No code changes. |
 | **v4.18** | Character models replaced: riflemen and engineers (Military RTS Character 1) and female zombies rigged on Mixamo with Mixamo animations, real M4 rifle model. |
@@ -750,7 +751,7 @@ Every feature, ranked by importance to the game being fun and shippable. **Work 
 15. ✔ **Power stations**: the first one, in region 3 (v4.17). The wider network and the other base unlocks power drives come with the open world (§12)
 16. ✔ **Med Bay** (v4.17), unlocked by restoring region 3's power. **Medic Team still open.**
 **Round 8 to-dos [v4.19], ranked (§22 #85–92):**
-- 16a. **Longer sight for riflemen and MG emplacements** (#86, #87). Quick tuning.
+- 16a. ✔ **Longer sight** (v4.21, #86, #87): rifle 24 → 30 m, carbine 18 → 22 m, MG emplacement 22 → 35 m (120° arc kept); guard-towered squads ~42 m.
 - 16b. **Civilians found by searching houses** (#91), introduced in tutorial region 3: a controllable civilian group that earns money and supplies when walked back to HQ. (Moves the civilians part of Tier 4 #36 forward.)
 - 16c. **Zombies roam between districts and attack outposts** (#88). Needed before the open world: holding ground has to mean defending it.
 - 16d. **Open-world unlock** (§17) with **an unlock-progress panel** (#92) showing what's left to unlock.

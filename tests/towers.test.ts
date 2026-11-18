@@ -26,8 +26,8 @@ describe('guard towers (v4.13, introduced by tutorial region 2)', () => {
     const other = w.spawnSquad('rifle', M(26, 45));
     expect(w.orderGarrison([other], tower)).toMatch(/already up there/);
 
-    // range: a target ~30 m out is beyond a rifle (24 m) on the ground, but in reach from the tower
-    const far = w.spawnZombie('walker', { x: tower.pos.x + 31, y: tower.pos.y })!;
+    // range: a target ~38 m out is beyond a rifle (30 m) on the ground, but in reach from the tower (42 m)
+    const far = w.spawnZombie('walker', { x: tower.pos.x + 38, y: tower.pos.y })!;
     far.def = { ...far.def, speed: 0, sight: 0, hearing: 0 };
     for (let i = 0; i < 30 * 8 && far.alive; i++) w.step(1 / 30);
     expect(far.alive).toBe(false);
