@@ -1,5 +1,5 @@
 import { dist, type Vec2 } from '../../core/math';
-import { BALANCE } from '../../config/balance';
+import { BALANCE, HORDE } from '../../config/balance';
 import { isEnabled } from '../../config/features';
 import { Squad, type Hive, type Zombie } from '../entities';
 import { ZOMBIES } from '../../config/units';
@@ -40,11 +40,11 @@ export function updateHives(w: World, dt: number): void {
     h.spawnTimer -= dt;
     if (h.spawnTimer <= 0) {
       const room = broodRoom(w, h);
-      const cap = T.normalPool[h.stage - 1] + T.mediumPool[h.stage - 1];
+      const cap = Math.round((T.normalPool[h.stage - 1] + T.mediumPool[h.stage - 1]) * HORDE.count);
       // a hive that's been bled dry rebuilds faster (v4.9, playtest #32)
       const thin = h.spawned.size < cap * H.reinforceBelow;
       h.spawnTimer = T.spawnIntervalSec[h.stage - 1] * (thin ? H.reinforceRate : 1);
-      for (let i = 0; i < T.spawnGroup[h.stage - 1]; i++) {
+      for (let i = 0; i < Math.round(T.spawnGroup[h.stage - 1] * HORDE.count); i++) {
         // separate pools (v4.13 #75): a medium if its pool has room and the roll says so, else a normal
         const medium = room.medium > 0 && (room.normal <= 0 || w.rng.chance(T.mediumChance[h.stage - 1]));
         if (!medium && room.normal <= 0) break;
@@ -86,7 +86,7 @@ export function broodRoom(w: World, h: Hive): { normal: number; medium: number }
     if (z.def.class === 'medium') medium++;
     else if (z.def.class === 'normal') normal++;
   }
-  return { normal: T.normalPool[h.stage - 1] - normal, medium: T.mediumPool[h.stage - 1] - medium };
+  return { normal: Math.round(T.normalPool[h.stage - 1] * HORDE.count) - normal, medium: Math.round(T.mediumPool[h.stage - 1] * HORDE.count) - medium };
 }
 
 /** Walker or Runner. */
@@ -127,7 +127,7 @@ export function pulseTarget(w: World, from: Vec2): Vec2 {
 }
 
 export function pulse(w: World, h: Hive, bonus = 0): void {
-  const size = Math.round((BALANCE.horde.basePulseSize + BALANCE.horde.perStagePulseSize * (h.stage - 1)) * w.tier(h.districtId).pulseSize) + bonus;
+  const size = Math.round((BALANCE.horde.basePulseSize + BALANCE.horde.perStagePulseSize * (h.stage - 1)) * w.tier(h.districtId).pulseSize * HORDE.count) + bonus;
   const runnerShare = w.tier(h.districtId).runnerShare[h.stage - 1];
   const target = pulseTarget(w, h.pos);
   let sent = 0;

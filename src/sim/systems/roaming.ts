@@ -1,4 +1,4 @@
-import { BALANCE } from '../../config/balance';
+import { BALANCE, HORDE } from '../../config/balance';
 import { isEnabled } from '../../config/features';
 import { Structure } from '../entities';
 import type { Rect } from '../../core/math';
@@ -25,7 +25,7 @@ export function updateRoaming(w: World, dt: number): void {
     if (d.roamTimer > 0) continue;
     const hasHive = w.hives.some((h) => h.alive && h.districtId === d.def.id);
     d.roamTimer = w.rng.range(T.everySec[0], T.everySec[1]) * (hasHive ? 1 : R.noHiveSlower);
-    sendPack(w, d, T.group);
+    sendPack(w, d, [Math.round(T.group[0] * HORDE.count), Math.round(T.group[1] * HORDE.count)]);
   }
 }
 

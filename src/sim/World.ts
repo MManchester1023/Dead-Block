@@ -1,7 +1,7 @@
 import { EventBus } from '../core/events';
 import { Rng } from '../core/rng';
 import { inRect, type Vec2 } from '../core/math';
-import { BALANCE, DIFFICULTY, type DifficultyTier } from '../config/balance';
+import { BALANCE, DIFFICULTY, HORDE, type DifficultyTier } from '../config/balance';
 import { STRUCTURES, UNITS, ZOMBIES } from '../config/units';
 import { buildStarterMap, type BuildingDef, type CityMap, type DistrictDef } from './map';
 import { NavGrid } from './grid';
@@ -181,7 +181,7 @@ export class World {
     const z = new Zombie(ZOMBIES[defId], { ...this.grid.nearestFree(pos) });
     // easier districts field weaker dead (v4.9, playtest #59)
     const d = this.districtAt(z.pos);
-    if (d) z.hp = z.maxHp = z.maxHp * this.tier(d.def.id).zombieHp;
+    z.hp = z.maxHp = z.maxHp * HORDE.toughness * (d ? this.tier(d.def.id).zombieHp : 1); // v4.49: weaker, more of them
     z.homeHiveId = hiveId;
     this.zombies.push(z);
     this.byId.set(z.id, z);

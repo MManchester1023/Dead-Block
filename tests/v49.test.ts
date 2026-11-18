@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { World } from '../src/sim/World';
-import { BALANCE } from '../src/config/balance';
+import { BALANCE, HORDE } from '../src/config/balance';
 import { CELL } from '../src/config/world';
 import { gainXp } from '../src/sim/systems/combat';
 import { broodRoom } from '../src/sim/systems/hives';
@@ -49,9 +49,12 @@ describe('v4.9 playtest round 5', () => {
     const T = w.tier('motel');
     const brood = [...h.spawned].map((id) => w.get(id)).filter(Boolean) as typeof w.zombies;
     const med = brood.filter((x) => x.def.class === 'medium').length;
-    expect(med).toBeLessThanOrEqual(T.mediumPool[h.stage - 1]);
-    expect(brood.length - med).toBeLessThanOrEqual(T.normalPool[h.stage - 1]);
-    expect(room.normal + room.medium).toBe(T.normalPool[h.stage - 1] + T.mediumPool[h.stage - 1] - brood.length);
+    // v4.49: pools scale with the horde (HORDE.count)
+    const normalPool = Math.round(T.normalPool[h.stage - 1] * HORDE.count);
+    const mediumPool = Math.round(T.mediumPool[h.stage - 1] * HORDE.count);
+    expect(med).toBeLessThanOrEqual(mediumPool);
+    expect(brood.length - med).toBeLessThanOrEqual(normalPool);
+    expect(room.normal + room.medium).toBe(normalPool + mediumPool - brood.length);
   }, 60000);
 
   it('a promotion raises max health but does not heal (#48)', () => {

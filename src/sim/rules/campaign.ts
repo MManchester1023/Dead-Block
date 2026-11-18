@@ -1,5 +1,5 @@
 import { type Vec2 } from '../../core/math';
-import { BALANCE } from '../../config/balance';
+import { BALANCE, HORDE } from '../../config/balance';
 import { Hive } from '../entities';
 import type { DistrictDef } from '../map';
 import { pickMedium } from '../systems/hives';
@@ -17,7 +17,7 @@ export function populate(w: World): void {
   for (const b of w.map.buildings) {
     const d = w.districtAt({ x: b.rect.x + b.rect.w / 2, y: b.rect.y + b.rect.h / 2 });
     const infested = !!d && d.def.id !== 'base' && d.infestation > 0;
-    const nest = infested && w.rng.chance(S.nestChance) ? w.rng.int(S.nestSize[0], S.nestSize[1]) : 0;
+    const nest = infested && w.rng.chance(S.nestChance) ? Math.round(w.rng.int(S.nestSize[0], S.nestSize[1]) * HORDE.count) : 0;
     w.buildingState.set(b.id, { searched: false, nest });
   }
   const m = w.map;
@@ -66,7 +66,7 @@ export function seedDistrict(w: World, d: DistrictState): void {
     w.hives.push(hive);
     w.registerHive(hive);
   }
-  const count = Math.round(d.infestation * d.def.density * T.density);
+  const count = Math.round(d.infestation * d.def.density * T.density * HORDE.count);
   const kinds = Object.entries(d.def.mix);
   const r = d.def.rect;
   // v4.15 (#77): a region opened mid-game keeps its dead well back from the cut fence and out of
@@ -98,7 +98,7 @@ export function seedDistrict(w: World, d: DistrictState): void {
   for (const pk of d.def.packs ?? [])
     for (let n = 0; n < pk.count; n++) {
       const c = spot();
-      for (let i = 0; i < pk.size; i++) w.spawnZombie(pk.kind, { x: c.x + w.rng.range(-2, 2), y: c.y + w.rng.range(-2, 2) });
+      for (let i = 0; i < Math.round(pk.size * HORDE.count); i++) w.spawnZombie(pk.kind, { x: c.x + w.rng.range(-2, 2), y: c.y + w.rng.range(-2, 2) });
     }
 }
 

@@ -1,3 +1,16 @@
+/**
+ * "More zombies, but weaker" (v4.49, the owner's call; starting point "moderate"). One place to turn the
+ * horde up or down: `count` multiplies how many dead there are everywhere (starting crowds, packs, house
+ * nests, hive broods and spawns, horde pulses, roaming packs); `toughness` multiplies their health and
+ * `damage` what each hit does. Per-kill rewards (money, supplies, XP) and infestation per kill are divided
+ * by `count`, so the economy and region clearing stay where they were.
+ */
+export const HORDE = {
+  count: 2,
+  toughness: 0.6,
+  damage: 0.75,
+};
+
 /** All tunable numbers in one place. Distances in metres, speeds in m/s (config/world.ts). Playtest targets, not gospel. */
 export const BALANCE = {
   tickRate: 30, // simulation steps per second (sim time)

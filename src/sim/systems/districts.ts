@@ -2,6 +2,7 @@ import { BALANCE } from '../../config/balance';
 import { isEnabled } from '../../config/features';
 import { Hive, Structure } from '../entities';
 import type { World } from '../World';
+import { infestationPerKill } from '../rules/damage';
 
 /** v4.9 (#65): squads brushing past, or gunfire next to, a building with dead inside brings them out. */
 function updateNests(w: World, dt: number): void {
@@ -45,7 +46,7 @@ export function updateDistricts(w: World, dt: number): void {
       let alive = 0;
       for (const z of w.zombies)
         if (z.alive && z.pos.x >= r.x && z.pos.y >= r.y && z.pos.x < r.x + r.w && z.pos.y < r.y + r.h) {
-          left += BALANCE.infestation.perKill[z.def.id] ?? 0.5;
+          left += infestationPerKill(z.def.id);
           alive++;
         }
       if (alive > 0 && d.infestation < 1) d.infestation = 1;

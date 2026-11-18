@@ -1,11 +1,16 @@
 import { dist, norm, sub, type Vec2 } from '../../core/math';
-import { BALANCE } from '../../config/balance';
+import { BALANCE, HORDE } from '../../config/balance';
 import { isEnabled } from '../../config/features';
 import { Hive, Squad, Structure, Zombie, newId, type ToxicCloud } from '../entities';
 import type { DamageType, Targetable } from '../types';
 import type { World } from '../World';
 
 /** Damage, death and noise: what happens when anything gets hurt, blown up, or makes a racket. */
+
+/** Infestation one kill of this kind takes off its district (v4.49: divided by HORDE.count). */
+export function infestationPerKill(defId: string): number {
+  return (BALANCE.infestation.perKill[defId] ?? 0.5) / HORDE.count;
+}
 
 export function makeNoise(w: World, pos: Vec2, loudness: number): void {
   if (!isEnabled('noise')) return;
@@ -75,9 +80,10 @@ export function damageZombie(w: World, z: Zombie, amount: number, type: DamageTy
     const d = w.districtAt(z.pos);
     w.events.emit('zombieKilled', { id: z.id, defId: z.def.id, pos: { ...z.pos }, facing: z.facing, districtId: d?.def.id ?? null });
     // small salvage per kill (v4.4): scavenged cash and gear
-    w.money += z.def.bounty.money;
-    w.addSupplies(z.def.bounty.supplies);
-    if (d) d.infestation = Math.max(0, d.infestation - (BALANCE.infestation.perKill[z.def.id] ?? 0.5));
+    // v4.49: twice the dead, so half the salvage and infestation each (HORDE.count)
+    w.money += z.def.bounty.money / HORDE.count;
+    w.addSupplies(z.def.bounty.supplies / HORDE.count);
+    if (d) d.infestation = Math.max(0, d.infestation - infestationPerKill(z.def.id));
     if (z.def.onDeath === 'toxicCloud') {
       const cloud: ToxicCloud = { id: newId(), pos: { ...z.pos }, radius: 5.5, remaining: 8, dps: 7 };
       w.clouds.push(cloud);

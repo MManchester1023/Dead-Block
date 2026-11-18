@@ -1,5 +1,5 @@
 import { dist, type Vec2 } from '../../core/math';
-import { BALANCE } from '../../config/balance';
+import { BALANCE, HORDE } from '../../config/balance';
 import { Hive, Squad, Structure, type Zombie } from '../entities';
 import type { Targetable } from '../types';
 import type { World } from '../World';
@@ -37,7 +37,7 @@ export function updateZombies(w: World, dt: number): void {
         z.facing = Math.atan2(target.pos.y - z.pos.y, target.pos.x - z.pos.x);
         if (z.attackCooldown <= 0) {
           z.attackCooldown = z.def.attackCooldown;
-          w.damage(target, z.def.damage, 'melee', z.pos);
+          w.damage(target, z.def.damage * HORDE.damage, 'melee', z.pos);
         }
         continue;
       }
@@ -93,7 +93,7 @@ export function updateZombies(w: World, dt: number): void {
           } else if (z.attackCooldown <= 0) {
             z.attackCooldown = z.def.attackCooldown;
             z.state = 'attack';
-            w.damage(st, z.def.damage, 'melee', z.pos);
+            w.damage(st, z.def.damage * HORDE.damage, 'melee', z.pos);
           }
           continue;
         }

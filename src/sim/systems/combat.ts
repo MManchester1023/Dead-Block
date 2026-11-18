@@ -1,5 +1,5 @@
 import { dist, type Vec2 } from '../../core/math';
-import { BALANCE } from '../../config/balance';
+import { BALANCE, HORDE } from '../../config/balance';
 import { isEnabled } from '../../config/features';
 import { ABILITIES, type WeaponDef } from '../../config/units';
 import { Hive, Squad, Zombie, Structure } from '../entities';
@@ -92,7 +92,7 @@ export function updateCombat(w: World, dt: number): void {
       m.lastShot = w.time;
       if (fire(w, m.pos, t, weapon, s.dmgMult, accMult, s)) {
         s.kills++;
-        gainXp(w, s, t instanceof Zombie && t.def.threat >= 2 ? 3 : BALANCE.combat.xpPerKill);
+        gainXp(w, s, (t instanceof Zombie && t.def.threat >= 2 ? 3 : BALANCE.combat.xpPerKill) / HORDE.count); // v4.49: more dead, less XP each
       }
     }
   }
