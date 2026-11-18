@@ -121,7 +121,7 @@ export class Hud {
   private radio: Radio;
   tutorial: Tutorial | null = null;
   /** Set by main.ts; drives the volume button. */
-  sound: { volume: number; cycleVolume(): void } | null = null;
+  sound: { volume: number; cycleVolume(): void; uiClick(): void } | null = null;
   private root: HTMLElement;
   private dirty = true;
   private last = 0;
@@ -251,6 +251,7 @@ export class Hud {
   private click(e: PointerEvent): void {
     const btn = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
     if (!btn || btn.classList.contains('disabled')) return;
+    this.sound?.uiClick();
     const g = this.game;
     const [act, arg] = btn.dataset.act!.split(':');
     switch (act) {

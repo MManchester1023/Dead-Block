@@ -75,3 +75,13 @@ Round 10 (in `assets-src/audio/`, uploaded by the owner; authors to fill in):
 | `satchelcharge.mp3` | Demo charges and other explosions (`explosion_1`) |
 | `engineergun.wav` | Engineers' carbine (`carbine_1`) |
 
+v4.38 (in `assets-src/audio/`, uploaded by the owner; authors to fill in):
+
+| File | Used as |
+|---|---|
+| `construction-garage-wheel-change-sequence-screw-and-hammer-01.wav` + `construction-tool-hammer-close-11.wav` + `construction-machine-hammer-drill-drill-high-01.wav` | Engineers at work, layered into one 15 s loop (`build_loop`) |
+| `human-soldier-infantry-die-03/04/05.wav` | Soldiers and survivors going down (`human_death_1–3`) |
+| `ui-click-retro-click-02.wav` | HUD buttons (`ui_click`) |
+| `atmo-suburban-calm-ambience-…-distant-plane-01.zip` (wav inside) | Ambience bed, made into a seamless 86 s loop (`amb_suburb`) |
+| `cinematic-horror-intense-overdrive-drone-02.wav` (also zipped) | Very quiet horror drone under the ambience, seamless 52 s loop (`amb_horror`) |
+
