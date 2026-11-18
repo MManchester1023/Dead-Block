@@ -84,4 +84,5 @@ v4.38 (in `assets-src/audio/`, uploaded by the owner; authors to fill in):
 | `ui-click-retro-click-02.wav` | HUD buttons (`ui_click`) |
 | `atmo-suburban-calm-ambience-…-distant-plane-01.zip` (wav inside) | Ambience bed, made into a seamless 86 s loop (`amb_suburb`) |
 | `cinematic-horror-intense-overdrive-drone-02.wav` (also zipped) | Very quiet horror drone under the ambience, seamless 52 s loop (`amb_horror`) |
+| `u_wxn5lzrjy3-military-radio-communication-222904.mp3` (Pixabay, user u_wxn5lzrjy3) | Radio chatter, cut at its pauses into 8 transmissions and level-matched (`radio_1–8`) |
 

@@ -19,12 +19,14 @@ import type { Vec2 } from '../core/math';
  *   build_loop    engineers at work: three construction recordings layered into one loop (v4.38, round 10 #111)
  *   amb_horror    a horror drone under everything, very quiet (v4.38)
  *   amb_suburb    suburban ambience bed (v4.38)
+ *   radio_1–8     military radio chatter, cut from one recording at its pauses (v4.38)
  */
 
-type Bank = 'rifle' | 'carbine' | 'death' | 'groan' | 'scream' | 'explosion' | 'bloater' | 'human' | 'click';
+type Bank = 'rifle' | 'carbine' | 'death' | 'groan' | 'scream' | 'explosion' | 'bloater' | 'human' | 'click' | 'radio';
 const FILES: Record<Bank, string[]> = {
   human: ['human_death_1', 'human_death_2', 'human_death_3'],
   click: ['ui_click'],
+  radio: ['radio_1', 'radio_2', 'radio_3', 'radio_4', 'radio_5', 'radio_6', 'radio_7', 'radio_8'],
   rifle: ['rifle_1', 'rifle_2', 'rifle_3'],
   carbine: ['carbine_1'],
   explosion: ['explosion_1'],
@@ -44,6 +46,7 @@ const LIMITS: Record<Bank, { voices: number; gap: number; volume: number }> = {
   scream: { voices: 1, gap: 6, volume: 0.45 },
   human: { voices: 3, gap: 0.15, volume: 0.6 },
   click: { voices: 2, gap: 0.03, volume: 0.3 },
+  radio: { voices: 1, gap: 4, volume: 0.32 },
 };
 
 /** Looping beds: ambience everywhere (volume), and the engineers' work loop (placed at each crew). */
@@ -55,6 +58,8 @@ const BUILD_LOOP = 'build_loop';
 const BUILD_VOLUME = 0.5;
 /** Orders that mean "engineers hammering away" once they're standing at the job. */
 const WORK_ORDERS = new Set(['build', 'repair', 'upgrade', 'deconstruct']);
+/** Radio traffic from these speakers gets a burst of chatter (squads' own lines don't). */
+const RADIO_SPEAKERS = new Set(['Command', 'Overwatch', 'Intel', 'Quartermaster', 'Engineers', 'Command Post']);
 /** Distance (m) at which a sound is at half volume; well beyond this it fades out. */
 const HALF_DIST = 28;
 const MAX_DIST = 140;
@@ -85,6 +90,8 @@ export class Sound {
   private playing = Object.fromEntries(Object.keys(FILES).map((b) => [b, 0])) as Record<Bank, number>;
   private lastStart = Object.fromEntries(Object.keys(FILES).map((b) => [b, -9])) as Record<Bank, number>;
   private groanTimer = 2;
+  /** Seconds until the next bit of background radio chatter. */
+  private chatterTimer = 30;
   private loops: Record<string, AudioBuffer | undefined> = {};
   private ambience: GainNode[] = [];
   /** One looping work sound per crew at a job (squad id → its nodes). */
@@ -118,6 +125,9 @@ export class Sound {
       else this.play('explosion', e.pos, { rate: 0.9 + Math.random() * 0.15, gain: Math.min(1.3, 0.6 + e.radius / 8) });
     });
     ev.on('memberKilled', (e) => this.play('human', e.pos, { rate: 0.92 + Math.random() * 0.16 }));
+    ev.on('radio', (e) => {
+      if (RADIO_SPEAKERS.has(e.speaker)) this.play('radio', null);
+    });
     ev.on('hordePulse', () => this.play('scream', null, { rate: 0.95 + Math.random() * 0.1 }));
     ev.on('noiseAlert', () => this.play('scream', null, { rate: 1.05 }));
   }
@@ -229,6 +239,12 @@ export class Sound {
     if (!this.ctx) return;
     this.updateWork();
     if (this.game.paused) return;
+    // now and then, quieter chatter from somewhere on the net
+    this.chatterTimer -= dt;
+    if (this.chatterTimer <= 0) {
+      this.chatterTimer = 45 + Math.random() * 45;
+      this.play('radio', null, { gain: 0.55 });
+    }
     this.groanTimer -= dt;
     if (this.groanTimer > 0) return;
     this.groanTimer = 1.2 + Math.random() * 2.8;
