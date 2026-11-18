@@ -30,6 +30,8 @@ const { OUT, launch, watchErrors, startGame } = require('./lib.cjs');
     document.getElementById('hud').style.display = 'none';
   });
   await p.waitForTimeout(1500);
+  // v4.46: the city streams in chunks; wait until everything in view is painted
+  await p.waitForFunction(() => !window.game.renderer.city || window.game.renderer.city.pending === 0, null, { timeout: 120000 }).catch(() => {});
   await p.screenshot({ path: path.join(OUT, `${tag}-street.png`) });
   await p.evaluate(() => {
     const g = window.game;
@@ -38,6 +40,8 @@ const { OUT, launch, watchErrors, startGame } = require('./lib.cjs');
     g.renderer.rig.zoom = 0.6;
   });
   await p.waitForTimeout(800);
+  // v4.46: the city streams in chunks; wait until everything in view is painted
+  await p.waitForFunction(() => !window.game.renderer.city || window.game.renderer.city.pending === 0, null, { timeout: 120000 }).catch(() => {});
   await p.screenshot({ path: path.join(OUT, `${tag}-wide.png`) });
   console.log(`saved tools/out/${tag}-street.png and ${tag}-wide.png`);
   console.log(errs.join('\n') || 'no errors');

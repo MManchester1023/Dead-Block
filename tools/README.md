@@ -29,8 +29,9 @@ Slow runs that print results instead of passing or failing. Not part of `npm tes
 | `sound.cjs` | Sound wiring in the real game: every clip decodes, both ambience beds start, a squad on the move gets footsteps, a working engineer crew gets its construction loop and loses it when done, HUD buttons click, soldier deaths play, Command's radio lines play chatter, the supply plane's fly-by and parachute, the hive's blast, and that barbed wire uses the model (checks the audio graph; it can't listen) |
 | `round13.cjs` | Round 13 in the real game: squad labels hidden until hovered, MG nests turned to their aim |
 | `mapeditor.cjs` | Map editor (`dev-map.html`): no problems in the starter map, Save with no edits gives exactly the repo file, dragging moves a building, Play starts the game on the edit |
+| `chunks.cjs` | City streaming on a 1.8 km test map (100 chunks): only chunks near the camera are built, memory stays within budget while crossing the map, the ops map uses low detail |
 | `smoke.cjs` | End to end in the real game: survivors evacuated, save to slot 1, load it back after a change, Continue on the start screen. Prints ok/FAIL per check |
-| `screens.cjs <tag>` + `pngdiff.py a b` | Screenshots of a fixed paused scene (street and wide). Compare before/after a visual refactor; two runs of the same code differ by ~0.001–0.05% (things that sway on real time) |
+| `screens.cjs <tag>` + `pngdiff.py a b` | Screenshots of a fixed paused scene (street and wide; waits for city streaming to finish). Compare before/after a visual refactor; two runs of the same code differ by ~0.001–0.05% (things that sway on real time) |
 | `bakecheck.cjs <tag> [--compare <tag>]` | Bakes every character as the game does and fingerprints every pose; with `--compare`, says which clips changed. Use around asset or loader changes |
 | `memory.cjs` | Load time and GPU memory of the baked characters (v4.31: ~6.3 s headless, 91 MB) |
 | `view.cjs <page> "<query>"` | Screenshot of a dev page: `bake` (baked poses), `model` (a raw GLB), `rifle` (the weapon fitter) |

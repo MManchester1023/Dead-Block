@@ -205,6 +205,7 @@ export class Renderer {
     this.rallyFlag.position.set(w.map.rally.x, 0, w.map.rally.y);
     this.rallyFlag.rotation.y = Math.sin(this.time * 1.3) * 0.15;
     this.crowds?.update(simDt);
+    this.city.update(); // stream city chunks in and out around the camera (STATUS #14)
     this.city.fadeOccluders(realDt);
     this.squads.update(f);
     if (!this.crowds) this.updateBoxZombies();

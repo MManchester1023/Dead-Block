@@ -19,75 +19,126 @@ const TILE_COLORS: Record<number, [number, number, number]> = {
 
 const LAWN: [number, number, number] = [86, 112, 54];
 
+/** What every chunk of a map shares: lawn cells, the scatter of tufts, road intersections (computed once). */
+interface GroundShared {
+  lawnCells: Set<number>;
+  tufts: { x: number; y: number; w: number; h: number; color: string }[];
+  intersections: Rect[];
+}
+const shared = new WeakMap<CityMap, GroundShared>();
+function sharedFor(map: CityMap): GroundShared {
+  let s = shared.get(map);
+  if (s) return s;
+  const lawnCells = new Set<number>();
+  for (const b of map.buildings)
+    if (b.kind === 'houses') for (let y = b.cells.y; y < b.cells.y + b.cells.h; y++) for (let x = b.cells.x; x < b.cells.x + b.cells.w; x++) lawnCells.add(y * map.cols + x);
+  // grass tufts and dirt patches, scattered over the whole map once (each chunk draws the ones in it)
+  const rng = new Rng(4242);
+  const tufts: GroundShared['tufts'] = [];
+  const n = Math.round((2600 * map.width * map.height) / (510 * 456)); // the same density as the v4.17 map
+  for (let i = 0; i < n; i++) {
+    const x = rng.range(0, map.width);
+    const y = rng.range(0, map.height);
+    const color = rng.chance(0.5) ? 'rgba(60,72,34,0.55)' : 'rgba(140,128,96,0.35)';
+    const w = rng.range(0.5, 1.5);
+    const h = rng.range(0.25, 0.75);
+    const t = map.tiles[Math.min(map.rows - 1, Math.floor(y / map.cell)) * map.cols + Math.min(map.cols - 1, Math.floor(x / map.cell))];
+    if (t === Tile.Grass || t === Tile.Dirt) tufts.push({ x, y, w, h, color });
+  }
+  s = { lawnCells, tufts, intersections: findIntersections(map.roads) };
+  shared.set(map, s);
+  return s;
+}
+
 /**
- * Paints the whole city floor onto one canvas: asphalt with lane lines, crosswalks and stop
- * lines at intersections, curbs, sidewalk slabs, parking stalls, lawns under house lots, scrub.
- * Canvas row 0 = world y 0 (north), which is what a CanvasTexture on the ground plane expects.
+ * Paints one window of the city floor (STATUS #14, v4.46: the ground comes in chunks): asphalt with lane
+ * lines, crosswalks and stop lines at intersections, curbs, sidewalk slabs, parking stalls, lawns under
+ * house lots, scrub. `win` is in metres; `P` is texels per metre (GROUND_PX for full detail, less for the
+ * zoomed-out ops map). Noise comes from the world position, so neighbouring chunks meet without a seam.
+ * Canvas row 0 = the window's north edge, which is what a CanvasTexture on a ground plane expects.
  */
-export function buildGroundTexture(map: CityMap): THREE.CanvasTexture {
-  const W = Math.round(map.width * GROUND_PX);
-  const H = Math.round(map.height * GROUND_PX);
+export function paintGround(map: CityMap, win: Rect, P = GROUND_PX): HTMLCanvasElement {
+  const job = groundJob(map, win, P);
+  while (!job.step(Infinity));
+  return job.canvas;
+}
+
+/**
+ * The same painting as a job that can be done a bit at a time (v4.46): `step(ms)` paints rows for up to
+ * about that long and returns true once the canvas is finished. Streaming chunks paint within a small
+ * per-frame budget instead of stalling a frame for ~100 ms.
+ */
+export function groundJob(map: CityMap, win: Rect, P = GROUND_PX): { canvas: HTMLCanvasElement; step: (ms: number) => boolean } {
+  const W = Math.max(1, Math.round(win.w * P));
+  const H = Math.max(1, Math.round(win.h * P));
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
   const g = canvas.getContext('2d')!;
-  const rng = new Rng(4242);
-  const cellPx = map.cell * GROUND_PX;
+  const { lawnCells, tufts, intersections } = sharedFor(map);
 
-  // 1) per-pixel base colour from the tile map, with noise
+  // 1) per-pixel base colour from the tile map, with noise (row by row, resumable)
   const img = g.createImageData(W, H);
-  const lawnCells = new Set<number>();
-  for (const b of map.buildings)
-    if (b.kind === 'houses') for (let y = b.cells.y; y < b.cells.y + b.cells.h; y++) for (let x = b.cells.x; x < b.cells.x + b.cells.w; x++) lawnCells.add(y * map.cols + x);
-  for (let py = 0; py < H; py++) {
-    const cy = Math.min(map.rows - 1, Math.floor(py / cellPx));
-    for (let px = 0; px < W; px++) {
-      const cx = Math.min(map.cols - 1, Math.floor(px / cellPx));
-      const ci = cy * map.cols + cx;
-      const t = map.tiles[ci];
-      let [r, gg, b] = lawnCells.has(ci) ? LAWN : TILE_COLORS[t] ?? [90, 90, 90];
-      if ((t === Tile.Grass || t === Tile.Dirt) && !lawnCells.has(ci)) {
-        // organic scrub: blend dirt↔grass with smooth noise instead of 3 m tile squares
-        const wx = px / GROUND_PX;
-        const wy = py / GROUND_PX;
-        const n = fbm(wx, wy);
-        const k = smooth((n - 0.42) / 0.16);
-        const D = TILE_COLORS[Tile.Dirt];
-        const G = TILE_COLORS[Tile.Grass];
-        r = D[0] + (G[0] - D[0]) * k;
-        gg = D[1] + (G[1] - D[1]) * k;
-        b = D[2] + (G[2] - D[2]) * k;
+  let row = 0;
+  const pixels = (rows: number) => {
+    const end = Math.min(H, row + rows);
+    for (let py = row; py < end; py++) {
+      const wyp = win.y + py / P;
+      const cy = Math.max(0, Math.min(map.rows - 1, Math.floor(wyp / map.cell)));
+      for (let px = 0; px < W; px++) {
+        const wxp = win.x + px / P;
+        const cx = Math.max(0, Math.min(map.cols - 1, Math.floor(wxp / map.cell)));
+        const ci = cy * map.cols + cx;
+        const t = map.tiles[ci];
+        let [r, gg, b] = lawnCells.has(ci) ? LAWN : TILE_COLORS[t] ?? [90, 90, 90];
+        if ((t === Tile.Grass || t === Tile.Dirt) && !lawnCells.has(ci)) {
+          // organic scrub: blend dirt↔grass with smooth noise instead of 3 m tile squares
+          const n = fbm(wxp, wyp);
+          const k = smooth((n - 0.42) / 0.16);
+          const D = TILE_COLORS[Tile.Dirt];
+          const G = TILE_COLORS[Tile.Grass];
+          r = D[0] + (G[0] - D[0]) * k;
+          gg = D[1] + (G[1] - D[1]) * k;
+          b = D[2] + (G[2] - D[2]) * k;
+        }
+        // per-texel grain from the world position (at full detail), so it's the same in every chunk
+        const hx = Math.floor(wxp * GROUND_PX);
+        const hy = Math.floor(wyp * GROUND_PX);
+        let n = (hash2(hx, hy) - 0.5) * 10;
+        if (t === Tile.Grass || t === Tile.Dirt || lawnCells.has(ci)) n *= 2.2; // vegetation is noisier
+        if (t === Tile.Road && hash2(hx + 7919, hy - 104729) < 0.004) n -= 22; // cracks / oil specks
+        const i = (py * W + px) * 4;
+        img.data[i] = clamp8(r + n);
+        img.data[i + 1] = clamp8(gg + n);
+        img.data[i + 2] = clamp8(b + n * 0.8);
+        img.data[i + 3] = 255;
       }
-      let n = (rng.next() - 0.5) * 10;
-      if (t === Tile.Grass || t === Tile.Dirt || lawnCells.has(ci)) n *= 2.2; // vegetation is noisier
-      if (t === Tile.Road && rng.chance(0.004)) n -= 22; // cracks / oil specks
-      const i = (py * W + px) * 4;
-      img.data[i] = clamp8(r + n);
-      img.data[i + 1] = clamp8(gg + n);
-      img.data[i + 2] = clamp8(b + n * 0.8);
-      img.data[i + 3] = 255;
     }
-  }
-  g.putImageData(img, 0, 0);
+    row = end;
+  };
 
-  const P = GROUND_PX;
-  const fill = (color: string, x: number, y: number, w: number, h: number) => {
-    g.fillStyle = color;
-    g.fillRect(Math.round(x * P), Math.round(y * P), Math.max(1, Math.round(w * P)), Math.max(1, Math.round(h * P)));
+  const finish = () => {
+    g.putImageData(img, 0, 0);
+
+    // everything below is drawn in world metres, shifted into the window; anything outside it is skipped
+    const x1 = win.x + win.w;
+    const y1 = win.y + win.h;
+    const fill = (color: string, x: number, y: number, w: number, h: number) => {
+      if (x > x1 || y > y1 || x + w < win.x || y + h < win.y) return;
+      g.fillStyle = color;
+      g.fillRect(Math.round((x - win.x) * P), Math.round((y - win.y) * P), Math.max(1, Math.round(w * P)), Math.max(1, Math.round(h * P)));
   };
 
   // 2) grass tufts and dirt patches
-  for (let i = 0; i < 2600; i++) {
-    const x = rng.range(0, map.width);
-    const y = rng.range(0, map.height);
-    const t = map.tiles[Math.min(map.rows - 1, Math.floor(y / map.cell)) * map.cols + Math.min(map.cols - 1, Math.floor(x / map.cell))];
-    if (t !== Tile.Grass && t !== Tile.Dirt) continue;
-    fill(rng.chance(0.5) ? 'rgba(60,72,34,0.55)' : 'rgba(140,128,96,0.35)', x, y, rng.range(0.5, 1.5), rng.range(0.25, 0.75));
-  }
+  for (const t of tufts) fill(t.color, t.x, t.y, t.w, t.h);
 
-  // 3) sidewalk slab joints + curbs
-  for (let cy = 0; cy < map.rows; cy++)
-    for (let cx = 0; cx < map.cols; cx++) {
+  // 3) sidewalk slab joints + curbs (only the cells in and right around the window)
+  const c0x = Math.max(0, Math.floor(win.x / map.cell) - 2);
+  const c0y = Math.max(0, Math.floor(win.y / map.cell) - 2);
+  const c1x = Math.min(map.cols, Math.ceil(x1 / map.cell) + 2);
+  const c1y = Math.min(map.rows, Math.ceil(y1 / map.cell) + 2);
+  for (let cy = c0y; cy < c1y; cy++)
+    for (let cx = c0x; cx < c1x; cx++) {
       const t = map.tiles[cy * map.cols + cx];
       const x = cx * map.cell;
       const y = cy * map.cell;
@@ -115,13 +166,13 @@ export function buildGroundTexture(map: CityMap): THREE.CanvasTexture {
     }
 
   // 4) road markings, crosswalks, stop lines
-  const intersections = findIntersections(map.roads);
   const inside = (x: number, y: number) => intersections.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
   for (const road of map.roads) {
     const r = road.rect;
     const horiz = road.axis === 'h';
     const len = horiz ? r.w : r.h;
     const across = horiz ? r.h : r.w;
+    if (r.x > x1 || r.y > y1 || r.x + r.w < win.x || r.y + r.h < win.y) continue;
     for (let s = 0; s < len; s += 0.5) {
       const along = (horiz ? r.x : r.y) + s;
       const at = (off: number) => (horiz ? { x: along, y: r.y + off } : { x: r.x + off, y: along });
@@ -177,19 +228,41 @@ export function buildGroundTexture(map: CityMap): THREE.CanvasTexture {
   // 5) a painted helipad and vehicle lane in the base
   const b = map.baseRect;
   g.strokeStyle = '#c8b25a';
-  g.lineWidth = 2;
+  g.lineWidth = Math.max(1, (2 * P) / GROUND_PX);
   g.beginPath();
-  g.arc((b.x + b.w * 0.62) * P, (b.y + b.h * 0.2) * P, 7 * P, 0, Math.PI * 2);
+  g.arc((b.x + b.w * 0.62 - win.x) * P, (b.y + b.h * 0.2 - win.y) * P, 7 * P, 0, Math.PI * 2);
   g.stroke();
   fill('#c8b25a', b.x + b.w * 0.62 - 2.2, b.y + b.h * 0.2 - 3, 0.8, 6);
   fill('#c8b25a', b.x + b.w * 0.62 + 1.4, b.y + b.h * 0.2 - 3, 0.8, 6);
   fill('#c8b25a', b.x + b.w * 0.62 - 1.4, b.y + b.h * 0.2 - 0.4, 2.8, 0.8);
 
-  const tex = new THREE.CanvasTexture(canvas);
+  };
+
+  let done = false;
+  return {
+    canvas,
+    step(ms: number): boolean {
+      const t0 = performance.now();
+      while (row < H) {
+        pixels(8);
+        if (performance.now() - t0 > ms) return false;
+      }
+      if (row >= H && !done) {
+        finish();
+        done = true;
+      }
+      return true;
+    },
+  };
+}
+/** A ground texture for one window (see paintGround). */
+export function groundTexture(map: CityMap, win: Rect, P = GROUND_PX): THREE.CanvasTexture {
+  const tex = new THREE.CanvasTexture(paintGround(map, win, P));
   tex.magFilter = THREE.LinearFilter;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
   return tex;
 }
 

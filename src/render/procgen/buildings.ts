@@ -24,8 +24,8 @@ const FLOOR_H = 3.2;
 export { frontOf } from '../../sim/map';
 
 /** Build every building; `sink` receives each one (its own batch, already in world space). */
-export function buildCity(map: CityMap, sink: (b: BuildingDef, batch: Batch) => void): void {
-  for (const b of map.buildings) {
+export function buildCity(map: CityMap, sink: (b: BuildingDef, batch: Batch) => void, list: BuildingDef[] = map.buildings): void {
+  for (const b of list) {
     // boxcars sit along their track; no "front" to find
     const side = b.front ?? (b.kind === 'boxcar' ? (b.rect.w >= b.rect.h ? 's' : 'e') : frontOf(map, b));
     const rot = { s: 0, n: Math.PI, e: Math.PI / 2, w: -Math.PI / 2 }[side];

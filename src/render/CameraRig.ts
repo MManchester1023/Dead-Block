@@ -29,6 +29,13 @@ export class CameraRig {
     this.apply(0);
   }
 
+  /** Roughly how far (metres) from the target the screen reaches on the ground, corner to centre (v4.46 chunk streaming). */
+  get viewRadius(): number {
+    const halfH = (this.viewHeight / this.zoom / 2) / Math.sin(Math.atan2(PITCH_RISE, Math.SQRT2));
+    const aspect = (this.camera.right - this.camera.left) / Math.max(1e-6, this.camera.top - this.camera.bottom);
+    return Math.hypot(halfH, (this.viewHeight / this.zoom / 2) * aspect) * 1.15;
+  }
+
   get strategic(): boolean {
     return this.zoom < STRATEGIC_ZOOM;
   }
