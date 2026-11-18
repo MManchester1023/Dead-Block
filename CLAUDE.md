@@ -20,6 +20,10 @@ assets are free-licence downloads, credited in `CREDITS.md`.
 
 - Straightforward, honest answers; light-hearted is welcome. Say when something is a guess (most balance
   numbers are until a playtest) and when you didn't check something.
+- **Mat decides difficulty from his own playtests.** The balance bots don't build or think, so don't run
+  probes to judge or retune difficulty, and don't propose difficulty changes based on them. Make the
+  change asked for and let Mat playtest it. Probes are still fine as a quick "nothing broke" check
+  (e.g. a region can still be won, an outpost can still hold); just don't spend effort on them.
 - **Playtest notes without a request to code: log them, don't build them.** Add a new round to §22 (table:
   # | Note | Current state from the code | Proposed fix | Needs from owner), a version row, and the items
   in STATUS.md in ranked order; give likely causes and proposals, then ask.
@@ -55,7 +59,7 @@ assets are free-licence downloads, credited in `CREDITS.md`.
 - `npm test` (~5 s, must pass) and `npx tsc --noEmit`. `npm run build` for the bundle (~11 MB).
 - Changes that shouldn't alter behaviour: `TAG=before`/`TAG=after npm run probe -- simhash` (identical
   files), `tools/browser/screens.cjs` + `pngdiff.py`, `tools/browser/bakecheck.cjs --compare`.
-- Gameplay paths: `node tools/browser/smoke.cjs`. Balance: `npm run probe -- region1|region2|region3|roaming`.
+- Gameplay paths: `node tools/browser/smoke.cjs`. Balance bots (crude, only a sanity check; Mat judges difficulty): `npm run probe -- region1|region2|region3|roaming`.
 - Dev server for the browser tools: `npx vite --port 5173 --strictPort` as a background task with a long
   timeout (the default limit stops it mid-session).
 - In this environment, long heredocs with some patterns trip a shell safety check: write edit scripts to a
