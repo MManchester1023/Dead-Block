@@ -31,6 +31,29 @@ const world = parts.map((m) => {
   }
   return out;
 });
+// v4.56: some models (e.g. Sketchfab "Z up" exports) come out lying down. A T-posed figure is about as
+// tall as its arm span and far shallower than both: if it's much bigger along z than y, stand it up
+// (z → y); then, as a T-pose's widest part (the arms) is near the top, flip it if that ends up low
+{
+  const b0 = new THREE.Box3();
+  world.flat().forEach((p) => b0.expandByPoint(p));
+  const sz = b0.getSize(new THREE.Vector3());
+  if (sz.z > sz.y * 2) {
+    for (const pts of world) for (const p of pts) p.set(p.x, p.z, -p.y);
+    const b1 = new THREE.Box3();
+    world.flat().forEach((p) => b1.expandByPoint(p));
+    const mid = (b1.min.y + b1.max.y) / 2;
+    let wideTop = 0;
+    let wideLow = 0;
+    const cx0 = (b1.min.x + b1.max.x) / 2;
+    for (const p of world.flat()) {
+      const w = Math.abs(p.x - cx0);
+      if (p.y > mid) wideTop = Math.max(wideTop, w);
+      else wideLow = Math.max(wideLow, w);
+    }
+    if (wideLow > wideTop) for (const pts of world) for (const p of pts) p.set(p.x, -p.y, -p.z); // upside down: turn it over
+  }
+}
 const box = new THREE.Box3();
 world.flat().forEach((p) => box.expandByPoint(p));
 const s = 1.8 / (box.max.y - box.min.y);
