@@ -11,7 +11,8 @@ import type { Vec2 } from '../core/math';
  *   zombie_death  a zombie going down
  *   groan_1–5     ambient groans from zombies near the camera
  *   scream_1–4    a horde wave starting / the noise meter filling
- *   carbine_1     engineers' (and later medics'/recon's) carbine (round 10 #114)
+ *   carbine_1     engineers' (and later recon's) carbine (round 10 #114)
+ *   pistol_1–2    the medics' pistols (v4.62, the owner's two pistol shots)
  *   explosion_1   demo charges, artillery (round 10 #109; the owner's satchel charge clip)
  *   bloater_death the Bloater bursting, from the owner's recording (v4.40; replaced round 10's layered pop + gore rip)
  *   human_death_1–3  a soldier or survivor going down (v4.38)
@@ -28,7 +29,7 @@ import type { Vec2 } from '../core/math';
  *   power_on      the power station starting up (v4.41, round 10 #112; from the owner's recording)
  */
 
-type Bank = 'rifle' | 'carbine' | 'death' | 'groan' | 'scream' | 'explosion' | 'bloater' | 'human' | 'click' | 'radio' | 'hive' | 'flyby' | 'chute' | 'power' | 'thud';
+type Bank = 'rifle' | 'carbine' | 'pistol' | 'death' | 'groan' | 'scream' | 'explosion' | 'bloater' | 'human' | 'click' | 'radio' | 'hive' | 'flyby' | 'chute' | 'power' | 'thud';
 const FILES: Record<Bank, string[]> = {
   human: ['human_death_1', 'human_death_2', 'human_death_3'],
   click: ['ui_click'],
@@ -40,6 +41,7 @@ const FILES: Record<Bank, string[]> = {
   radio: ['radio_1', 'radio_2', 'radio_3', 'radio_4', 'radio_5', 'radio_6', 'radio_7', 'radio_8'],
   rifle: ['rifle_1', 'rifle_2', 'rifle_3'],
   carbine: ['carbine_1'],
+  pistol: ['pistol_1', 'pistol_2'],
   explosion: ['explosion_1'],
   bloater: ['bloater_death'],
   death: ['zombie_death'],
@@ -50,6 +52,7 @@ const FILES: Record<Bank, string[]> = {
 const LIMITS: Record<Bank, { voices: number; gap: number; volume: number }> = {
   rifle: { voices: 10, gap: 0.035, volume: 0.42 },
   carbine: { voices: 8, gap: 0.035, volume: 0.36 },
+  pistol: { voices: 8, gap: 0.035, volume: 0.36 },
   explosion: { voices: 3, gap: 0.08, volume: 0.8 },
   bloater: { voices: 3, gap: 0.1, volume: 0.7 },
   death: { voices: 4, gap: 0.12, volume: 0.5 },
@@ -143,7 +146,7 @@ export class Sound {
     const ev = game.world.events;
     ev.on('shot', (e) => {
       if (e.weapon === 'Carbine') this.play('carbine', e.from, { rate: 0.93 + Math.random() * 0.14 });
-      else if (e.weapon === 'Pistol') this.play('carbine', e.from, { rate: 1.25 + Math.random() * 0.1, gain: 0.7 }); // STATUS #20: stand-in pistol
+      else if (e.weapon === 'Pistol') this.play('pistol', e.from, { rate: 0.95 + Math.random() * 0.1, gain: 0.8 }); // STATUS #20 medics
       else if (e.weapon === 'Mounted HMG') this.mgFiring(e.from); // v4.55: a continuous 50-cal burst, not single shots
       else this.play('rifle', e.from, e.heavy ? { rate: 0.82, gain: 1.35 } : { rate: 0.94 + Math.random() * 0.12 });
     });

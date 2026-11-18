@@ -14,10 +14,11 @@ import { CHARACTER_SPECS, DEFAULT_FIT, loadRifleFit, loadRifleModel, rifleFitMat
 
 // round 10: pick the unit (any Mixamo-rigged character that holds a gun) and the gun, from the panel:
 // dev-rifle.html?unit=engineer&gun=models/weapons/scar.glb (default: the unit's own gun)
-const UNITS: Record<string, string> = { soldier: 'Rifleman', engineer: 'Engineer' };
+const UNITS: Record<string, string> = { soldier: 'Rifleman', engineer: 'Engineer', medic: 'Medic' };
 const GUNS: Record<string, string> = {
   'models/weapons/m4_kolos.glb': 'M4 (rifleman’s own)',
   'models/weapons/scar.glb': 'SCAR (engineer’s own)',
+  'models/weapons/pistol.glb': 'Pistol (medic’s own)',
   'models/weapons/barrett.glb': 'Barrett (sniper, later)',
   'models/weapons/m4.glb': 'M4 (old, szaw)',
 };

@@ -53,7 +53,7 @@ Everything else in the city (buildings, vehicles, trees, street furniture, groun
 
 ## Mixamo (`assets-src/models/mixamo/`)
 
-Rigs and animations from [Mixamo](https://www.mixamo.com) (Adobe), downloaded by the project owner. **In the game:** riflemen and engineers (since round 10: Kolos Studios' and MadTrollStudio's soldiers, rigged on Mixamo) with Rifle Idle, Walking, Firing Rifle, Dying and Working On Device; soldiers also use Shoot Rifle (walking while firing), Taking Cover, Taking Cover Idle and Idle Crouching Aiming, and since v4.55 Fire Rifle (kneeling), Walk Crouching Forward Right, Crouch To Standing With Rifle, Death Crouching Headshot Front, Freehang Climb and Climbing Down; civilians (still the stand-in soldier model) use Breathing Idle and Slow Run; female zombies use Zombie Idle, Walking, Zombie Run, Zombie Attack and Zombie Dying (Zombie Punching kept in `assets-src/models/` as an alternative). Mixamo's terms allow royalty-free use in games; the raw files may not be redistributed as a standalone asset pack.
+Rigs and animations from [Mixamo](https://www.mixamo.com) (Adobe), downloaded by the project owner. **In the game:** riflemen and engineers (since round 10: Kolos Studios' and MadTrollStudio's soldiers, rigged on Mixamo) with Rifle Idle, Walking, Firing Rifle, Dying and Working On Device; soldiers also use Shoot Rifle (walking while firing), Taking Cover, Taking Cover Idle and Idle Crouching Aiming, and since v4.55 Fire Rifle (kneeling), Crouch To Standing With Rifle, Death Crouching Headshot Front, Freehang Climb and Climbing Down (since v4.62 Rifle Crouch Walk, replacing Walk Crouching Forward Right); civilians (since v4.62 the Casual LowPoly models, rigged on Mixamo) use Breathing Idle and Slow Run; medics (v4.62) use Pistol Idle, Pistol Run, Pistol Kneeling Idle, Pistol Kneel To Stand and a medic healing animation; female zombies use Zombie Idle, Walking, Zombie Run, Zombie Attack and Zombie Dying (Zombie Punching kept in `assets-src/models/` as an alternative). Mixamo's terms allow royalty-free use in games; the raw files may not be redistributed as a standalone asset pack.
 
 ## Sound effects (`public/audio/`, originals in `assets-src/audio/soundfx.zip`)
 
@@ -99,6 +99,8 @@ v4.39 (uploaded by the owner; authors to fill in where blank):
 | `2026-11-18 11-39-23.mp4` (owner's recording) | Power station starting up, cut from its audio (`power_on`, v4.41) |
 | `impact-drop-wood-crate-dropped-02.wav` | Supply crate landing (`crate_land`, v4.41) |
 | `freesound_community-50-cal-mg-104736.mp3` (Pixabay, freesound_community) | MG emplacement firing: a seamless 1.3 s stretch of the burst, looped while it fires (`mg_loop`, v4.55) |
+| `weapons-pistol-close-shot-04.wav` (source to fill in) | Medics' pistol, one shot (`pistol_1`, v4.62) |
+| `freesound_community-browning-hi-power-101932.mp3` (Pixabay, freesound_community) | Medics' pistol, one shot, 6 dB quieter to match (`pistol_2`, v4.62) |
 | `freesound_community-boots-on-gravel-67143.mp3` (Pixabay, freesound_community) | Footsteps (v4.44), removed in v4.48 at the owner's request; kept here as a source |
 
 ## Barbed wire model (v4.39)
@@ -109,9 +111,14 @@ v4.39 (uploaded by the owner; authors to fill in where blank):
 
 "[Generic passenger car pack](https://sketchfab.com/3d-models/generic-passenger-car-pack-20f9af9b8a404d5cb022ac6fe87f21f5)" by [Comrade1280](https://sketchfab.com/comrade1280), licensed under [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). **Changed:** each of the ten cars merged with its wheels, its textures baked into vertex colours, simplified to ~1,500 triangles and scaled to 4.6 m (`src/dev/carExport.ts`, `tools/assets/export-cars.cjs`). Original in `assets-src/models/mixamo/generic_passenger_car_pack.glb`, game copies in `public/models/cars/`.
 
-## Civilian models (not in the game yet)
+## Civilian models (v4.62)
 
-"Casual LowPoly Male Rig T-pose" and the female version by [Denys Almaral](https://sketchfab.com/denysalmaral), **Sketchfab Standard licence** (use in a game is allowed; check the terms before redistributing the raw files, e.g. in a public repository). Uploaded by the owner to `assets-src/models/`; skeleton-free OBJ exports for Mixamo's auto-rigger in `assets-src/models/mixamo/to-rig/civilian_*_for_mixamo.zip`.
+"Casual LowPoly Male Rig T-pose" and the female version by [Denys Almaral](https://sketchfab.com/denysalmaral), **Sketchfab Standard licence** (use in a game is allowed; check the terms before redistributing the raw files, e.g. in a public repository). **Changed:** exported skeleton-free (`assets-src/models/mixamo/to-rig/civilian_*_for_mixamo.zip`) and re-rigged on Mixamo by the owner; the game copies (`public/models/characters/civilian/male.fbx`, `female.fbx`, one shared `palette.png`) are those Mixamo downloads.
+
+## Medic model and pistol (v4.62, uploaded by the owner; authors and licences to fill in)
+
+- **Medic** (`assets-src/models/medic.zip`: `test.fbx` with a base-colour texture): not in the game yet. It has its own 22-bone rig, so it's exported skeleton-free for Mixamo's auto-rigger (`assets-src/models/mixamo/to-rig/medic_for_mixamo.zip`); until then medics use the engineer model tinted red.
+- **Pistol** (`assets-src/models/pistol.zip`): **changed:** the slide, frame, trigger and magazine merged, the colour texture (shrunk to 512 px) baked into vertex colours, turned into the rifle frame and scaled to 20 cm (`tools/assets/export-gun.cjs`). Game copy `public/models/weapons/pistol.glb`.
 
 ## Trees and shrubs (v4.58)
 

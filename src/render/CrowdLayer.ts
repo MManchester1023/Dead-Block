@@ -15,10 +15,12 @@ export function zombieLook(id: number, defId: string): { key: string; sx: number
 }
 
 /** The crowd a squad's soldiers are drawn from. */
-// STATUS #20: medics borrow the engineer body (it has the 'work' clip for treating) with a red tint, until a
-// medic model exists. Every body in the engineer crowd gets a colour, so a tint never sticks to another one.
-const squadCrowd = (defId: string) => (defId === 'engineer' || defId === 'medic' ? 'engineer' : defId === 'civilians' ? 'civilian' : 'soldier');
-const squadTint = (defId: string) => (defId === 'medic' ? 0xffa89c : defId === 'engineer' ? 0xffffff : undefined);
+// STATUS #20 / v4.62: medics have their own crowd (pistol clips, healing animation) on the engineer body, tinted
+// red to tell them apart until their own model is rigged.
+const squadCrowd = (defId: string) => (defId === 'engineer' ? 'engineer' : defId === 'medic' ? 'medic' : defId === 'civilians' ? 'civilian' : 'soldier');
+/** v4.62: every other civilian is the female model. */
+const memberCrowd = (defId: string, i: number | undefined, base: string) => (defId === 'civilians' && (i ?? 0) % 2 === 1 ? 'civilianF' : base);
+const squadTint = (defId: string) => (defId === 'medic' ? 0xffa89c : undefined);
 
 /**
  * Animated soldiers, engineers, civilians, zombies and corpses, drawn as flipbook crowds
@@ -43,7 +45,9 @@ export class CrowdLayer {
     this.crowds = {
       soldier: new Crowd(cast.soldier, 96),
       engineer: new Crowd(cast.engineer, 48),
+      medic: new Crowd(cast.medic, 32), // v4.62
       civilian: new Crowd(cast.civilian, 64),
+      civilianF: new Crowd(cast.civilianF, 64), // v4.62: every other civilian
       zombieM: new Crowd(cast.zombieM, 2000),
       zombieF: new Crowd(cast.zombieF, 2000),
     };
@@ -59,9 +63,9 @@ export class CrowdLayer {
   }
 
   /** A soldier (or civilian) died. */
-  memberDied(e: { unitId: string; pos: { x: number; y: number }; facing: number; low?: boolean }): void {
+  memberDied(e: { unitId: string; pos: { x: number; y: number }; facing: number; low?: boolean; member?: number }): void {
     // v4.55: shot while crouched or in cover: the crouched death
-    this.corpses.push({ key: squadCrowd(e.unitId), x: e.pos.x, z: e.pos.y, facing: e.facing, t0: this.clock, sx: 1, sy: 1, tint: squadTint(e.unitId), clip: e.low ? 'deathCrouch' : undefined });
+    this.corpses.push({ key: memberCrowd(e.unitId, e.member, squadCrowd(e.unitId)), x: e.pos.x, z: e.pos.y, facing: e.facing, t0: this.clock, sx: 1, sy: 1, tint: squadTint(e.unitId), clip: e.low ? 'deathCrouch' : undefined });
   }
 
   update(simDt: number): void {
@@ -101,7 +105,7 @@ export class CrowdLayer {
     this.frame++;
     for (const s of w.squads) {
       if (!s.alive) continue;
-      const crowd = C[squadCrowd(s.def.id)];
+      const squadKey = squadCrowd(s.def.id);
       const order = s.currentOrder?.type;
       const working = !s.moving && (order === 'upgrade' || order === 'build' || order === 'repair' || order === 'deconstruct' || order === 'charge' || order === 'search' || order === 'heal');
       const tgt = w.get(s.targetId);
@@ -138,6 +142,7 @@ export class CrowdLayer {
       };
       s.members.forEach((m, i) => {
         if (!m.alive) return;
+        const crowd = C[memberCrowd(s.def.id, i, squadKey)] ?? C[squadKey];
         const key = s.id * 8 + i + 1e7;
         const v = speedOf(key, m.pos.x, m.pos.y);
         // round 12 #137: resting soldiers no longer drift (they stand still or walk to their spot at ~2 m/s),
@@ -153,7 +158,8 @@ export class CrowdLayer {
         else if (walking) {
           // v4.24 (#95): moving while engaged = walking while firing; v4.55: crouched squads crouch-walk
           clip = s.crouched && crowd.has('crouchWalk') ? 'crouchWalk' : firing && crowd.has('walkShoot') ? 'walkShoot' : 'walk';
-          rate = Math.min(3, Math.max(0.7, v / (clip === 'crouchWalk' ? 1.5 : 2.2)));
+          // v4.62: the straight "Rifle Crouch Walk" covers ~0.6 m/s at normal speed (crouched squads move ~6x that)
+          rate = clip === 'crouchWalk' ? Math.min(3.5, Math.max(0.7, v / 0.6)) : Math.min(3, Math.max(0.7, v / 2.2));
         } else if (s.openCover && crowd.has('crouch') && s.garrisonedIn == null) clip = firing && crowd.has('crouchShoot') ? 'crouchShoot' : 'crouch'; // round 11 #125 (v4.55: kneeling fire)
         else if (firing) clip = 'shoot'; // stand up and fire, cover or not
         else if (inCover && crowd.has('crouch') && offCover(m.pos)) clip = 'crouch'; // too far out to lean on it

@@ -2,15 +2,20 @@
 // in the game's rifle frame (barrel +X, magazine -Z, metres, colours baked into vertices).
 //   ?model=…glb&meshes=Object_186&barrel=x&down=-y   (barrel/down: the gun's axes in the file's bind pose)
 // Without barrel/down it just shows the extracted gun from the side and top, to work them out.
+// v4.62: also a stand-alone gun model: an .fbx works too, `tex=` gives it a base-colour texture when the file
+// doesn't link one, and `length=` scales it so the barrel axis is that many metres long.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { texSampler } from '../render/characters';
 
 const params = new URLSearchParams(location.search);
 const meshes = params.get('meshes')!.split(',');
-const gl = await new GLTFLoader().loadAsync(params.get('model')!);
-const root = gl.scene;
+const modelUrl = params.get('model')!;
+const root = /\.fbx$/i.test(modelUrl) ? await new FBXLoader().loadAsync(modelUrl) : (await new GLTFLoader().loadAsync(modelUrl)).scene;
+const extTex = params.get('tex') ? await new THREE.TextureLoader().loadAsync(params.get('tex')!) : null;
+if (extTex) extTex.colorSpace = THREE.SRGBColorSpace;
 root.updateMatrixWorld(true);
 const parts: THREE.Mesh[] = [];
 root.traverse((o) => {
@@ -41,8 +46,9 @@ for (const m of parts) {
   const g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry;
   const P = g.attributes.position as THREE.BufferAttribute;
   const uv = g.attributes.uv as THREE.BufferAttribute | undefined;
-  const mat = m.material as THREE.MeshStandardMaterial;
-  const tex = mat.map && uv ? texSampler(mat.map) : null;
+  const mat = (Array.isArray(m.material) ? m.material[0] : m.material) as THREE.MeshStandardMaterial;
+  const map = extTex ?? mat.map;
+  const tex = map && uv ? texSampler(map) : null;
   const v = new THREE.Vector3();
   for (let i = 0; i < P.count; i++) {
     v.fromBufferAttribute(P, i);
@@ -55,13 +61,20 @@ for (const m of parts) {
     }
     v.applyMatrix4(m.matrixWorld).applyMatrix4(toRifle);
     pos.push(v.x, v.y, v.z);
-    c.copy(mat.color);
+    c.copy(extTex ? new THREE.Color(1, 1, 1) : mat.color);
     if (tex) {
       tex(uv!.getX(i), uv!.getY(i), c);
-      c.multiply(mat.color);
+      if (!extTex) c.multiply(mat.color);
     }
     col.push(c.r, c.g, c.b);
   }
+}
+if (params.get('length')) {
+  // scale so the gun is `length` m along the barrel (X once in the rifle frame)
+  let lo = Infinity, hi = -Infinity;
+  for (let i = 0; i < pos.length; i += 3) (lo = Math.min(lo, pos[i])), (hi = Math.max(hi, pos[i]));
+  const k = Number(params.get('length')) / (hi - lo);
+  for (let i = 0; i < pos.length; i++) pos[i] *= k;
 }
 const geo = new THREE.BufferGeometry();
 geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));

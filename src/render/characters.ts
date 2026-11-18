@@ -335,6 +335,12 @@ export function rifleFitMatrix(fit: RifleFit): THREE.Matrix4 {
   );
 }
 
+/** Guns that aren't rifle-sized (v4.62): length in metres, and the grip as fractions of the length (from the
+ *  butt) and the height (from the bottom). Everything else is treated as an M4. */
+const GUN_SHAPES: Record<string, { length: number; grip: [number, number] }> = {
+  'models/weapons/pistol.glb': { length: 0.2, grip: [0.25, 0.39] },
+};
+
 const rifleCache = new Map<string, Promise<THREE.BufferGeometry>>();
 
 /**
@@ -372,10 +378,11 @@ export function loadRifleModel(url: string): Promise<THREE.BufferGeometry> {
       geo.computeBoundingBox();
       const bb = geo.boundingBox!;
       const len = bb.max.x - bb.min.x;
-      const s = 0.84 / len; // an M4 is ~84 cm long
-      // pistol grip: a bit behind the magazine well, below the receiver
-      const gripX = bb.min.x + len * 0.33;
-      const gripZ = bb.min.z + (bb.max.z - bb.min.z) * 0.45;
+      const shape = GUN_SHAPES[url] ?? { length: 0.84, grip: [0.33, 0.45] };
+      const s = shape.length / len; // an M4 is ~84 cm long
+      // pistol grip: a bit behind the magazine well, below the receiver (a handgun: where its magazine sits)
+      const gripX = bb.min.x + len * shape.grip[0];
+      const gripZ = bb.min.z + (bb.max.z - bb.min.z) * shape.grip[1];
       const pos = geo.attributes.position as THREE.BufferAttribute;
       for (let i = 0; i < pos.count; i++) {
         const x = (pos.getX(i) - gripX) * s;
@@ -656,8 +663,9 @@ export const SOLDIER_CLIPS: Partial<Record<Clip, string>> = {
   cover: 'models/characters/soldier/cover.clip.json',
   // round 10 #107: Mixamo "Idle Crouching Aiming"
   crouch: 'models/characters/soldier/crouch.clip.json',
-  // v4.55 (round 14 uploads): Mixamo "Fire Rifle" (kneeling), "Walk Crouching Forward Right", "Crouch To
-  // Standing With Rifle", "Death Crouching Headshot Front", "Freehang Climb", "Climbing Down"
+  // v4.55 (round 14 uploads): Mixamo "Fire Rifle" (kneeling), "Crouch To Standing With Rifle", "Death Crouching
+  // Headshot Front", "Freehang Climb", "Climbing Down"; v4.62: the straight "Rifle Crouch Walk" (it was
+  // "Walk Crouching Forward Right", which walks diagonally)
   crouchShoot: 'models/characters/soldier/crouchshoot.clip.json',
   crouchWalk: 'models/characters/soldier/crouchwalk.clip.json',
   standUp: 'models/characters/soldier/standup.clip.json',
@@ -702,18 +710,50 @@ export const CHARACTER_SPECS: CharacterSpec[] = [
     simplifyIndexed: true,
   },
   {
-    // STATUS #10: civilians. Placeholder until there's a civilian model and unarmed animations: the
-    // rifleman without his gun, in civilian colours (Mixamo names his materials mat0mat…mat4mat)
+    // v4.62 (STATUS #20): the Medic Team. Stand-in body: the engineer (until the owner's medic model is
+    // re-rigged on Mixamo), with the owner's pistol and Mixamo pistol clips, and "medic healing" while treating
+    key: 'medic',
+    url: 'models/characters/engineer/engineer.fbx',
+    texture: 'models/characters/engineer/engineer.png',
+    clips: ['idle', 'walk', 'shoot', 'death', 'work', 'crouch', 'cover', 'standUp', 'crouchWalk', 'deathCrouch', 'climbUp', 'climbDown'],
+    clipFiles: {
+      ...SOLDIER_CLIPS,
+      idle: 'models/characters/medic/idle.clip.json',
+      walk: 'models/characters/medic/run.clip.json',
+      shoot: 'models/characters/medic/idle.clip.json', // no pistol-firing clip yet: the pistol idle has it raised
+      work: 'models/characters/medic/heal.clip.json',
+      crouch: 'models/characters/medic/kneel.clip.json',
+      cover: 'models/characters/medic/kneel.clip.json',
+      standUp: 'models/characters/medic/standup.clip.json',
+    },
+    inPlace: true,
+    pinHipsY: ['climbUp', 'climbDown'],
+    deathFalls: true,
+    rifle: true,
+    rifleBone: 'mixamorigRightHand',
+    rifleModel: 'models/weapons/pistol.glb',
+    simplify: 0.03,
+    simplifyIndexed: true,
+  },
+  {
+    // v4.62 (#41): the owner's civilians ("Casual LowPoly" male/female, Denys Almaral), re-rigged on Mixamo,
+    // one shared palette texture; Mixamo "Breathing Idle" and "Slow Run" (survivors hurry to the Command Post)
     key: 'civilian',
-    url: 'models/characters/rifleman/rifleman.fbx',
-    recolor: { mat0mat: 0x4f6f9a, mat1mat: 0x4a4038, mat2mat: 0x6a5a48, mat3mat: 0x8a8a84 },
+    url: 'models/characters/civilian/male.fbx',
+    texture: 'models/characters/civilian/palette.png',
     clips: ['idle', 'walk', 'death'],
-    // v4.55: Mixamo "Breathing Idle" and "Slow Run" (survivors hurry to the Command Post)
     clipFiles: { idle: 'models/characters/civilian/idle.clip.json', walk: 'models/characters/civilian/run.clip.json', death: SOLDIER_CLIPS.death },
     inPlace: true,
     deathFalls: true,
-    simplify: 0.03,
-    simplifyIndexed: true,
+  },
+  {
+    key: 'civilianF',
+    url: 'models/characters/civilian/female.fbx',
+    texture: 'models/characters/civilian/palette.png',
+    clips: ['idle', 'walk', 'death'],
+    clipFiles: { idle: 'models/characters/civilian/idle.clip.json', walk: 'models/characters/civilian/run.clip.json', death: SOLDIER_CLIPS.death },
+    inPlace: true,
+    deathFalls: true,
   },
   {
     // v4.9: "Zombie" by pxltiger (CC-BY 4.0, see CREDITS.md). Real fall-back death (#34), in-place walk/run.

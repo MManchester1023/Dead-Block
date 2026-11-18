@@ -51,7 +51,7 @@ export function damageSquad(w: World, sq: Squad, amount: number, type: DamageTyp
     const alive = sq.members.filter((m) => m.alive);
     const victim = source ? alive.reduce((a, b) => (dist(a.pos, source) < dist(b.pos, source) ? a : b)) : w.rng.pick(alive);
     victim.alive = false;
-    w.events.emit('memberKilled', { squadId: sq.id, squadName: sq.name, pos: { ...victim.pos }, facing: victim.facing, unitId: sq.def.id, low: !sq.moving && (sq.openCover || sq.inCover > 0) });
+    w.events.emit('memberKilled', { squadId: sq.id, squadName: sq.name, pos: { ...victim.pos }, facing: victim.facing, unitId: sq.def.id, low: !sq.moving && (sq.openCover || sq.inCover > 0), member: sq.members.indexOf(victim) });
     if (!sq.alive) {
       w.events.emit('squadWiped', { squadId: sq.id, squadName: sq.name });
       w.forget(sq.id);

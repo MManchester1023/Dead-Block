@@ -45,8 +45,8 @@ Slow runs that print results instead of passing or failing. Not part of `npm tes
 | Script | What it does |
 |---|---|
 | `convert-clips.cjs <fbx…>` | Mixamo FBX animation → compact `.clip.json` (~10x smaller). See `assets-src/README.md` |
-| `export-obj.cjs "<query>" <name>` | A model's character (guns left out) as an OBJ zip for Mixamo's auto-rigger |
-| `export-gun.cjs "<query>" [out.glb]` | Cut a character's own gun out into a weapon GLB in the game's rifle frame (then fit it in `dev-rifle.html`) |
+| `export-obj.cjs "<query>" <name>` | A model's character (guns left out) as an OBJ zip for Mixamo's auto-rigger (v4.62: `.fbx` too, `tex=` for an unlinked texture) |
+| `export-gun.cjs "<query>" [out.glb]` | Cut a character's own gun out into a weapon GLB in the game's rifle frame (then fit it in `dev-rifle.html`). v4.62: a stand-alone `.fbx` gun too, with `tex=` and `length=` (metres); e.g. the pistol: `model=…/pistol.fbx&meshes=slide,trigger,lower,mag&tex=…/pistolcolor.png&barrel=z&down=-y&length=0.2`. A gun that isn't rifle-sized also needs its length and grip in `GUN_SHAPES` (characters.ts) |
 | `resize-texture.cjs in out 512` | Downscale a texture exactly the way the game samples it (no dev server needed) |
 | `trim_glb.py …` | Keep only a GLB's used animations and colour texture (Python, no dependencies; ffmpeg only if resizing without the PNG above) |
 | `export-cars.cjs [pack.glb]` | The owner's car pack → one small GLB per car in `public/models/cars/` (wheels merged, textures baked to colours, ~1,500 triangles, 4.6 m), listed in the model manifest as car1…carN (needs the dev server) |

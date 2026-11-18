@@ -1,14 +1,17 @@
 // Dev-only page (dev-objexport.html): one character of a GLB, in its bind (T) pose, as OBJ + MTL + textures,
 // for Mixamo's auto-rigger (which doesn't take .glb). Feet on y = 0, 1.8 units tall, facing +Z.
 //   ?model=models/x.glb&meshes=Object_1,Object_2   (or &skip=Object_3)   → window.__out = { obj, mtl, images }
+// v4.62: an .fbx works too, and `tex=` gives every part a base-colour texture when the file doesn't link one.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 
 const params = new URLSearchParams(location.search);
 const keep = params.get('meshes')?.split(',');
 const skip = params.get('skip')?.split(',') ?? [];
-const gl = await new GLTFLoader().loadAsync(params.get('model')!);
-const root = gl.scene;
+const modelUrl = params.get('model')!;
+const root = /\.fbx$/i.test(modelUrl) ? await new FBXLoader().loadAsync(modelUrl) : (await new GLTFLoader().loadAsync(modelUrl)).scene;
+const extTex = params.get('tex') ? await new THREE.TextureLoader().loadAsync(params.get('tex')!) : null;
 root.updateMatrixWorld(true);
 const parts: THREE.Mesh[] = [];
 root.traverse((o) => {
@@ -79,10 +82,11 @@ parts.forEach((m, pi) => {
     if (!name) {
       name = `mat${matNames.size}`;
       matNames.set(mat, name);
-      const c = mat.color;
+      const c = extTex ? new THREE.Color(1, 1, 1) : mat.color;
       mtl += `newmtl ${name}\nKa 1 1 1\nKd ${c.r.toFixed(4)} ${c.g.toFixed(4)} ${c.b.toFixed(4)}\nKs 0 0 0\nd 1\nillum 1\n`;
-      if (mat.map?.image) {
-        const img = mat.map.image as ImageBitmap | HTMLImageElement;
+      const map = extTex ?? mat.map;
+      if (map?.image) {
+        const img = map.image as ImageBitmap | HTMLImageElement;
         const cv = document.createElement('canvas');
         cv.width = img.width;
         cv.height = img.height;
