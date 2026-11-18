@@ -50,6 +50,14 @@ export class Squad implements Targetable {
   targetId: number | null = null;
   holding = false;
   inCover = 0; // current cover damage reduction
+  /** Round 11 #125: the player told it to crouch (G): half cover in the open, slower on the move. Stays until G again. */
+  crouched = false;
+  /** Round 11 #126: sent to cover that was full, so it crouches in the open where it was sent (until its next order). */
+  autoCrouch = false;
+  /** Just arrived on a take-cover order: next still tick, crouch if the cover has no room. */
+  seekCover = false;
+  /** Crouching in the open right now (no real cover): set by updateCover. */
+  openCover = false;
   /** Which way the formation is laid out (round 12 #137): follows the squad on the move, frozen at rest. */
   formFacing: number | null = null;
   coverPropId: number | null = null;

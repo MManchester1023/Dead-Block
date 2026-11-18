@@ -37,7 +37,7 @@ const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60
 /** Engineer build menu entries, in display order (round 9 #104). */
 const BUILD_MENU: { kind: 'structure' | 'tool'; id: string; name: string; key: string; icon: string; tip: string; unlock?: string }[] = [
   { kind: 'structure', id: 'sandbags', name: 'Sandbags', key: 'F', icon: 'sandbags', tip: 'Cover for squads behind it (R rotates)' },
-  { kind: 'structure', id: 'wire', name: 'Barbed Wire', key: 'G', icon: 'wire', tip: 'Slows everything that crosses it, yours included' },
+  { kind: 'structure', id: 'wire', name: 'Barbed Wire', key: 'Z', icon: 'wire', tip: 'Slows everything that crosses it, yours included' },
   { kind: 'structure', id: 'mgNest', name: 'MG Nest', key: 'T', icon: 'mg', tip: '35 m, 120° field of fire aimed with R' },
   { kind: 'structure', id: 'guardTower', name: 'Guard Tower', key: 'V', icon: 'tower', tip: 'One squad mans it: +40% range, sees over cover', unlock: 'opens with Gas Station Strip' },
   { kind: 'structure', id: 'medBay', name: 'Med Bay', key: 'N', icon: 'med', tip: 'In the base; resting squads heal (needs power)', unlock: 'restore the Rail Siding power station' },
@@ -81,17 +81,18 @@ const CONTROLS: [string, [string, string][]][] = [
     ['Double-click a squad', 'Centre the camera on it'],
     ['Right-click ground', 'Move'],
     ['Right-click a zombie', 'Attack that one'],
-    ['Right-click a car / sandbags', 'Take cover (two squads per car)'],
+    ['Right-click a car / sandbags', 'Take cover (two squads per car, three per sandbag wall; the rest crouch beside it)'],
     ['Right-click a building', 'Search it (supplies, sometimes zombies)'],
     ['Right-click a guard tower', 'Man it'],
     [`${K('Shift')} + right-click`, 'Queue orders'],
     [`${K('Ctrl')}+${K('A')}`, 'Attack-move'],
     [K('H'), 'Hold position'],
+    [K('G'), 'Crouch / stand (half cover anywhere, slower on the move)'],
     [`${K('Ctrl')}+${K('S')}`, 'Stop'],
     [`${K('Ctrl')}+${K('1')}–${K('9')} / ${K('1')}–${K('9')}`, 'Save / recall a group (press twice to centre)'],
   ]],
   ['Engineers', [
-    [K('F'), 'Sandbags'], [K('G'), 'Barbed wire'], [K('T'), 'MG nest'], [K('V'), 'Guard tower (region 2)'],
+    [K('F'), 'Sandbags'], [K('Z'), 'Barbed wire'], [K('T'), 'MG nest'], [K('V'), 'Guard tower (region 2)'],
     [K('N'), 'Med Bay (after power)'], [K('O'), 'Outpost'], [K('C'), 'Demo charge (click a hive)'], [K('X'), 'Deconstruct'],
     [K('R'), 'Rotate while placing (MG: turn its field of fire)'],
     ['Right-click own structure', 'Resume building / repair (or restore the power station)'],
@@ -261,6 +262,7 @@ export class Hud {
       case 'support': g.setMode({ kind: 'support', id: arg }); break;
       case 'attackMove': g.setMode({ kind: 'attackMove' }); break;
       case 'hold': g.hold(); break;
+      case 'crouch': g.crouch(); break;
       case 'stop': g.stop(); break;
       case 'disband': g.disband(); break;
       case 'upgrade': g.upgradeSelected(); break;
@@ -524,7 +526,7 @@ export class Hud {
     };
     const mode = g.mode;
     const civOnly = sq.every((s) => s.def.category === 'civilian');
-    let cmds = civOnly ? btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'Ctrl+S') : btn('attackMove', 'Attack-move', 'Ctrl+A', undefined, mode.kind === 'attackMove') + btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'Ctrl+S') + `<button class="cmd" data-act="disband" title="Walk back to the Barracks and stand down: frees command and upkeep, refunds ${BALANCE.economy.disbandRefund * 100}% of the cost">Disband</button>`;
+    let cmds = civOnly ? btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'Ctrl+S') : btn('attackMove', 'Attack-move', 'Ctrl+A', undefined, mode.kind === 'attackMove') + btn('hold', 'Hold', 'H') + btn('crouch', sq.every((s) => s.crouched) ? 'Stand' : 'Crouch', 'G', undefined, sq.every((s) => s.crouched)) + btn('stop', 'Stop', 'Ctrl+S') + `<button class="cmd" data-act="disband" title="Walk back to the Barracks and stand down: frees command and upkeep, refunds ${BALANCE.economy.disbandRefund * 100}% of the cost">Disband</button>`;
     // engineers' build tools live in the bottom-centre build bar (round 9 #104; see renderBuildBar)
     void eng;
     const modeHint =

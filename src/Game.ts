@@ -232,16 +232,19 @@ export class Game {
       const others = allCover(w)
         .filter((c) => c.id !== clicked.id && dist(c.pos, clicked.pos) < 25)
         .sort((a, b) => dist(a.pos, clicked.pos) - dist(b.pos, clicked.pos));
-      // a car shelters two squads (one at each end), a sandbag wall three
-      const spots = [clicked, ...others].flatMap((c) => c.slots.map((along) => ({ ...c, along })));
+      // a car shelters two squads (one at each end), a sandbag wall three; places other squads already
+      // hold don't count (round 11 #126)
+      const held = (c: CoverSpot) => w.squads.filter((q) => q.alive && !sq.includes(q) && q.coverPropId === c.id).length;
+      const spots = [clicked, ...others].flatMap((c) => c.slots.slice(held(c)).map((along) => ({ ...c, along })));
       // closest squad to the clicked cover takes it, and so on
       const order = [...sq].sort((a, b) => dist(a.pos, clicked.pos) - dist(b.pos, clicked.pos));
       order.forEach((s, i) => {
         const c = spots[i];
         if (c) w.issueOrder([s], { type: 'cover', pos: w.grid.nearestFree(coverSpot(c, center, c.along)), targetId: c.id }, queue);
-        else w.issueOrder([s], { type: 'move', pos: w.grid.nearestFree({ x: clicked.pos.x + (i - n / 2) * 3, y: clicked.pos.y + Math.sign(center.y - clicked.pos.y || 1) * 6 }) }, queue);
+        // round 11 #126: no room left: crouch in the open just behind the cover (half the protection)
+        else w.issueOrder([s], { type: 'cover', pos: w.grid.nearestFree({ x: clicked.pos.x + (i - n / 2) * 3, y: clicked.pos.y + Math.sign(center.y - clicked.pos.y || 1) * 6 }) }, queue);
       });
-      if (sq.length > spots.length) this.toast(`Only enough cover here for ${spots.length} of ${sq.length} squads`);
+      if (sq.length > spots.length) this.toast(`Cover for ${spots.length} of ${sq.length} squads; the rest crouch in the open`);
       this.renderer.marker(clicked.pos, 0x7ab0e0);
       return;
     }
@@ -323,6 +326,15 @@ export class Game {
   hold(): void {
     const sq = this.selectedSquads;
     if (sq.length) this.world.issueOrder(sq, { type: 'hold', pos: sq[0].pos });
+    this.changed();
+  }
+
+  /** Round 11 #125: G crouches the selected squads (or stands them up if they all are). */
+  crouch(): void {
+    const sq = this.selectedSquads.filter((s) => s.def.category !== 'civilian');
+    if (!sq.length) return;
+    const on = this.world.toggleCrouch(sq);
+    this.toast(on ? 'Crouched: half cover anywhere, slower on the move (G to stand)' : 'Standing up');
     this.changed();
   }
 

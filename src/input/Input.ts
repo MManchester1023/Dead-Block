@@ -260,7 +260,11 @@ export class Input {
         g.startBuild('sandbags');
         break;
       case 'g':
-        g.startBuild('wire');
+        // round 11 #125: G = crouch (barbed wire moved to Z, next to X deconstruct and C charge)
+        g.crouch();
+        break;
+      case 'z':
+        if (!ctrl) g.startBuild('wire');
         break;
       case 't':
         g.startBuild('mgNest');

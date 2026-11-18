@@ -120,6 +120,11 @@ export const BALANCE = {
 
   combat: {
     coverReduction: 0.45,
+    /** Round 11 #125/#126: crouching in the open: half of cover's damage reduction, and slower on the move. */
+    openCoverReduction: 0.225,
+    crouchSpeed: 0.6,
+    /** Squads that fit behind one piece of cover: a car or pump island, and (per structure) `coverSlots`. */
+    propCoverSlots: 2,
     dangerCloseRadius: 6.4, // metres
     xpPerKill: 1,
     levels: [

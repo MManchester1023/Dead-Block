@@ -20,6 +20,8 @@ assets are free-licence downloads, credited in `CREDITS.md`.
 
 - Straightforward, honest answers; light-hearted is welcome. Say when something is a guess (most balance
   numbers are until a playtest) and when you didn't check something.
+- **No screenshots for Mat** (he asked): don't send or describe screenshots; check visuals with the scripted
+  browser checks and say what was checked. Screenshot only if something can't be checked any other way.
 - **Mat decides difficulty from his own playtests.** The balance bots don't build or think, so don't run
   probes to judge or retune difficulty, and don't propose difficulty changes based on them. Make the
   change asked for and let Mat playtest it. Probes are still fine as a quick "nothing broke" check

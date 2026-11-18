@@ -19,12 +19,33 @@ export class Effects {
   private tracerGeo = new THREE.BufferGeometry();
   private tracerPos = new Float32Array(1024 * 6);
   private activeSprays = 0;
+  /** Round 11 #127: muzzle flashes, two pooled point clouds (rifles/carbines, and big guns). Real time. */
+  private flashes: { p: Vec2; life: number; big: boolean }[] = [];
+  private flashSets = [false, true].map((big) => {
+    const pos = new Float32Array(512 * 3);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ map: flashTexture(), size: big ? 2.4 : 1.4, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, color: 0xffd890 }));
+    pts.frustumCulled = false;
+    pts.renderOrder = 3;
+    return { big, pos, geo, pts };
+  });
 
   constructor(private scene: THREE.Scene) {
     this.tracerGeo.setAttribute('position', new THREE.BufferAttribute(this.tracerPos, 3));
     const tracerLines = new THREE.LineSegments(this.tracerGeo, new THREE.LineBasicMaterial({ color: PAL.tracer, transparent: true, opacity: 0.9 }));
     tracerLines.frustumCulled = false;
     this.scene.add(tracerLines);
+    for (const f of this.flashSets) this.scene.add(f.pts);
+  }
+
+  /** A muzzle flash a little way out of the barrel, toward the target (round 11 #127). */
+  muzzleFlash(from: Vec2, to: Vec2, big: boolean): void {
+    if (this.flashes.length >= 1000) return;
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const l = Math.hypot(dx, dy) || 1;
+    this.flashes.push({ p: { x: from.x + (dx / l) * 0.75, y: from.y + (dy / l) * 0.75 }, life: big ? 0.07 : 0.05, big });
   }
 
   tracer(from: Vec2, to: Vec2, heavy: boolean): void {
@@ -172,6 +193,21 @@ export class Effects {
     this.tracerGeo.setDrawRange(0, n * 2);
     (this.tracerGeo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
 
+    for (const set of this.flashSets) {
+      let k = 0;
+      for (const fl of this.flashes) {
+        if (fl.big !== set.big || fl.life <= 0 || k >= 512) continue;
+        set.pos[k * 3] = fl.p.x;
+        set.pos[k * 3 + 1] = 1.25;
+        set.pos[k * 3 + 2] = fl.p.y;
+        k++;
+      }
+      set.geo.setDrawRange(0, k);
+      (set.geo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+    }
+    for (const fl of this.flashes) fl.life -= realDt;
+    this.flashes = this.flashes.filter((fl) => fl.life > 0);
+
     for (const f of this.fx) {
       f.life -= simDt > 0 ? simDt : 0;
       f.update(time, f);
@@ -179,4 +215,33 @@ export class Effects {
     for (const f of this.fx) if (f.life <= 0) this.scene.remove(f.obj);
     this.fx = this.fx.filter((f) => f.life > 0);
   }
+}
+
+/** Soft star-shaped glow for muzzle flashes (drawn once, shared). */
+let flashTex: THREE.Texture | null = null;
+function flashTexture(): THREE.Texture {
+  if (flashTex) return flashTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 30);
+  grad.addColorStop(0, 'rgba(255,255,235,1)');
+  grad.addColorStop(0.25, 'rgba(255,215,120,0.9)');
+  grad.addColorStop(0.6, 'rgba(255,150,40,0.35)');
+  grad.addColorStop(1, 'rgba(255,120,20,0)');
+  g.fillStyle = grad;
+  g.beginPath();
+  // a four-pointed star over the round glow reads as a flash, not a light bulb
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const r = i % 2 ? 9 : 31;
+    g.lineTo(32 + Math.cos(a) * r, 32 + Math.sin(a) * r);
+  }
+  g.closePath();
+  g.fill();
+  g.beginPath();
+  g.arc(32, 32, 16, 0, Math.PI * 2);
+  g.fill();
+  flashTex = new THREE.CanvasTexture(c);
+  return flashTex;
 }

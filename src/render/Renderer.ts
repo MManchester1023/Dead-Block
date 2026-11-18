@@ -124,7 +124,10 @@ export class Renderer {
 
   private hookEvents(): void {
     const ev = this.world.events;
-    ev.on('shot', (e) => this.fx.tracer(e.from, e.to, !!e.heavy));
+    ev.on('shot', (e) => {
+      this.fx.tracer(e.from, e.to, !!e.heavy);
+      this.fx.muzzleFlash(e.from, e.to, !!e.heavy || e.weapon === 'Mounted HMG');
+    });
     ev.on('explosion', (e) => this.fx.explosion(e.pos, e.radius, e.type === 'toxic' ? 0x8fbf3a : 0xffa040));
     // a tutorial region opens: the fence comes down in a cloud of dust
     ev.on('districtUnlocked', (e) => {

@@ -230,3 +230,6 @@ h3.collapsible:hover { color: #fff; }
 .popup.bad { color: var(--bad); }
 .popup.muted { color: #b8b8a8; }
 .dname { cursor: pointer; } .dname:hover { text-decoration: underline; }
+/* round 11 #135: a hive's growth toward its next stage (on hover) */
+.hive-label .hive-next { font-size: 9px; color: #e8c890; margin-top: 2px; }
+.hive-label .bar.grow i { background: var(--warn); }

@@ -13,6 +13,12 @@ import type { World } from '../World';
  */
 
 export function issueOrder(w: World, squads: Squad[], order: Order, queue = false): void {
+  for (const s of squads) {
+    if (!queue) {
+      s.autoCrouch = false;
+      s.seekCover = false;
+    }
+  }
   // line formation for multi-squad moves (doc §4): fighters in the front rank, support one rank behind
   const n = squads.length;
   const center = squads.reduce((a, s) => ({ x: a.x + s.pos.x / n, y: a.y + s.pos.y / n }), { x: 0, y: 0 });
@@ -119,6 +125,16 @@ export function orderCharge(w: World, engineers: Squad[], hive: Hive, queue = fa
   if (!eng.length) return 'Only engineers carry demo charges';
   issueOrder(w, eng.slice(0, 1), { type: 'charge', pos: hive.pos, targetId: hive.id }, queue);
   return null;
+}
+
+/** Round 11 #125: toggle crouching for these squads (all crouch unless all already are). */
+export function toggleCrouch(squads: Squad[]): boolean {
+  const on = !squads.every((s) => s.crouched);
+  for (const s of squads) {
+    s.crouched = on;
+    s.autoCrouch = false;
+  }
+  return on;
 }
 
 /** Why a structure's upgrade can't be installed right now, or null if it can. */

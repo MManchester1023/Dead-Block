@@ -135,7 +135,8 @@ export class CrowdLayer {
           // v4.24 (#95): moving while engaged = walking while firing
           clip = firing && crowd.has('walkShoot') ? 'walkShoot' : 'walk';
           rate = Math.min(3, Math.max(0.7, v / 2.2));
-        } else if (firing) clip = 'shoot'; // stand up and fire, cover or not
+        } else if (s.openCover && crowd.has('crouch') && s.garrisonedIn == null) clip = 'crouch'; // round 11 #125: crouched in the open (its aiming pose fires too)
+        else if (firing) clip = 'shoot'; // stand up and fire, cover or not
         else if (inCover && crowd.has('crouch') && offCover(m.pos)) clip = 'crouch'; // too far out to lean on it
         else if (inCover && crowd.has('cover')) {
           // v4.24: get into cover once, then hold the cover pose

@@ -344,6 +344,10 @@ export class World {
     return Commands.upgradeStructure(this, st);
   }
 
+  toggleCrouch(squads: Squad[]): boolean {
+    return Commands.toggleCrouch(squads);
+  }
+
   orderUpgrade(squads: Squad[], st: Structure, queue = false): string | null {
     return Commands.orderUpgrade(this, squads, st, queue);
   }

@@ -99,7 +99,10 @@ export function updateOrders(w: World, dt: number): void {
           if (moveToward(w, s, o.pos, dt, ARRIVE)) {
             s.orders.shift();
             s.path = [];
-            if (o.type === 'cover') s.holding = true;
+            if (o.type === 'cover') {
+              s.holding = true;
+              s.seekCover = true; // round 11 #126: no room behind it → crouch here
+            }
           }
           break;
         case 'attackMove': {
@@ -182,7 +185,7 @@ export function moveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: n
   const wp = s.path[0];
   const d = dist(s.pos, wp);
   // v4.9 (#49): wire slows soldiers as much as zombies; plan your own lanes through it
-  const step = Math.min(d, s.def.speed * dt * w.grid.slowAt(s.pos));
+  const step = Math.min(d, s.def.speed * (s.crouched ? BALANCE.combat.crouchSpeed : 1) * dt * w.grid.slowAt(s.pos));
   const dir = norm(sub(wp, s.pos));
   // always move through collision (no snapping onto a waypoint that hugs an obstacle)
   const blocked = moveWithCollision(w.grid, s.pos, dir.x * step, dir.y * step, BODY);
@@ -452,6 +455,8 @@ function approachPoint(w: World, s: Squad, target: Vec2, radius: number): Vec2 {
 function separate(w: World, s: Squad, dt: number): void {
   for (const o of w.squadHash.query(s.pos, 4.5)) {
     if (o === s) continue;
+    // round 11 #126: a squad settled in cover holds its ground; whoever arrives later steps aside
+    if (s.coverPropId != null && !s.moving && o.coverPropId == null) continue;
     const d = dist(s.pos, o.pos);
     // two squads holding behind the same car can stand closer (round 7 #81: they used to shove each other out of cover)
     const min = s.holding && o.holding && !s.moving && !o.moving ? 2.4 : 4;
@@ -463,23 +468,45 @@ function separate(w: World, s: Squad, dt: number): void {
   }
 }
 
+/**
+ * Cover (round 11 #126): a still squad near a car, pump or sandbags gets its protection, if there's room:
+ * a car or pump holds two squads, sandbags three (`coverSlots`); whoever was there first keeps the spot.
+ * A squad that's crouched (G), or was sent to cover that turned out to be full, crouches in the open
+ * instead: half the protection.
+ */
 function updateCover(w: World, s: Squad): void {
+  const prev = s.coverPropId;
   s.inCover = 0;
   s.coverPropId = null;
-  if (s.moving) return;
-  for (const p of w.map.props) {
-    if (Math.abs(p.pos.x - s.pos.x) > 6 || Math.abs(p.pos.y - s.pos.y) > 6) continue;
-    if (dist(p.pos, s.pos) < 4.5 && p.cover > s.inCover) {
-      s.inCover = p.cover;
-      s.coverPropId = p.id;
+  s.openCover = false;
+  if (!s.moving) {
+    const spots: { id: number; cover: number; slots: number }[] = [];
+    for (const p of w.map.props) {
+      if (Math.abs(p.pos.x - s.pos.x) > 6 || Math.abs(p.pos.y - s.pos.y) > 6) continue;
+      if (dist(p.pos, s.pos) < 4.5) spots.push({ id: p.id, cover: p.cover, slots: BALANCE.combat.propCoverSlots });
+    }
+    for (const st of w.structures) {
+      if (!st.built || !st.def.cover) continue;
+      if (dist(st.pos, s.pos) < st.radius + 3) spots.push({ id: st.id, cover: st.def.cover, slots: st.def.coverSlots ?? 3 });
+    }
+    // best cover first; the spot we already hold wins a tie
+    spots.sort((a, b) => b.cover - a.cover || Number(b.id === prev) - Number(a.id === prev));
+    for (const c of spots) {
+      let taken = 0;
+      for (const q of w.squads) if (q !== s && q.alive && q.coverPropId === c.id) taken++;
+      if (taken >= c.slots) continue; // full: whoever got there first keeps it
+      s.inCover = c.cover;
+      s.coverPropId = c.id;
+      break;
+    }
+    if (s.seekCover) {
+      if (!s.coverPropId) s.autoCrouch = true;
+      s.seekCover = false;
     }
   }
-  for (const st of w.structures) {
-    if (!st.built || !st.def.cover) continue;
-    if (dist(st.pos, s.pos) < st.radius + 3 && st.def.cover > s.inCover) {
-      s.inCover = st.def.cover;
-      s.coverPropId = st.id;
-    }
+  if (!s.coverPropId && (s.crouched || (s.autoCrouch && !s.moving)) && s.garrisonedIn == null) {
+    s.openCover = true;
+    s.inCover = BALANCE.combat.openCoverReduction;
   }
 }
 
