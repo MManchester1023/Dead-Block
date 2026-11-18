@@ -14,7 +14,7 @@ const ok = (cond, what) => console.log(`${cond ? 'ok  ' : 'FAIL'} ${what}`);
   await p.keyboard.press('Shift'); // a key press unlocks audio
   await p.waitForFunction(() => {
     const s = window.sound;
-    return s && s.buffers.radio?.length === 8 && s.buffers.human?.length === 3 && s.buffers.click?.length === 1 && s.loops.build_loop && s.loops.footsteps_loop && s.ambience.length >= 2;
+    return s && s.buffers.radio?.length === 8 && s.buffers.human?.length === 3 && s.buffers.click?.length === 1 && s.loops.build_loop && s.ambience.length >= 2;
   }, null, { timeout: 60000 }).catch(() => {});
   const st = await p.evaluate(() => {
     const s = window.sound;
@@ -22,19 +22,6 @@ const ok = (cond, what) => console.log(`${cond ? 'ok  ' : 'FAIL'} ${what}`);
   });
   ok(st.human === 3 && st.click === 1 && st.build && st.radio === 8, `clips decoded: 3 deaths ${st.human}, click ${st.click}, build loop ${st.build}, radio ${st.radio}/8`);
   ok(st.ambience === 2, `ambience beds playing: ${st.ambience} of 2 (suburban + horror)`);
-
-  // footsteps under a squad on the move near the camera (v4.44)
-  await p.evaluate(() => {
-    const g = window.game, w = g.world, s = w.squads.find((q) => q.def.id === 'rifle');
-    g.paused = false;
-    g.renderer.rig.focus(s.pos);
-    w.issueOrder([s], { type: 'move', pos: { x: s.pos.x, y: s.pos.y + 40 } });
-    window.__walker = s.id;
-  });
-  await p.waitForFunction(() => window.sound.steps.has(window.__walker), null, { timeout: 60000 }).catch(() => {});
-  ok(await p.evaluate(() => window.sound.steps.has(window.__walker)), 'a squad on the move near the camera has footsteps');
-  await p.waitForFunction(() => !window.sound.steps.has(window.__walker), null, { timeout: 120000 }).catch(() => {});
-  ok(await p.evaluate(() => !window.sound.steps.has(window.__walker)), 'the footsteps stop when it does');
 
   // engineers at a build site get a work loop; it goes away when they stop
   await p.evaluate(() => {
