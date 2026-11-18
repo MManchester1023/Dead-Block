@@ -23,9 +23,21 @@ const FLOOR_H = 3.2;
 
 export { frontOf } from '../../sim/map';
 
-/** Build every building; `sink` receives each one (its own batch, already in world space). */
-export function buildCity(map: CityMap, sink: (b: BuildingDef, batch: Batch) => void, list: BuildingDef[] = map.buildings): void {
+/** v4.59: when set, house yards record their tree spots here (canonical frame) instead of drawing a tree. */
+let yardTrees: { x: number; z: number; scale: number }[] | null = null;
+
+/**
+ * Build every building; `sink` receives each one (its own batch, already in world space) and, with
+ * `modelTrees`, the world spots (and sizes) of its yard trees for the caller to fill with tree models.
+ */
+export function buildCity(
+  map: CityMap,
+  sink: (b: BuildingDef, batch: Batch, trees: { x: number; z: number; scale: number }[]) => void,
+  list: BuildingDef[] = map.buildings,
+  modelTrees = false,
+): void {
   for (const b of list) {
+    yardTrees = modelTrees ? [] : null;
     // boxcars sit along their track; no "front" to find
     const side = b.front ?? (b.kind === 'boxcar' ? (b.rect.w >= b.rect.h ? 's' : 'e') : frontOf(map, b));
     const rot = { s: 0, n: Math.PI, e: Math.PI / 2, w: -Math.PI / 2 }[side];
@@ -61,7 +73,12 @@ export function buildCity(map: CityMap, sink: (b: BuildingDef, batch: Batch) => 
     );
     const out = new Batch();
     local.transferTo(out, m);
-    sink(b, out);
+    const trees = (yardTrees ?? []).map((t) => {
+      const v = new THREE.Vector3(t.x, 0, t.z).applyMatrix4(m);
+      return { x: v.x, z: v.z, scale: t.scale };
+    });
+    yardTrees = null;
+    sink(b, out, trees);
   }
 }
 
@@ -224,8 +241,13 @@ function house(B: Batch, cx: number, lw: number, ld: number, floors: number, rng
   // a tree in the yard
   const tx = cx + (rng.chance(0.5) ? -1 : 1) * (lw / 2 - 2.2);
   const tz = rng.chance(0.5) ? ld / 2 - 1.8 : -ld / 2 + 2;
-  if (rng.chance(0.4)) palmTree(B, tx, tz, rng);
-  else if (rng.chance(0.8)) leafyTree(B, tx, tz, rng, 0.8);
+  // v4.59: with tree models loaded, the yard gets one of those (placed by the city layer) instead
+  const palm = rng.chance(0.4);
+  const leafy = !palm && rng.chance(0.8);
+  if (yardTrees) {
+    if (palm || leafy) yardTrees.push({ x: tx, z: tz, scale: palm ? 0.9 : 0.75 });
+  } else if (palm) palmTree(B, tx, tz, rng);
+  else if (leafy) leafyTree(B, tx, tz, rng, 0.8);
   // hedges along the front
   if (rng.chance(0.5)) B.box(hw * 0.4, 0.9, 0.9, 0x3e5a2a, hx - hw * 0.25, 0.45, hz + hd / 2 + 0.8);
 }

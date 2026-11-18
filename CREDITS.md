@@ -115,5 +115,5 @@ v4.39 (uploaded by the owner; authors to fill in where blank):
 
 ## Trees and shrubs (v4.58)
 
-Two low-poly tree packs uploaded by the owner (`assets-src/models/low-poly-tree-pack.zip`, `low-poly-tree-set.zip`), **free to use** per the owner (authors to fill in). **Changed:** each tree merged with its material colours baked in, big ones simplified to ~900 triangles, trees scaled to 6–9.5 m and three small ones used as shrubs at 1–1.6 m (`src/dev/treeExport.ts`, `tools/assets/export-trees.cjs`). Game copies in `public/models/trees/`.
+Two low-poly tree packs uploaded by the owner (`assets-src/models/low-poly-tree-pack.zip`, `low-poly-tree-set.zip`), **free to use** per the owner (authors to fill in). **Changed:** each tree merged with its material colours baked in, big ones simplified to ~900 triangles, trees scaled to 6–9.5 m and three small ones used as shrubs at 1–1.6 m; since v4.59 every tree in the game (street trees, the old palm spots, house yards) is one of these (`src/dev/treeExport.ts`, `tools/assets/export-trees.cjs`). Game copies in `public/models/trees/`.
 

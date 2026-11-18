@@ -204,21 +204,35 @@ export class CityLayer {
     const { world } = this.ctx;
     const m = world.map;
     const grp = new THREE.Group();
+    const treeKinds = variants('tree');
+    const plant = (x: number, z: number, scale: number, seed: number) => {
+      const t = models.instance(treeKinds[Math.abs(seed) % treeKinds.length]);
+      if (!t) return;
+      t.position.set(x, 0, z);
+      t.rotation.y += (seed % 628) / 100;
+      t.scale.multiplyScalar(scale);
+      t.userData.shared = true;
+      grp.add(t);
+    };
     buildCity(
       m,
-      (b, batch) => {
+      (b, batch, trees) => {
         const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
         const mesh = batch.build(mat);
         grp.add(mesh);
+        // v4.59: the yard trees are the owner's tree models too
+        for (const t of trees) plant(t.x, t.z, t.scale, Math.floor(t.x * 131 + t.z * 977));
         const top = b.height + (b.kind === 'houses' ? 4 : b.kind === 'apartment' ? 4 : 2.5); // roofs, tanks, signs
         c.occluders.push({ mesh, mat, box: new THREE.Box3(new THREE.Vector3(b.rect.x, 0, b.rect.y), new THREE.Vector3(b.rect.x + b.rect.w, top, b.rect.y + b.rect.h)), opacity: 1 });
       },
       c.buildings,
+      treeKinds.length > 0,
     );
     const decor = new Batch();
     for (const d of c.decor) {
-      // v4.58: trees and shrubs from the owner's tree packs (tree1…, shrub1…), one per spot by its seed
-      const vs = variants(d.kind);
+      // v4.58: trees and shrubs from the owner's tree packs (tree1…, shrub1…), one per spot by its seed;
+      // v4.59: palms too (the packs have none), so no procedural tree is left once the models load
+      const vs = variants(d.kind === 'palm' ? 'tree' : d.kind);
       const model = models.instance(vs.length ? vs[Math.abs(d.seed) % vs.length] : d.kind);
       if (model) {
         model.position.set(d.x, 0, d.z);
