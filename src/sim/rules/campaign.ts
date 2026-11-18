@@ -1,7 +1,7 @@
 import { type Vec2 } from '../../core/math';
 import { BALANCE, HORDE } from '../../config/balance';
 import { Hive } from '../entities';
-import type { DistrictDef } from '../map';
+import { Tile, type DistrictDef } from '../map';
 import { pickMedium } from '../systems/hives';
 import type { DistrictState, World } from '../World';
 
@@ -55,10 +55,56 @@ export function firstRoam(w: World, d: DistrictState): void {
   d.roamTimer = T ? T.everySec[1] : 0;
 }
 
+/**
+ * Round 14 #163: where a district's hives go this game. As many hives as the map gives it sites, each at a
+ * random spot on open ground (no building, road, sidewalk or rail under it), well away from the region's
+ * fence line, the base and your squads, and apart from each other. Uses the game's seeded random numbers,
+ * so a saved game keeps its hives. Falls back to the map's own site when nothing fits. `w.fixedHives`
+ * (tests, tools) keeps the map's sites.
+ */
+export function hiveSites(w: World, d: DistrictState): Vec2[] {
+  const fixed = d.def.hiveSites.map((p) => ({ ...p }));
+  if (w.fixedHives || !fixed.length) return fixed;
+  const r = d.def.rect;
+  const m = w.map;
+  const borders = d.def.borders ?? [];
+  const distRect = (p: Vec2, b: { x: number; y: number; w: number; h: number }) =>
+    Math.hypot(Math.max(b.x - p.x, 0, p.x - (b.x + b.w)), Math.max(b.y - p.y, 0, p.y - (b.y + b.h)));
+  const apart = Math.min(r.w, r.h) * 0.4;
+  const open = (p: Vec2) => {
+    // the hive's 2 × 2 cells, and a cell round them, on open ground
+    const cx = Math.floor(p.x / m.cell);
+    const cy = Math.floor(p.y / m.cell);
+    for (let y = cy - 2; y <= cy + 1; y++)
+      for (let x = cx - 2; x <= cx + 1; x++) {
+        if (x < 0 || y < 0 || x >= m.cols || y >= m.rows || w.grid.isBlocked(x, y)) return false;
+        const t = m.tiles[y * m.cols + x];
+        if (t === Tile.Building || t === Tile.Road || t === Tile.Sidewalk || t === Tile.Rail) return false;
+      }
+    return true;
+  };
+  const out: Vec2[] = [];
+  for (let i = 0; i < fixed.length; i++) {
+    let site: Vec2 | null = null;
+    for (let k = 0; k < 400 && !site; k++) {
+      const p = { x: w.rng.range(r.x + 15, r.x + r.w - 15), y: w.rng.range(r.y + 15, r.y + r.h - 15) };
+      if (!open(p)) continue;
+      if (borders.some((b) => distRect(p, b) < 60)) continue;
+      if (distRect(p, m.baseRect) < 90) continue;
+      if (w.squads.some((s) => s.alive && Math.hypot(s.pos.x - p.x, s.pos.y - p.y) < 70)) continue;
+      if (out.some((o) => Math.hypot(o.x - p.x, o.y - p.y) < apart)) continue;
+      site = p;
+    }
+    out.push(site ?? fixed[i]);
+  }
+  // west to east, so per-hive settings keep their meaning (Rail Siding: the eastern hive starts at stage 2, #133)
+  return out.sort((a, b) => a.x - b.x);
+}
+
 /** Hives plus the district's own starting population mix. */
 export function seedDistrict(w: World, d: DistrictState): void {
   const T = w.tier(d.def.id);
-  for (const [i, site] of d.def.hiveSites.entries()) {
+  for (const [i, site] of hiveSites(w, d).entries()) {
     const hs = d.def.hiveStage ?? 1;
     const stage = Array.isArray(hs) ? (hs[i] ?? 1) : hs;
     const hive = new Hive({ ...site }, d.def.id, BALANCE.hive.hpByStage[stage - 1], T.firstPulseDelaySec);

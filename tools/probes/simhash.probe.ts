@@ -14,7 +14,7 @@ it('simulation fingerprint', () => {
   const lines: string[] = [];
   const t0 = performance.now();
   for (const seed of [3, 11]) {
-    const w = new World({ seed });
+    const w = new World({ seed, fixedHives: true });
     w.unlockDistrict('gasStrip');
     w.unlockDistrict('railSiding');
     const eng = w.squads.find((s) => s.def.id === 'engineer')!;

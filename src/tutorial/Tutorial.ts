@@ -220,7 +220,7 @@ export const ROADSIDE_MOTEL_TUTORIAL: TutorialStep[] = [
   {
     id: 'hive',
     title: 'Kill the hive',
-    text: 'The <b>hive</b> in the south-east keeps making zombies and gets worse through <b>4 stages</b>; it never gets better on its own. <b>Bullets can’t hurt it.</b><br><br>Fight your way there, clear the area, then <b>right-click the hive with engineers</b> to plant a demo charge. Planting takes 3 seconds and <b>getting hit restarts it</b>, so cover them. Getting close also wakes up every zombie around it.',
+    text: 'The <b>hive</b> (somewhere in the district: find it) keeps making zombies and gets worse through <b>4 stages</b>; it never gets better on its own. <b>Bullets can’t hurt it.</b><br><br>Fight your way there, clear the area, then <b>right-click the hive with engineers</b> to plant a demo charge. Planting takes 2 seconds and <b>getting hit restarts it</b>, so cover them. Getting close also wakes up every zombie around it.',
     objective: 'Destroy the hive.',
     done: (g) => g.world.hives.every((h) => !h.alive),
     highlight: '.hud-objectives',

@@ -97,7 +97,11 @@ export class World {
   private byId = new Map<number, Targetable>();
   private nameCounter = 0;
 
-  constructor(opts: { seed?: number; map?: CityMap; populate?: boolean } = {}) {
+  /** Keep hives at the map's own sites instead of random spots (round 14 #163); for tests and tools. */
+  fixedHives = false;
+
+  constructor(opts: { seed?: number; map?: CityMap; populate?: boolean; fixedHives?: boolean } = {}) {
+    this.fixedHives = !!opts.fixedHives;
     this.rng = new Rng(opts.seed ?? 1337);
     this.map = opts.map ?? buildStarterMap();
     this.grid = new NavGrid(this.map.cols, this.map.rows, this.map.cell);

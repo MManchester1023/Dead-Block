@@ -350,7 +350,7 @@ function drawSide(): void {
     const d = data.districts[s.i];
     body = `<h3>District: ${d.name}</h3>` + rectFields(d.rect) +
       `<label>All settings (JSON): id, name, difficulty (0 tutorial, 1 easy, 2 standard), initialInfestation, density, mix, packs, hiveStage, locked, unlockAfter, borders, civilians…</label><textarea data-f="json">${JSON.stringify(d, null, 1)}</textarea><button data-a="applyjson">Apply</button>`;
-  } else if (s?.t === 'hive') body = `<h3>Hive site (${data.districts[s.i].name})</h3><p>Drag to move.</p>`;
+  } else if (s?.t === 'hive') body = `<h3>Hive site (${data.districts[s.i].name})</h3><p>Since v4.53 each game puts a region's hives at random open spots; the sites here set <b>how many</b> hives it has (and are the fallback if no spot fits). Drag to move.</p>`;
   else if (s?.t === 'power') body = `<h3>Power station (${data.districts[s.i].name})</h3><p>6 × 4 cells, placed when the region opens. Drag to move.</p>`;
   else if (s?.t === 'base') body = '<h3>Main base</h3>' + rectFields(data.base.rect);
   else if (s?.t === 'gate') body = '<h3>Base gate</h3>' + rectFields(data.base.gate);

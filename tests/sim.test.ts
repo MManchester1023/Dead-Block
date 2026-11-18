@@ -79,7 +79,7 @@ describe('world rules', () => {
   });
 
   it('an engineer can plant a charge even when parked cars crowd the hive, and it kills a stage-1 hive', () => {
-    const w = new World({ seed: 1 });
+    const w = new World({ seed: 1, fixedHives: true }); // the cars round the motel hive's map site
     for (const z of w.zombies) z.alive = false;
     w.step(1 / 30);
     const hive = w.hives[0];

@@ -9,7 +9,7 @@ it('region 3', () => {
   for (const naive of [false, true]) {
     let wins = 0;
     for (const seed of [1, 2, 3, 4, 5, 6]) {
-      const w = new World({ seed });
+      const w = new World({ seed, fixedHives: true });
       for (const id of ['motel', 'gasStrip']) {
         const d = w.districts.get(id)!;
         for (const h of w.hives) if (h.districtId === id) h.alive = false;

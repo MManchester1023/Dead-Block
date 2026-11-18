@@ -16,7 +16,7 @@ for (const fort of ['none', 'mg+bags', 'mg+bags+garrison'])
     const N = 4;
     const bias = BALANCE.roaming.outpostBias;
     for (let seed = 1; seed <= N; seed++) {
-      const w = new World({ seed });
+      const w = new World({ seed, fixedHives: true });
       const d = w.districts.get('motel')!;
       for (const z of w.zombies) if (inRect(d.def.rect, z.pos)) z.alive = false;
       for (const h of w.hives) if (h.districtId === 'motel') h.alive = false;

@@ -1,5 +1,6 @@
 // Balance bot, region 1 (Roadside Motel): the starting force bounds forward (moves only when it's quiet)
 // vs. charges straight at the hive, 6 seeds each. Prints per-seed results and a win count.
+// (v4.53: hives sit at the map sites here, fixedHives: the bots follow scripted routes to them)
 import { it } from 'vitest';
 import { World } from '../../src/sim/World';
 import { CELL } from '../../src/config/world';
@@ -10,7 +11,7 @@ it('region 1', () => {
   for (const naive of [false, true]) {
     let wins = 0;
     for (const seed of [1, 2, 3, 4, 5, 6]) {
-      const w = new World({ seed });
+      const w = new World({ seed, fixedHives: true });
       let boom = -1;
       w.events.on('hiveDestroyed', () => (boom = w.time));
       const bounds = naive ? [M(90, 53)] : [M(40, 36), M(48, 36), M(56, 37), M(64, 37), M(72, 37), M(80, 37), M(88, 40), M(88, 47), M(90, 53)];

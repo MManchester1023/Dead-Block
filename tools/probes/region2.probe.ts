@@ -8,7 +8,7 @@ it('region 2', () => {
   for (const naive of [false, true]) {
     let wins = 0;
     for (const seed of [1, 2, 3, 4, 5, 6]) {
-      const w = new World({ seed });
+      const w = new World({ seed, fixedHives: true });
       for (const h of w.hives) h.alive = false;
       for (const z of w.zombies) z.alive = false;
       w.districts.get('motel')!.infestation = 0;

@@ -630,7 +630,7 @@ export class Hud {
     this.modal.innerHTML = `<div class="dialog">
       <h1>DEAD BLOCK <span>COMMAND</span></h1>
       <p class="tag">Reclaim it block by block.</p>
-      <p>You hold a fortified base on the city's edge. East of the gate, <b>Roadside Motel</b> is 65% infested and a <b>hive</b> is growing in the southeast lot. Every few minutes it sends a horde at your lines, and every stage it gets worse. It never gets better on its own.</p>
+      <p>You hold a fortified base on the city's edge. East of the gate, <b>Roadside Motel</b> is 65% infested and a <b>hive</b> is growing somewhere in it (it's never in the same place twice). Every few minutes it sends a horde at your lines, and every stage it gets worse. It never gets better on its own.</p>
       <div class="cols one">
         <div><h3>Field notes</h3>
           <ul>
