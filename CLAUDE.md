@@ -8,7 +8,8 @@ assets are free-licence downloads, credited in `CREDITS.md`.
 - **`docs/Dead_Block_Command_Design_Doc_v4.md`** is the source of truth: version table at the top (one row
   per change, newest first), §21 roadmap, **§22 playtest log** (rounds of numbered notes, #1–#118 so far).
 - **`STATUS.md`** is the short, ranked to-do list plus what's done. **Item numbers are fixed** ("work on #13" always means
-  item **#13**): never renumber; new items take the next free number and go where they rank.
+  item **#13**): never renumber; new items take the next free number and go where they rank. Keep "Next, in
+  order" **ranked by importance with open items only**; finished items move to Done → Finished items.
 - `CREDITS.md` (every model, animation, sound), `assets-src/README.md` (source assets, how to add a Mixamo
   clip), `tools/README.md` (probes, browser checks, asset scripts).
 - Code: `src/sim/` is the deterministic simulation (World = state + registry + step loop; `rules/` =
