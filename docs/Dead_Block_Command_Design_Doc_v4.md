@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.61** | STATUS #20 / round 9 #103: the **Medic Team** is in. Unlocks with the Med Bay; pistols (15 m); **Heal** (K / button / right-click a hurt squad): walk over, treat 2 s without shooting, +40% of the squad's health and fallen soldiers back, 30 s cooldown. Engineer body tinted red and a pitched-up carbine sound as stand-ins. |
 | **v4.60** | Design: the Medic Team unlocks with the Med Bay (owner); recorded on STATUS #20, not built yet. |
 | **v4.59** | All trees are the owner's models now: the street palms and the house-yard trees use them too (procedural trees only as a fallback). |
 | **v4.58** | The owner's two tree packs (free use) as the street trees and shrubs: 20 trees and 3 shrubs, colours baked, ≤ 900 triangles, picked per spot; palms stay procedural. |
@@ -172,6 +173,7 @@ Conventional RTS selection and orders, plus an optional direct-control mode. Ord
 | Right-click building **[v4]** | Garrison / roof | Elite infantry enter the building and take the roof (see §5). |
 | Right-click zombie **[v4.2]** | Force attack | Selected units close to range and shoot that zombie, overriding threat priority. |
 | Middle-mouse drag **[v4.2]** | Rotate camera | Free rotation. Q / E snap 90°. Shift + middle-drag pans. |
+| K then click a squad **[v4.61]** | Heal | Medics treat the squad (also: right-click a hurt squad with medics selected). |
 | X then click **[v4.2]** | Deconstruct | Engineers take down something they built (see §6). |
 | M | Operations map | Full map: units, base, districts captured and uncaptured, fog of war. |
 | A + click | Attack-move | Move toward a destination, engaging enemies that come in range along the way. |
@@ -312,7 +314,7 @@ The core unit roles and unlock structure stay the same. The roster covers infant
 |---|---|---|
 | Rifle Squad (4) | All-round infantry | Starting unit; main early-game force |
 | Engineer Team (2) | Builds outposts and defenses; restores power; patches vehicles | Starting unit |
-| Medic Team (2) | Restores lost members to nearby squads over time | Suburbs / Barracks level 2 |
+| Medic Team (2) | Pistols (15 m). **Heal** (K): treats a chosen squad for 2 s → +40% health and fallen soldiers back; 30 s cooldown (v4.61) | Build a Med Bay |
 | Recon Pair (2) | Quiet, fast scouts with long vision | Suburbs / Barracks level 2 |
 | Machine Gun Team (3) | Crowd suppression; slow movement | Main Street / Armory |
 | Sniper Team (2) | Long-range precision against dangerous targets | Main Street / Armory |
@@ -788,7 +790,7 @@ Every feature, ranked by importance to the game being fun and shippable. **Work 
 13. ✔ **Playtest round 7 fixes** (v4.16, #76–84)
 14. ✔ **Tutorial region 3: Rail Siding** (v4.17). The open-world unlock after it is still to come (#58, §17)
 15. ✔ **Power stations**: the first one, in region 3 (v4.17). The wider network and the other base unlocks power drives come with the open world (§12)
-16. ✔ **Med Bay** (v4.17), unlocked by restoring region 3's power. **Medic Team still open.**
+16. ✔ **Med Bay** (v4.17), unlocked by restoring region 3's power. ✔ **Medic Team** (v4.61), unlocked by the Med Bay.
 **Round 8 to-dos [v4.19], ranked (§22 #85–92):**
 - 16a. ✔ **Longer sight** (v4.21, #86, #87): rifle 24 → 30 m, carbine 18 → 22 m, MG emplacement 22 → 35 m (120° arc kept); guard-towered squads ~42 m.
 - 16b. ✔ (v4.28) **Civilians found by searching houses** (#91), introduced in tutorial region 3: a controllable civilian group that earns money and supplies when walked back to HQ. (Moves the civilians part of Tier 4 #36 forward.)
@@ -1049,7 +1051,7 @@ Both tutorial regions cleared on the first try.
 | 100 | FPS fine with a lot of zombies | First real-hardware performance check (T1). | ✔ Done; no Web Worker needed for now. |
 | 101 | Only recon units can deploy the drone | Drone and recon are planned (fog of war, §21); not built. | Design decision: the drone is a **Recon Pair ability**, not a Command Post call-in. Recorded for the fog-of-war/recon item. |
 | 102 | The drone circles for 30 seconds, clearing fog of war in a circle where it's placed | Not built. | Recon squad uses the ability on a point → the drone flies there and orbits for **30 s**, revealing a circle of fog (radius to tune, ~40–50 m); then it's gone, with a cooldown. |
-| 103 | Medic Team: pistols/short-range weapons, plus a healing ability with a cooldown that has to be selected to use | The Medic Team exists only as roster data (§6). | Pistols (~15 m, weak). **Heal** is an active ability: select the medics, press the ability (or its button), click a squad in range → it heals a chunk of that squad's health (and can bring a fallen soldier back), then a cooldown. No passive healing, consistent with #48. |
+| 103 | Medic Team: pistols/short-range weapons, plus a healing ability with a cooldown that has to be selected to use | ✔ v4.61 (STATUS #20). Was: the Medic Team existed only as roster data (§6). | Pistols (~15 m, weak). **Heal** is an active ability: select the medics, press the ability (or its button), click a squad in range → it heals a chunk of that squad's health (and can bring a fallen soldier back), then a cooldown. No passive healing, consistent with #48. |
 | 104 | The engineer building menu should pop up in the bottom middle showing what they can build | Build buttons sit in the left-hand selection panel with the squad cards. | When engineers are selected, a build bar appears bottom-centre: one button per structure with its icon, hotkey and cost, greyed out when unaffordable or locked (with the reason). |
 
 **Status after v4.23 (round 9):** done: #93 rifle rolled 90° (magazine down) · #96 clips sampled by length (10 poses per second of animation, max 48), with soldier poses kept indexed and colours shared across poses (all crowds ~99 MB, down from 241 MB on the first attempt) · #97 2 s to climb up/down a tower (no moving or shooting; CLIMBING status) · #98 with no hive, infestation can't reach 0% or count as cleared while any zombie is alive in the district · #99 command cap 14, +3 per secured district · #104 engineer build bar bottom-centre: icon, hotkey, cost; locked items show how to unlock them; the squad panel narrows while it's open. **Open:** #95 shooting animations (needs two Mixamo clips), #101–103 drone/recon and Medic Team (with fog of war and the Medic Team items).

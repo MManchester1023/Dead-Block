@@ -89,6 +89,14 @@ export class Input {
       g.setMode({ kind: 'normal' });
       return;
     }
+    if (g.mode.kind === 'heal') {
+      // STATUS #20: click the squad to treat
+      const t = this.squadAt(e.clientX, e.clientY);
+      if (t == null) g.toast('Click a squad to heal');
+      else g.healSquad(t, e.shiftKey);
+      g.setMode({ kind: 'normal' });
+      return;
+    }
     this.dragStart = { x: e.clientX, y: e.clientY };
     this.dragging = false;
   }
@@ -148,6 +156,18 @@ export class Input {
     return out.sort((a, b) => a.d - b.d).map((o) => o.id);
   }
 
+  /** STATUS #20: right-click a hurt squad (not one of the selection) with medics selected → they treat it. */
+  private rightHeal(e: MouseEvent): boolean {
+    const g = this.game;
+    if (!g.selectedMedics.length) return false;
+    const id = this.squadAt(e.clientX, e.clientY);
+    if (id == null || g.selected.has(id)) return false;
+    const t = g.world.squads.find((s) => s.id === id && s.alive);
+    if (!t || t.def.category === 'civilian') return false;
+    if (t.pool >= t.poolMax && t.aliveCount >= t.members.length) return false;
+    return g.healSquad(id, e.shiftKey) || true;
+  }
+
   private squadAt(x: number, y: number): number | null {
     const r = this.game.renderer;
     const byName = r.squadAtLabel(x, y);
@@ -155,6 +175,7 @@ export class Input {
     let best: number | null = null;
     let bestD = 28;
     for (const s of this.game.world.squads) {
+      if (!s.alive) continue;
       const p = r.worldToScreen(s.pos);
       const d = Math.hypot(p.x - x, p.y - y);
       if (d < bestD) {
@@ -198,7 +219,7 @@ export class Input {
       this.rightDrag = null;
       this.game.renderer.formationPreview = [];
       if (d.dragging) this.game.formationMoveAt(d.p, this.ground(e), e.shiftKey);
-      else this.game.commandAt(d.p, e.shiftKey);
+      else if (!this.rightHeal(e)) this.game.commandAt(d.p, e.shiftKey);
       return;
     }
     if (e.button !== 0 || !this.dragStart) return;
@@ -278,6 +299,10 @@ export class Input {
         break;
       case 'h':
         g.hold();
+        break;
+      case 'k':
+        // STATUS #20: medics heal
+        g.startHeal();
         break;
       case 's':
         if (!ctrl) break;

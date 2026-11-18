@@ -15,7 +15,10 @@ export function zombieLook(id: number, defId: string): { key: string; sx: number
 }
 
 /** The crowd a squad's soldiers are drawn from. */
-const squadCrowd = (defId: string) => (defId === 'engineer' ? 'engineer' : defId === 'civilians' ? 'civilian' : 'soldier');
+// STATUS #20: medics borrow the engineer body (it has the 'work' clip for treating) with a red tint, until a
+// medic model exists. Every body in the engineer crowd gets a colour, so a tint never sticks to another one.
+const squadCrowd = (defId: string) => (defId === 'engineer' || defId === 'medic' ? 'engineer' : defId === 'civilians' ? 'civilian' : 'soldier');
+const squadTint = (defId: string) => (defId === 'medic' ? 0xffa89c : defId === 'engineer' ? 0xffffff : undefined);
 
 /**
  * Animated soldiers, engineers, civilians, zombies and corpses, drawn as flipbook crowds
@@ -58,7 +61,7 @@ export class CrowdLayer {
   /** A soldier (or civilian) died. */
   memberDied(e: { unitId: string; pos: { x: number; y: number }; facing: number; low?: boolean }): void {
     // v4.55: shot while crouched or in cover: the crouched death
-    this.corpses.push({ key: squadCrowd(e.unitId), x: e.pos.x, z: e.pos.y, facing: e.facing, t0: this.clock, sx: 1, sy: 1, clip: e.low ? 'deathCrouch' : undefined });
+    this.corpses.push({ key: squadCrowd(e.unitId), x: e.pos.x, z: e.pos.y, facing: e.facing, t0: this.clock, sx: 1, sy: 1, tint: squadTint(e.unitId), clip: e.low ? 'deathCrouch' : undefined });
   }
 
   update(simDt: number): void {
@@ -100,7 +103,7 @@ export class CrowdLayer {
       if (!s.alive) continue;
       const crowd = C[squadCrowd(s.def.id)];
       const order = s.currentOrder?.type;
-      const working = !s.moving && (order === 'upgrade' || order === 'build' || order === 'repair' || order === 'deconstruct' || order === 'charge' || order === 'search');
+      const working = !s.moving && (order === 'upgrade' || order === 'build' || order === 'repair' || order === 'deconstruct' || order === 'charge' || order === 'search' || order === 'heal');
       const tgt = w.get(s.targetId);
       // round 6 #67: stay in the firing pose while engaged; dropping it between shots (fire every 0.9 s,
       // pose shown for 0.7 s) is what made the arms jump up and down once a second
@@ -171,7 +174,7 @@ export class CrowdLayer {
         } else if (since !== undefined) this.standing.delete(key);
         if (low) this.wasLow.add(key);
         else this.wasLow.delete(key);
-        crowd.add(clip, this.animTime(key, clip, rate, simDt), m.pos.x, m.pos.y, m.facing, 1, undefined, -lift);
+        crowd.add(clip, this.animTime(key, clip, rate, simDt), m.pos.x, m.pos.y, m.facing, 1, squadTint(s.def.id), -lift);
       });
     }
 

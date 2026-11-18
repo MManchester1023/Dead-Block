@@ -143,6 +143,7 @@ export class Sound {
     const ev = game.world.events;
     ev.on('shot', (e) => {
       if (e.weapon === 'Carbine') this.play('carbine', e.from, { rate: 0.93 + Math.random() * 0.14 });
+      else if (e.weapon === 'Pistol') this.play('carbine', e.from, { rate: 1.25 + Math.random() * 0.1, gain: 0.7 }); // STATUS #20: stand-in pistol
       else if (e.weapon === 'Mounted HMG') this.mgFiring(e.from); // v4.55: a continuous 50-cal burst, not single shots
       else this.play('rifle', e.from, e.heavy ? { rate: 0.82, gain: 1.35 } : { rate: 0.94 + Math.random() * 0.12 });
     });

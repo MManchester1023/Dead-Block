@@ -20,7 +20,9 @@ export type Mode =
   | { kind: 'support'; id: string }
   | { kind: 'rally' }
   /** Round 14 #174: clicking patrol points; `started` once the first point is down (later clicks add to the loop). */
-  | { kind: 'patrol'; started: boolean };
+  | { kind: 'patrol'; started: boolean }
+  /** STATUS #20: medics pick a squad to treat. */
+  | { kind: 'heal' };
 
 /**
  * Owns the fixed-step loop, pause/speed (doc §2), the current selection and the
@@ -123,6 +125,33 @@ export class Game {
     return sq.length > 0 && sq.every((s) => s.def.id === 'engineer');
   }
 
+  /** STATUS #20: selected squads that can Heal. */
+  get selectedMedics(): Squad[] {
+    return this.selectedSquads.filter((s) => s.def.abilities?.includes('heal'));
+  }
+
+  /** STATUS #20: the selected medics treat this squad (Heal mode click, or a right-click on a hurt squad). */
+  healSquad(id: number, queue = false): boolean {
+    const t = this.world.squads.find((s) => s.id === id && s.alive);
+    const medics = this.selectedMedics;
+    if (!t || !medics.length || t.def.category === 'civilian') return false;
+    const err = this.world.orderHeal(medics, t, queue);
+    if (err) this.toast(err);
+    else this.renderer.marker(t.pos, 0x6fd08a);
+    this.changed();
+    return !err;
+  }
+
+  /** STATUS #20: K / the Heal button. */
+  startHeal(): void {
+    if (!this.selectedMedics.length) {
+      this.toast('Select a Medic Team to heal');
+      return;
+    }
+    this.setMode({ kind: 'heal' });
+    this.toast('Heal: click a hurt squad');
+  }
+
   get selectedEngineers(): Squad[] {
     return this.selectedSquads.filter((s) => s.def.canBuild?.length);
   }
@@ -131,7 +160,7 @@ export class Game {
     if (!add) this.selected.clear();
     if (ids.length || !add) this.selectedStructure = null;
     for (const id of ids) this.selected.add(id);
-    if (this.mode.kind !== 'normal' && !this.selectedEngineers.length && this.mode.kind !== 'attackMove' && this.mode.kind !== 'patrol' && this.mode.kind !== 'rally' && this.mode.kind !== 'support') this.mode = { kind: 'normal' };
+    if (this.mode.kind !== 'normal' && !this.selectedEngineers.length && this.mode.kind !== 'attackMove' && this.mode.kind !== 'patrol' && this.mode.kind !== 'rally' && this.mode.kind !== 'support' && !(this.mode.kind === 'heal' && this.selectedMedics.length)) this.mode = { kind: 'normal' };
     this.changed();
   }
 

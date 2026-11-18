@@ -150,7 +150,7 @@ export class World {
   nextSquadName(defId: string): string {
     if (defId === 'civilians') return `Survivors ${++this.survivorGroups}`;
     const n = SQUAD_NAMES[this.nameCounter++ % SQUAD_NAMES.length];
-    return defId === 'engineer' ? `Sapper ${n}` : n;
+    return defId === 'engineer' ? `Sapper ${n}` : defId === 'medic' ? `Medic ${n}` : n;
   }
 
   /** Name counters, for save/load. */
@@ -346,6 +346,15 @@ export class World {
   }
   upgradeStructure(st: Structure): string | null {
     return Commands.upgradeStructure(this, st);
+  }
+
+  orderHeal(medics: Squad[], target: Squad, queue = false): string | null {
+    return Commands.orderHeal(this, medics, target, queue);
+  }
+
+  /** Has the campaign unlocked this unit (STATUS #20: medics once a Med Bay is built)? */
+  unitUnlocked(defId: string): boolean {
+    return Commands.unitUnlocked(this, defId);
   }
 
   orderPatrol(squads: Squad[], p: Vec2, add = false): void {

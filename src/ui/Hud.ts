@@ -91,6 +91,7 @@ const CONTROLS: [string, [string, string][]][] = [
     [`${K('Ctrl')}+${K('A')}`, 'Attack-move'],
     [K('H'), 'Hold position'],
     [K('G'), 'Crouch / stand (half cover anywhere, slower on the move)'],
+    [K('K'), 'Medics: heal a squad (or right-click a hurt squad)'],
     [`${K('Ctrl')}+${K('S')}`, 'Stop'],
     [`${K('Ctrl')}+${K('1')}–${K('9')} / ${K('1')}–${K('9')}`, 'Save / recall a group (press twice to centre)'],
   ]],
@@ -267,6 +268,7 @@ export class Hud {
       case 'attackMove': g.setMode({ kind: 'attackMove' }); break;
       case 'hold': g.hold(); break;
       case 'crouch': g.crouch(); break;
+      case 'heal': g.startHeal(); break;
       case 'patrol': g.setMode({ kind: 'patrol', started: false }); break;
       case 'formation': g.setFormation(arg as FormationShape); break;
       case 'stop': g.stop(); break;
@@ -533,6 +535,12 @@ export class Hud {
     const mode = g.mode;
     const civOnly = sq.every((s) => s.def.category === 'civilian');
     let cmds = civOnly ? btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'Ctrl+S') : btn('attackMove', 'Attack-move', 'Ctrl+A', undefined, mode.kind === 'attackMove') + btn('patrol', 'Patrol', 'P', undefined, mode.kind === 'patrol') + btn('hold', 'Hold', 'H') + btn('crouch', sq.every((s) => s.crouched) ? 'Stand' : 'Crouch', 'G', undefined, sq.every((s) => s.crouched)) + btn('stop', 'Stop', 'Ctrl+S') + `<button class="cmd" data-act="disband" title="Walk back to the Barracks and stand down: frees command and upkeep, refunds ${BALANCE.economy.disbandRefund * 100}% of the cost">Disband</button>`;
+    // STATUS #20: medics' Heal, with its cooldown
+    const medics = g.selectedMedics;
+    if (medics.length) {
+      const wait = Math.ceil(Math.min(...medics.map((s) => s.healReadyAt)) - g.world.time);
+      cmds = btn('heal', wait > 0 ? `Heal <small>${wait}s</small>` : 'Heal', 'K', undefined, mode.kind === 'heal') + cmds;
+    }
     // round 14 #177: formation shapes for moving several squads (right-drag places it and sets its facing)
     if (!civOnly && sq.length > 1)
       cmds += `<div class="formations"><small>Formation</small>${(['line', 'column', 'wedge', 'box', 'spread'] as const)
@@ -545,6 +553,7 @@ export class Hud {
       : mode.kind === 'patrol' ? 'Patrol: click the points of the loop · Shift+click to keep adding · right-click to cancel'
       : mode.kind === 'attackMove' ? 'Attack-move: click a destination'
       : mode.kind === 'charge' ? 'Click a hive to plant a demo charge'
+      : mode.kind === 'heal' ? 'Heal: click a hurt squad · right-click to cancel'
       : mode.kind === 'deconstruct' ? 'Click something your engineers built to take it down (unstarted: full refund, built: half)'
       : civOnly ? 'Right-click to walk them · get them to the Command Post to evacuate them'
       : `${sq.length} selected · right-click a zombie to focus it · right-click a building to search it · Shift+right-click queues`;
@@ -609,8 +618,10 @@ export class Hud {
     const barracks = w.structures.find((s) => s.def.id === 'barracks');
     const queue = barracks?.queue ?? [];
     const recruitable = Object.values(UNITS).filter((u) => u.category !== 'civilian');
-    const avail = recruitable.filter((u) => !u.requires || isEnabled(u.requires as never));
-    const locked = recruitable.filter((u) => u.requires && !isEnabled(u.requires as never));
+    // STATUS #20: campaign unlocks too (the Medic Team comes with the Med Bay)
+    const open = (u: (typeof recruitable)[number]) => (!u.requires || isEnabled(u.requires as never)) && w.unitUnlocked(u.id);
+    const avail = recruitable.filter(open);
+    const locked = recruitable.filter((u) => !open(u));
     const rows = avail
       .map((u) => {
         const ok = w.canAfford(u.cost) && (!w.hasCommandCap || w.commandUsed + u.command <= w.commandCap);

@@ -1,7 +1,7 @@
 import { BALANCE } from '../../config/balance';
 import { dist, norm, sub, type Vec2 } from '../../core/math';
 import { ABILITIES } from '../../config/units';
-import { Hive, Structure, type Squad } from '../entities';
+import { Hive, Squad, Structure } from '../entities';
 import { newId } from '../entities';
 import { findPath } from '../pathfinding';
 import type { World } from '../World';
@@ -166,6 +166,9 @@ export function updateOrders(w: World, dt: number): void {
         case 'upgrade':
           doUpgrade(w, s, dt);
           break;
+        case 'heal':
+          doHeal(w, s, dt);
+          break;
         case 'disband':
           // v4.9 (#55): walk into the Barracks and stand down
           if (moveToward(w, s, o.pos, dt, 2.5)) w.standDown(s);
@@ -213,6 +216,46 @@ export function moveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: n
   // a destination right against a car or wall can be unreachable for a body this wide: close enough is arrived
   if (blocked && left <= arrive + BODY * 2) return true;
   return !s.path.length && left <= arrive + 1.8;
+}
+
+/** STATUS #20: a medic team walks to its patient, treats it for a moment, and restores part of its health. */
+function doHeal(w: World, s: Squad, dt: number): void {
+  const o = s.currentOrder!;
+  const H = ABILITIES.heal;
+  const t = w.get(o.targetId ?? null);
+  if (!(t instanceof Squad) || !t.alive || w.time < s.healReadyAt) {
+    s.orders.shift();
+    s.buildProgress = 0;
+    return;
+  }
+  o.pos = { ...t.pos };
+  if (dist(s.pos, t.pos) > H.reach) {
+    s.buildProgress = 0;
+    moveToward(w, s, t.pos, dt, H.reach - 1);
+    return;
+  }
+  s.path = [];
+  s.facing = Math.atan2(t.pos.y - s.pos.y, t.pos.x - s.pos.x);
+  s.buildProgress += dt;
+  if (s.buildProgress < H.workSec) return;
+  s.buildProgress = 0;
+  s.orders.shift();
+  s.healReadyAt = w.time + H.cooldown;
+  const before = t.pool;
+  t.pool = Math.min(t.poolMax, t.pool + t.poolMax * H.share);
+  t.healing = w.time;
+  let rejoined = 0;
+  while (t.aliveCount < t.membersSupported) {
+    const m = t.members.find((x) => !x.alive);
+    if (!m) break;
+    m.alive = true;
+    m.pos.x = t.pos.x;
+    m.pos.y = t.pos.y;
+    rejoined++;
+    w.events.emit('memberRejoined', { squadId: t.id, squadName: t.name, pos: { ...m.pos } });
+  }
+  w.events.emit('squadHealed', { medicId: s.id, targetId: t.id, amount: t.pool - before, rejoined });
+  w.events.emit('radio', { speaker: s.name, text: rejoined ? `${t.name} patched up. ${rejoined === 1 ? 'One' : rejoined} back on ${rejoined === 1 ? 'his' : 'their'} feet.` : `${t.name} patched up.`, tone: 'good' });
 }
 
 /** Round 12 #138: engineers install a structure's upgrade (outpost Garrison): walk over, work, done. */
@@ -279,6 +322,11 @@ function doBuild(w: World, s: Squad, dt: number): void {
     site.hp = site.def.hp;
     if (site.def.slow) w.grid.setSlow(site.tile.x, site.tile.y, site.size.w, site.size.h, site.def.slow, site.id);
     w.events.emit('structureBuilt', { id: site.id, defId: site.def.id, pos: site.pos });
+    if (site.def.id === 'medBay' && !w.unlocked.has('medic')) {
+      // STATUS #20 (owner): the Med Bay brings the Medic Team
+      w.unlocked.add('medic');
+      w.events.emit('radio', { speaker: 'Command', text: 'Med Bay is up. Medic Teams can be recruited at the Barracks now.', tone: 'good' });
+    }
     if (site.def.restore) {
       const first = !w.unlocked.has('medBay');
       w.unlocked.add('power');

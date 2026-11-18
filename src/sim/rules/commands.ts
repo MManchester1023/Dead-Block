@@ -124,10 +124,34 @@ export function stop(squads: Squad[]): void {
   }
 }
 
+/** Campaign unlocks for units (STATUS #20): medics once a Med Bay stands (also true for saves from before the unlock existed). */
+export function unitUnlocked(w: World, defId: string): boolean {
+  const key = UNITS[defId]?.unlockKey;
+  if (!key) return true;
+  if (w.unlocked.has(key)) return true;
+  return key === 'medic' && w.structures.some((s) => s.alive && s.built && s.def.id === 'medBay');
+}
+
+/**
+ * Heal (STATUS #20): medics walk to a hurt squad, treat it for a moment, and restore part of its health;
+ * lost soldiers rejoin. One use per `cooldown` per medic team.
+ */
+export function orderHeal(w: World, squads: Squad[], target: Squad, queue = false): string | null {
+  const medics = squads.filter((s) => s.alive && s.def.abilities?.includes('heal') && s !== target);
+  if (!medics.length) return 'Only medics can heal';
+  if (!target.alive) return 'Nobody left to treat';
+  if (target.pool >= target.poolMax && target.aliveCount >= target.members.length) return `${target.name} isn't hurt`;
+  const ready = medics.filter((s) => w.time >= s.healReadyAt);
+  if (!ready.length) return `Heal ready in ${Math.ceil(Math.min(...medics.map((s) => s.healReadyAt)) - w.time)} s`;
+  issueOrder(w, ready.slice(0, 1), { type: 'heal', pos: { ...target.pos }, targetId: target.id }, queue);
+  return null;
+}
+
 export function queueProduction(w: World, defId: string): string | null {
   const def = UNITS[defId];
   if (!def) return 'Unknown unit';
   if (def.requires && !isEnabled(def.requires as never)) return `Locked — ${def.unlock}`;
+  if (!unitUnlocked(w, defId)) return `Locked — ${def.unlock}`;
   const producer = w.structures.find((s) => s.alive && s.def.id === def.producedAt);
   if (!producer) return `Needs ${def.producedAt}`;
   if (w.hasCommandCap && w.commandUsed + def.command > w.commandCap) return 'Command cap reached';

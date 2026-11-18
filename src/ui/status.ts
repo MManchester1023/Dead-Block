@@ -38,6 +38,8 @@ export function squadStatus(s: Squad, w: World): { text: string; tone: StatusTon
       return { text: s.moving ? 'TO SEARCH' : 'SEARCHING', tone: 'work' };
     case 'upgrade':
       return { text: s.moving ? 'TO THE OUTPOST' : 'INSTALLING', tone: 'work' };
+    case 'heal':
+      return { text: s.moving ? 'TO PATIENT' : 'HEALING', tone: 'work' };
     case 'disband':
       return { text: 'STANDING DOWN', tone: 'move' };
   }

@@ -65,7 +65,7 @@ export function updateCombat(w: World, dt: number): void {
     if (!s.alive || s.stunned > 0 || s.climb) continue; // hands on the ladder
     if (s.def.category === 'civilian') continue; // unarmed
     const order = s.currentOrder;
-    const busy = order?.type === 'build' || order?.type === 'charge' || order?.type === 'deconstruct' || order?.type === 'repair' || order?.type === 'upgrade';
+    const busy = order?.type === 'build' || order?.type === 'charge' || order?.type === 'deconstruct' || order?.type === 'repair' || order?.type === 'upgrade' || order?.type === 'heal';
     // forced target (right-clicked zombie) overrides threat priority once it's in range and visible
     // up a guard tower: longer reach, and they see over cars and walls (v4.13)
     const tower = s.garrisonedIn != null ? w.get(s.garrisonedIn) : undefined;

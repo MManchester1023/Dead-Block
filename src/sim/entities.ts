@@ -52,6 +52,8 @@ export class Squad implements Targetable {
   targetId: number | null = null;
   holding = false;
   inCover = 0; // current cover damage reduction
+  /** Medics (STATUS #20): sim time when Heal can be used again. */
+  healReadyAt = 0;
   /** Round 11 #125: the player told it to crouch (G): half cover in the open, slower on the move. Stays until G again. */
   crouched = false;
   /** Round 11 #126: sent to cover that was full, so it crouches in the open where it was sent (until its next order). */

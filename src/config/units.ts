@@ -29,6 +29,8 @@ export interface UnitDef {
   /** Feature id that must be enabled, plus the in-world unlock condition from doc §12. */
   requires?: string;
   unlock: string;
+  /** Campaign unlock (`World.unlocked`), e.g. 'medic' once a Med Bay is built (STATUS #20). */
+  unlockKey?: string;
   canBuild?: string[];
   abilities?: string[];
   tags?: string[];
@@ -37,6 +39,8 @@ export interface UnitDef {
 // v4.21 (#86): riflemen see/engage a little further (was 24 m; carbine was 18 m)
 const rifle: WeaponDef = { name: 'Service rifle', range: 30, damage: 9, cooldown: 0.9, accuracy: 0.62, type: 'bullet', loudness: 2.2 };
 // round 11 #134: engineers hit a little harder than riflemen per soldier (was 7: ~4.9 dmg/s vs the rifle's ~6.2; now ~7.0)
+// STATUS #20: medics carry pistols: short range, light
+const pistol: WeaponDef = { name: 'Pistol', range: 15, damage: 7, cooldown: 0.8, accuracy: 0.7, type: 'bullet', loudness: 1.2 };
 const carbine: WeaponDef = { name: 'Carbine', range: 22, damage: 10, cooldown: 1.0, accuracy: 0.7, type: 'bullet', loudness: 1.8 };
 
 /**
@@ -63,7 +67,8 @@ export const UNITS: Record<string, UnitDef> = {
     weapon: { name: 'Unarmed', range: 0, damage: 0, cooldown: 99, accuracy: 0, type: 'bullet', loudness: 0 },
     cost: { money: 0, supplies: 0 }, upkeep: 0, command: 0, buildTime: 0, producedAt: 'none', unlock: 'Found by searching houses (Rail Siding on)',
   },
-  medic: { id: 'medic', name: 'Medic Team', category: 'infantry', members: 2, memberHp: 36, speed: 6.4, weapon: carbine, cost: { money: 70, supplies: 20 }, upkeep: 3, command: 2, buildTime: 12, producedAt: 'barracks', requires: 'powerStations', unlock: 'Suburbs power / Barracks Lv2' },
+  // STATUS #20: unlocked by building a Med Bay (owner); pistols, and Heal (an active ability with a cooldown)
+  medic: { id: 'medic', name: 'Medic Team', category: 'infantry', members: 2, memberHp: 36, speed: 6.4, weapon: pistol, cost: { money: 70, supplies: 20 }, upkeep: 3, command: 2, buildTime: 12, producedAt: 'barracks', unlockKey: 'medic', unlock: 'Build a Med Bay', abilities: ['heal'], tags: ['canCover'] },
   recon: { id: 'recon', name: 'Recon Pair', category: 'infantry', members: 2, memberHp: 32, speed: 8.4, weapon: { ...carbine, loudness: 0.6 }, cost: { money: 60, supplies: 15 }, upkeep: 3, command: 1, buildTime: 10, producedAt: 'barracks', requires: 'fogOfWar', unlock: 'Suburbs power / Barracks Lv2' },
   mg: { id: 'mg', name: 'Machine Gun Team', category: 'infantry', members: 3, memberHp: 42, speed: 4.8, weapon: { name: 'M240-style MG', range: 20, damage: 6, cooldown: 0.18, accuracy: 0.55, type: 'bullet', loudness: 3 }, cost: { money: 110, supplies: 30 }, upkeep: 5, command: 3, buildTime: 16, producedAt: 'armory', requires: 'powerStations', unlock: 'Main Street power / Armory' },
   sniper: { id: 'sniper', name: 'Sniper Team', category: 'infantry', members: 2, memberHp: 34, speed: 6, weapon: { name: 'Marksman rifle', range: 36, damage: 45, cooldown: 2.4, accuracy: 0.92, type: 'bullet', loudness: 3.5 }, cost: { money: 110, supplies: 25 }, upkeep: 4, command: 2, buildTime: 16, producedAt: 'armory', requires: 'powerStations', unlock: 'Main Street power / Armory' },
@@ -173,6 +178,8 @@ export const STRUCTURES: Record<string, StructureDef> = {
 };
 
 export const ABILITIES = {
+  /** STATUS #20: medics walk to a hurt squad, treat it for `workSec`, and restore `share` of its health (lost soldiers rejoin). */
+  heal: { name: 'Heal', reach: 7, workSec: 2, share: 0.4, cooldown: 30 },
   demoCharge: { name: 'Demo Charge', plantTime: 2, // round 14 #171: was 3
      fuse: 5, damage: 520, radius: 7, type: 'explosive' as DamageType, cost: { money: 25, supplies: 10 }, loudness: 30 },
 };
