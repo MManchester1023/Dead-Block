@@ -9,15 +9,18 @@ import { models } from './ModelLibrary';
 import { PAL } from './palette';
 import type { RenderCtx } from './context';
 
-/** The car models the manifest lists (car1, car2, …), in order. */
-let carKindsCache: string[] | null = null;
-function carKinds(): string[] {
-  if (!carKindsCache) {
-    carKindsCache = [];
-    for (let i = 1; models.has(`car${i}`); i++) carKindsCache.push(`car${i}`);
+/** Numbered model variants the manifest lists (car1, car2…, tree1…, shrub1…), in order. */
+const variantCache = new Map<string, string[]>();
+function variants(base: string): string[] {
+  let v = variantCache.get(base);
+  if (!v) {
+    v = [];
+    for (let i = 1; models.has(`${base}${i}`); i++) v.push(`${base}${i}`);
+    variantCache.set(base, v);
   }
-  return carKindsCache;
+  return v;
 }
+const carKinds = () => variants('car');
 
 /** Chunk size (metres): 64 nav cells. STATUS #14, v4.46. */
 const CHUNK = 192;
@@ -214,7 +217,9 @@ export class CityLayer {
     );
     const decor = new Batch();
     for (const d of c.decor) {
-      const model = models.instance(d.kind);
+      // v4.58: trees and shrubs from the owner's tree packs (tree1…, shrub1…), one per spot by its seed
+      const vs = variants(d.kind);
+      const model = models.instance(vs.length ? vs[Math.abs(d.seed) % vs.length] : d.kind);
       if (model) {
         model.position.set(d.x, 0, d.z);
         model.rotation.y += -d.ry;

@@ -113,3 +113,7 @@ v4.39 (uploaded by the owner; authors to fill in where blank):
 
 "Casual LowPoly Male Rig T-pose" and the female version by [Denys Almaral](https://sketchfab.com/denysalmaral), **Sketchfab Standard licence** (use in a game is allowed; check the terms before redistributing the raw files, e.g. in a public repository). Uploaded by the owner to `assets-src/models/`; skeleton-free OBJ exports for Mixamo's auto-rigger in `assets-src/models/mixamo/to-rig/civilian_*_for_mixamo.zip`.
 
+## Trees and shrubs (v4.58)
+
+Two low-poly tree packs uploaded by the owner (`assets-src/models/low-poly-tree-pack.zip`, `low-poly-tree-set.zip`), **free to use** per the owner (authors to fill in). **Changed:** each tree merged with its material colours baked in, big ones simplified to ~900 triangles, trees scaled to 6–9.5 m and three small ones used as shrubs at 1–1.6 m (`src/dev/treeExport.ts`, `tools/assets/export-trees.cjs`). Game copies in `public/models/trees/`.
+
