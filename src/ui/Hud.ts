@@ -264,6 +264,15 @@ export class Hud {
       case 'stop': g.stop(); break;
       case 'disband': g.disband(); break;
       case 'upgrade': g.upgradeSelected(); break;
+      case 'goto-district': {
+        // round 12 #150: click a district's name to look at it (its outpost if it has one)
+        const d = g.world.districts.get(arg);
+        if (!d) break;
+        const op = d.outpostId != null ? g.world.get(d.outpostId) : undefined;
+        const r = d.def.rect;
+        g.renderer.rig.focus(op && op.alive ? op.pos : { x: r.x + r.w / 2, y: r.y + r.h / 2 });
+        break;
+      }
       case 'pause': g.togglePause(); break;
       case 'speed': g.setSpeed(Number(arg)); break;
       case 'focus': {
@@ -375,7 +384,7 @@ export class Hud {
       <div class="brand">DEAD BLOCK <span>COMMAND</span></div>
       <div class="res" title="Money: the hard resource. Income from secured districts, kills, clears and hives."><b>$</b>${Math.floor(w.money)}<small class="rate">${inc.money ? `+${inc.money}/min` : ''}</small></div>
       <div class="res" title="Supplies. Income from the base depot, secured districts and kills."><b>▣</b>${Math.floor(w.supplies)}<small class="rate">+${inc.supplies}/min</small></div>
-      <div class="res" title="Command used / cap"><b>★</b>${w.commandUsed}<small>/${w.commandCap}</small></div>
+      <div class="res" title="${w.hasCommandCap ? 'Command used / cap' : 'Command used (no cap from Rail Siding on)'}"><b>★</b>${w.commandUsed}${w.hasCommandCap ? `<small>/${w.commandCap}</small>` : ''}</div>
       <div class="res day" title="Upkeep is charged at the end of each day">
         Day ${w.day}<div class="bar"><i style="width:${dayPct.toFixed(1)}%"></i></div><small>upkeep −${upkeep}</small>
       </div>`);
@@ -403,9 +412,9 @@ export class Hud {
       const hive = w.hives.filter((h) => h.alive && h.districtId === d.def.id);
       const status = d.secured && d.contested ? '<span class="warn">CONTESTED</span>' : d.secured ? '<span class="good">SECURED</span>' : d.cleared ? '<span class="warn">CLEAR — build outpost</span>' : '<span class="bad">INFESTED</span>';
       html += `<div class="district">
-        <div class="row"><b>${d.def.name}</b>${status}</div>
+        <div class="row"><b class="dname" data-act="goto-district:${d.def.id}" title="Show on the map">${d.def.name}</b>${status}</div>
         <label>Infestation ${Math.ceil(d.infestation)}%${!d.secured && !hive.length ? ` · ${w.deadIn(d.def.id)} dead left` : ''}</label><div class="bar red"><i style="width:${d.infestation}%"></i></div>
-        <label>Noise</label><div class="bar amber"><i style="width:${d.noise}%"></i></div>
+        <label>Noise${w.time < (d.noiseLockUntil ?? 0) ? ` <small>· cooling down ${Math.ceil(d.noiseLockUntil - w.time)}s</small>` : ''}</label><div class="bar amber"><i style="width:${d.noise}%"></i></div>
         ${hive.map((h) => `<div class="row small"><span>Hive stage ${h.stage}/4</span><span>next pulse ${fmtTime(Math.max(0, h.pulseTimer))}</span></div>`).join('')}
         ${(() => {
           const st = w.structures.find((x) => x.alive && x.def.restore && x.districtId === d.def.id);
@@ -472,12 +481,14 @@ export class Hud {
       // round 11 #129: an outpost starts unarmed; its garrison is bought here
       const up = st.def.upgrade;
       const w = g.world;
-      const err = st.upgraded ? null : !st.built ? 'Finish building it first' : !w.canAfford(up.cost) ? 'Not enough money or supplies' : null;
+      const busy = w.squads.find((s) => s.alive && s.currentOrder?.type === 'upgrade' && s.currentOrder.targetId === st.id);
+      const noEng = !w.squads.some((s) => s.alive && s.def.canBuild?.length);
+      const err = st.upgraded ? null : busy ? `${busy.name} ${busy.moving ? 'on the way' : `installing: ${Math.floor((busy.buildProgress / up.workSec) * 100)}%`}` : w.upgradeBlocked(st) ?? (noEng ? 'Needs an engineer team' : null);
       const hp = `<div class="row small"><span>Health</span><span>${Math.ceil(st.hp)} / ${st.def.hp}</span></div>`;
       const btn = st.upgraded
         ? `<div class="row small"><span class="good">✔ ${esc(up.name)}</span><span>${up.weapon.range} m all round</span></div>`
-        : `<button class="cmd ${err ? 'disabled' : ''}" data-act="upgrade" title="${esc(up.desc)}"><span><b>${esc(up.name)}</b><small>${err ? esc(err) : `$${up.cost.money} · ${up.cost.supplies}▣`}</small></span></button>`;
-      this.set(this.selection, `<h3>${esc(st.def.name)}</h3>${hp}${btn}<p class="hint">${esc(up.desc)}.</p>`);
+        : `<button class="cmd ${err ? 'disabled' : ''}" data-act="upgrade" title="${esc(up.desc)}"><span><b>Install ${esc(up.name)}</b><small>${err ? esc(err) : `$${up.cost.money} · ${up.cost.supplies}▣ · the nearest engineers, ${up.workSec} s`}</small></span></button>`;
+      this.set(this.selection, `<h3>${esc(st.def.name)}</h3>${hp}${btn}<p class="hint">${esc(up.desc)}. Engineers install it (or right-click the outpost with engineers selected).</p>`);
       return;
     }
     if (!sq.length) {
@@ -588,7 +599,7 @@ export class Hud {
     const locked = recruitable.filter((u) => u.requires && !isEnabled(u.requires as never));
     const rows = avail
       .map((u) => {
-        const ok = w.canAfford(u.cost) && w.commandUsed + u.command <= w.commandCap;
+        const ok = w.canAfford(u.cost) && (!w.hasCommandCap || w.commandUsed + u.command <= w.commandCap);
         return `<button class="prod ${ok ? '' : 'disabled'}" data-act="produce:${u.id}">
           <b>${u.name}</b><small>$${u.cost.money} · ${u.cost.supplies}▣ · ★${u.command} · ${u.buildTime}s</small></button>`;
       })
@@ -598,7 +609,7 @@ export class Hud {
     const rallyOn = g.mode.kind === 'rally';
     return `<h3>Barracks · Recruit</h3><div class="prod-list">${rows}</div>${q ? `<div class="queue">${q}</div>` : ''}
       <div class="cmds"><button class="cmd ${rallyOn ? 'on' : ''}" data-act="rally">⚑ Set rally point</button></div>
-      <p class="hint">${rallyOn ? 'Click the map where new squads should gather · right-click to cancel' : `★ ${w.commandUsed}/${w.commandCap} command used. New squads walk to the rally flag.`}</p>
+      <p class="hint">${rallyOn ? 'Click the map where new squads should gather · right-click to cancel' : `★ ${w.commandUsed}${w.hasCommandCap ? `/${w.commandCap}` : ''} command used. New squads walk to the rally flag.`}</p>
       <details><summary>Roster roadmap (${locked.length} locked)</summary>${lockedHtml}</details>`;
   }
 

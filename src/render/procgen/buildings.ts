@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Rng } from '../../core/rng';
-import { Tile, type BuildingDef, type CityMap } from '../../sim/map';
+import { frontOf, housesInRow, type BuildingDef, type CityMap } from '../../sim/map';
 import { Batch, gableRoof } from './batch';
 import { leafyTree, palmTree } from './props';
 
@@ -21,39 +21,13 @@ const GLASS = 0x2e3c46;
 const GLASS_LIT = 0x8a9aa0;
 const FLOOR_H = 3.2;
 
-type Side = 'n' | 's' | 'e' | 'w';
-
-/** Which side faces the most street/parking — that's the front. */
-export function frontOf(map: CityMap, b: BuildingDef): Side {
-  const c = b.cells;
-  const score = (t: number) => (t === Tile.Parking ? 3 : t === Tile.Road || t === Tile.Sidewalk ? 2 : t === Tile.Building ? -1 : 0.3);
-  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= map.cols || y >= map.rows ? -2 : score(map.tiles[y * map.cols + x]));
-  const sides: Record<Side, number> = { n: 0, s: 0, e: 0, w: 0 };
-  for (let x = c.x; x < c.x + c.w; x++) {
-    for (let k = 1; k <= 3; k++) {
-      sides.n += at(x, c.y - k) / k;
-      sides.s += at(x, c.y + c.h - 1 + k) / k;
-    }
-  }
-  for (let y = c.y; y < c.y + c.h; y++) {
-    for (let k = 1; k <= 3; k++) {
-      sides.w += at(c.x - k, y) / k;
-      sides.e += at(c.x + c.w - 1 + k, y) / k;
-    }
-  }
-  // normalise by edge length so long walls don't automatically win
-  sides.n /= c.w;
-  sides.s /= c.w;
-  sides.e /= c.h;
-  sides.w /= c.h;
-  return (Object.entries(sides) as [Side, number][]).sort((a, b) => b[1] - a[1])[0][0];
-}
+export { frontOf } from '../../sim/map';
 
 /** Build every building; `sink` receives each one (its own batch, already in world space). */
 export function buildCity(map: CityMap, sink: (b: BuildingDef, batch: Batch) => void): void {
   for (const b of map.buildings) {
     // boxcars sit along their track; no "front" to find
-    const side = b.kind === 'boxcar' ? (b.rect.w >= b.rect.h ? 's' : 'e') : frontOf(map, b);
+    const side = b.front ?? (b.kind === 'boxcar' ? (b.rect.w >= b.rect.h ? 's' : 'e') : frontOf(map, b));
     const rot = { s: 0, n: Math.PI, e: Math.PI / 2, w: -Math.PI / 2 }[side];
     const along = side === 'n' || side === 's';
     const frontage = along ? b.rect.w : b.rect.h;
@@ -155,7 +129,7 @@ function fence(B: Batch, x0: number, z0: number, x1: number, z1: number, color: 
 // ---------------------------------------------------------------- houses
 
 function houses(B: Batch, frontage: number, depth: number, floors: number, rng: Rng): void {
-  const lots = Math.max(1, Math.min(3, Math.round(frontage / 13)));
+  const lots = housesInRow(frontage); // one, now that rows are split per house (#141)
   const lw = frontage / lots;
   for (let i = 0; i < lots; i++) {
     const cx = -frontage / 2 + lw * (i + 0.5);

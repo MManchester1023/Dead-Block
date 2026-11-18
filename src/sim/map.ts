@@ -31,7 +31,40 @@ export interface BuildingDef {
   /** Future: hp for collapse (doc §6a), rooftop slots (doc §5). */
   hp: number;
   roofCapacity: number;
+  /** Side facing the street (round 12 #141: set for houses, which are split into one building per house). */
+  front?: Side;
 }
+
+export type Side = 'n' | 's' | 'e' | 'w';
+
+/** Which side faces the most street/parking: that's the front. (Was in render/procgen; the sim needs it to split house rows.) */
+export function frontOf(map: Pick<CityMap, 'cols' | 'rows' | 'tiles'>, b: Pick<BuildingDef, 'cells'>): Side {
+  const c = b.cells;
+  const score = (t: number) => (t === Tile.Parking ? 3 : t === Tile.Road || t === Tile.Sidewalk ? 2 : t === Tile.Building ? -1 : 0.3);
+  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= map.cols || y >= map.rows ? -2 : score(map.tiles[y * map.cols + x]));
+  const sides: Record<Side, number> = { n: 0, s: 0, e: 0, w: 0 };
+  for (let x = c.x; x < c.x + c.w; x++) {
+    for (let k = 1; k <= 3; k++) {
+      sides.n += at(x, c.y - k) / k;
+      sides.s += at(x, c.y + c.h - 1 + k) / k;
+    }
+  }
+  for (let y = c.y; y < c.y + c.h; y++) {
+    for (let k = 1; k <= 3; k++) {
+      sides.w += at(c.x - k, y) / k;
+      sides.e += at(c.x + c.w - 1 + k, y) / k;
+    }
+  }
+  // normalise by edge length so long walls don't automatically win
+  sides.n /= c.w;
+  sides.s /= c.w;
+  sides.e /= c.h;
+  sides.w /= c.h;
+  return (Object.entries(sides) as [Side, number][]).sort((a, b) => b[1] - a[1])[0][0];
+}
+
+/** Houses per row: one per ~13 m of street frontage, 1–3 (the renderer used to draw this many in one building). */
+export const housesInRow = (frontageM: number) => Math.max(1, Math.min(3, Math.round(frontageM / 13)));
 
 export interface PropDef {
   id: number;
@@ -324,6 +357,28 @@ export function buildStarterMap(seed = 7): CityMap {
   for (const b of buildings) {
     b.rect = m(b.cells);
     b.height *= CELL;
+  }
+  // round 12 #141: a row of houses is drawn as 1–3 houses, so it becomes one building per house (each its
+  // own search). The first house keeps the row's id (old saves still line up); the others get new ids.
+  for (const b of [...buildings]) {
+    if (b.kind !== 'houses') continue;
+    const side = frontOf({ cols: width, rows: height, tiles }, b);
+    b.front = side;
+    const along = side === 'n' || side === 's';
+    const n = housesInRow(along ? b.rect.w : b.rect.h);
+    if (n < 2) continue;
+    const row = { ...b.rect };
+    const cells = { ...b.cells };
+    for (let i = 0; i < n; i++) {
+      const lot = i === 0 ? b : { ...b, id: buildings.length + 1, color: b.color };
+      lot.rect = along ? { x: row.x + (row.w / n) * i, y: row.y, w: row.w / n, h: row.h } : { x: row.x, y: row.y + (row.h / n) * i, w: row.w, h: row.h / n };
+      // whole nav cells (for lawns and footprints): split the row's cells as evenly as they go
+      const c0 = Math.round(((along ? cells.w : cells.h) * i) / n);
+      const c1 = Math.round(((along ? cells.w : cells.h) * (i + 1)) / n);
+      lot.cells = along ? { x: cells.x + c0, y: cells.y, w: c1 - c0, h: cells.h } : { x: cells.x, y: cells.y + c0, w: cells.w, h: c1 - c0 };
+      lot.roofCapacity = Math.max(1, Math.floor((lot.cells.w * lot.cells.h) / 12));
+      if (i > 0) buildings.push(lot);
+    }
   }
   for (const p of props) {
     const horizontal = p.w > p.h;

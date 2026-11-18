@@ -87,7 +87,11 @@ describe('world rules', () => {
     const eng = w.squads.find((s) => s.def.id === 'engineer')!;
     eng.pos = M(92, 55); // approach from the side where cars block the closest tiles
     expect(w.orderCharge([eng], hive)).toBeNull();
-    for (let i = 0; i < 30 * 15 && hive.alive; i++) w.step(1 / 30);
+    // round 12 #140: engineers don't shoot while planting, so keep strays (nest bursts) off them here
+    for (let i = 0; i < 30 * 15 && hive.alive; i++) {
+      for (const z of w.zombies) z.alive = false;
+      w.step(1 / 30);
+    }
     expect(hive.alive).toBe(false);
     expect(eng.alive).toBe(true); // it ran from its own blast
   });

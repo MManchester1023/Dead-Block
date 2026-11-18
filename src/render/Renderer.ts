@@ -12,6 +12,7 @@ import { Effects } from './Effects';
 import { MAX_ZOMBIES, makeZombieMeshes } from './meshes';
 import { PlacementGhost } from './PlacementGhost';
 import { SupplyDrops } from './SupplyDrops';
+import { Popups } from './Popups';
 import { HiveLayer, SquadLayer, StructureLayer } from './UnitLayers';
 
 const SHADOW_HALF = 200; // metres either side of the camera target that get sun shadows
@@ -53,6 +54,7 @@ export class Renderer {
   private structures: StructureLayer;
   private hives: HiveLayer;
   private drops: SupplyDrops;
+  private popups: Popups;
   private sun: THREE.DirectionalLight;
   private hemi: THREE.HemisphereLight;
   private rallyFlag: THREE.Group;
@@ -112,6 +114,7 @@ export class Renderer {
     this.structures = new StructureLayer(this.ctx, (p) => this.fx.explosion(p, 1.5, 0x9a8a6a));
     this.hives = new HiveLayer(this.ctx);
     this.drops = new SupplyDrops(this.scene, world);
+    this.popups = new Popups(this.ctx);
 
     this.hookEvents();
     window.addEventListener('resize', () => this.resize());
@@ -205,6 +208,7 @@ export class Renderer {
     this.structures.update(f);
     this.hives.update(f);
     this.drops.update();
+    this.popups.update(realDt);
     this.city.updateDistricts();
     this.fx.update(this.time, realDt, simDt);
     if (isEnabled('dayNight')) this.applyTimeOfDay(w.dayTimer / BALANCE.economy.dayLengthSec);

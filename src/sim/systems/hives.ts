@@ -64,6 +64,7 @@ export function updateHives(w: World, dt: number): void {
       if (loud && d) {
         w.events.emit('noiseAlert', { districtId: d.def.id });
         d.noise = 0;
+        d.noiseLockUntil = w.time + BALANCE.noise.pulseCooldownSec;
       }
       h.pulseTimer = T.pulseIntervalSec[h.stage - 1];
       pulse(w, h, loud ? 4 : 0);

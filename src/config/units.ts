@@ -142,7 +142,7 @@ export interface StructureDef {
   /** Med Bay (v4.17): squads resting within `radius` m heal `perSec` of their max health per second, paying supplies. */
   heal?: { radius: number; perSec: number; suppliesPerHp: number; restAfterHitSec: number };
   /** A one-time upgrade bought from the structure's panel (round 11 #129: the outpost garrison). Adds `weapon`. */
-  upgrade?: { name: string; desc: string; cost: { money: number; supplies: number }; weapon: WeaponDef };
+  upgrade?: { name: string; desc: string; cost: { money: number; supplies: number }; weapon: WeaponDef; workSec: number };
 }
 
 export const STRUCTURES: Record<string, StructureDef> = {
@@ -159,10 +159,11 @@ export const STRUCTURES: Record<string, StructureDef> = {
   // STATUS #11 gave every outpost a small all-round garrison; round 11 #129 made it a paid upgrade
   outpost: { id: 'outpost', name: 'Outpost', hp: 600, cost: { money: 100, supplies: 30 }, buildTime: 30, size: { w: 3, h: 3 }, blocksMovement: true, requiresSecured: true, hotkey: 'O',
     upgrade: { name: 'Garrison', desc: 'A few soldiers man the outpost: 26 m all-round fire, enough for strays, not for a roaming pack',
-      cost: { money: 80, supplies: 25 }, weapon: { name: 'Outpost garrison', range: 26, damage: 7, cooldown: 0.7, accuracy: 0.7, type: 'bullet', loudness: 1.5 } } },
+      cost: { money: 80, supplies: 25 }, workSec: 6, weapon: { name: 'Outpost garrison', range: 26, damage: 7, cooldown: 0.7, accuracy: 0.7, type: 'bullet', loudness: 1.5 } } },
   sandbags: { id: 'sandbags', name: 'Sandbag Wall', hp: 260, cost: { money: 15, supplies: 10 }, buildTime: 6, size: { w: 3, h: 1 }, blocksMovement: true, cover: 0.55, climbable: true, hotkey: 'Q' },
   wire: { id: 'wire', name: 'Barbed Wire', hp: 120, cost: { money: 10, supplies: 5 }, buildTime: 4, size: { w: 3, h: 1 }, blocksMovement: false, slow: 0.35, hotkey: 'W' },
-  mgNest: { id: 'mgNest', name: 'MG Emplacement', hp: 380, cost: { money: 140, supplies: 45 }, buildTime: 12, size: { w: 2, h: 2 }, blocksMovement: true, cover: 0.5, hotkey: 'E', arc: 120, weapon: { name: 'Mounted HMG', range: 35, damage: 8, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 } },
+  // round 12 #145: 8 → 12 damage a round
+  mgNest: { id: 'mgNest', name: 'MG Emplacement', hp: 380, cost: { money: 140, supplies: 45 }, buildTime: 12, size: { w: 2, h: 2 }, blocksMovement: true, cover: 0.5, hotkey: 'E', arc: 120, weapon: { name: 'Mounted HMG', range: 35, damage: 12, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 } },
   tallWall: { id: 'tallWall', name: 'Tall Concrete Wall (40 ft)', hp: 4000, cost: { money: 400, supplies: 120 }, buildTime: 60, size: { w: 4, h: 1 }, blocksMovement: true, climbable: false, requires: 'tallWalls' },
   loudspeaker: { id: 'loudspeaker', name: 'Loudspeaker', hp: 80, cost: { money: 40, supplies: 10 }, buildTime: 8, size: { w: 1, h: 1 }, blocksMovement: false, lure: 6, requires: 'tallWalls' },
 };

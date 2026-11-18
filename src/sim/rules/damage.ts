@@ -15,7 +15,7 @@ export function makeNoise(w: World, pos: Vec2, loudness: number): void {
   if (same) same.loudness = Math.max(same.loudness, loudness) + Math.min(loudness, same.loudness) * 0.1;
   else w.noiseEvents.push({ pos: { ...pos }, loudness, age: 0 });
   const d = w.districtAt(pos);
-  if (d && d.def.id !== 'base' && !d.locked) {
+  if (d && d.def.id !== 'base' && !d.locked && w.time >= (d.noiseLockUntil ?? 0)) {
     d.noise = Math.min(BALANCE.noise.pulseThreshold, d.noise + loudness * 0.12);
     d.noiseHold = BALANCE.noise.holdSec;
   }

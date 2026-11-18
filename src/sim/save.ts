@@ -99,7 +99,7 @@ export function loadWorld(data: SaveData, seed = 1337): World {
   w.nestTimer = s.nestTimer;
   w.setCounters(s.counters);
   w.unlocked = new Set(s.unlocked);
-  w.buildingState = new Map(s.buildingState);
+  for (const [id, st] of s.buildingState) w.buildingState.set(id, st); // round 12 #141: new houses keep their fresh state
   w.supportReadyAt = new Map(s.supportReadyAt);
   w.impacts = s.impacts;
   w.crates = s.crates;

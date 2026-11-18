@@ -47,7 +47,7 @@ function allCover(w: World): CoverSpot[] {
 function coverAt(w: World, p: Vec2): CoverSpot | undefined {
   const prop = w.map.props.find((c) => dist(c.pos, p) < 3);
   if (prop) return { id: prop.id, pos: prop.pos, horiz: prop.w > prop.h, slots: CAR_SLOTS };
-  const st = w.structures.find((s) => s.built && s.def.cover && s.def.id !== 'mgNest' && !s.def.garrison && dist(s.pos, p) < s.radius + 1.5);
+  const st = w.structureAt(p, (s) => s.built && !!s.def.cover && s.def.id !== 'mgNest' && !s.def.garrison, 1.5);
   return st ? { id: st.id, pos: st.pos, horiz: st.size.w > st.size.h, slots: WALL_SLOTS } : undefined;
 }
 
@@ -179,7 +179,16 @@ export class Game {
     // engineers + right-click own structure: resume an unfinished site, or repair damage (v4.4)
     const eng = sq.filter((s) => s.def.canBuild?.length);
     // (a power station counts too: engineers restore it, v4.17)
-    const own = w.structures.find((s) => s.alive && (s.def.cost.money + s.def.cost.supplies > 0 || !!s.def.restore) && dist(s.pos, p) < s.radius + 1);
+    const own = w.structureAt(p, (s) => s.def.cost.money + s.def.cost.supplies > 0 || !!s.def.restore);
+    // round 12 #138: an outpost without its Garrison: the engineers install it
+    if (eng.length && own && own.built && own.hp >= own.def.hp && own.def.upgrade && !own.upgraded) {
+      const err = w.orderUpgrade(eng, own, queue);
+      if (err) this.toast(err);
+      else this.renderer.marker(own.pos, 0xd0c070);
+      const rest = sq.filter((s) => !eng.includes(s));
+      if (!rest.length) return;
+      sq = rest;
+    }
     if (eng.length && own && (!own.built || own.hp < own.def.hp)) {
       const err = own.built ? w.orderRepair(eng, own, queue) : w.orderResume(eng, own, queue);
       if (err) this.toast(err);
@@ -190,7 +199,7 @@ export class Game {
     }
 
     // right-click a guard tower: the first infantry squad climbs up (v4.13)
-    const tower = w.structures.find((s) => s.alive && s.def.garrison && dist(s.pos, p) < s.radius + 1);
+    const tower = w.structureAt(p, (s) => !!s.def.garrison);
     if (tower) {
       const err = w.orderGarrison(sq, tower, queue);
       if (err) this.toast(err);
@@ -252,7 +261,7 @@ export class Game {
 
   /** Click on the map without hitting a squad: select a building if there is one. */
   selectStructureAt(p: Vec2): boolean {
-    const st = this.world.structures.find((s) => s.alive && SELECTABLE.has(s.def.id) && dist(s.pos, p) < s.radius + 2);
+    const st = this.world.structureAt(p, (s) => SELECTABLE.has(s.def.id), 2);
     if (!st) return false;
     this.selectStructure(st.id);
     return true;
@@ -294,7 +303,7 @@ export class Game {
   }
 
   deconstructAt(p: Vec2, queue: boolean): void {
-    const st = this.world.structures.find((s) => s.alive && dist(s.pos, p) < s.radius + 1);
+    const st = this.world.structureAt(p);
     if (!st) {
       this.toast('Click a structure to deconstruct');
       return;
@@ -317,12 +326,13 @@ export class Game {
     this.changed();
   }
 
-  /** Buy the selected structure's upgrade (round 11 #129: outpost garrison). */
+  /** Send the nearest engineer team to install the selected structure's upgrade (round 12 #138). */
   upgradeSelected(): void {
     const st = this.world.structures.find((s) => s.id === this.selectedStructure && s.alive);
     if (!st) return;
-    const err = this.world.upgradeStructure(st);
+    const err = this.world.orderUpgrade([], st);
     if (err) this.toast(err);
+    else this.renderer.marker(st.pos, 0xd0c070);
     this.changed();
   }
 

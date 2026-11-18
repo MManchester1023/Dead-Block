@@ -138,7 +138,8 @@ export class Input {
     const w = this.game.world;
     const p = this.game.renderer.screenToGround(x, y);
     for (const h of w.hives) if (h.alive && Math.hypot(h.pos.x - p.x, h.pos.y - p.y) < h.radius + 2) return h.id;
-    for (const s of w.structures) if (s.alive && Math.hypot(s.pos.x - p.x, s.pos.y - p.y) < s.radius + 1) return s.id;
+    const st = w.structureAt(p);
+    if (st) return st.id;
     return null;
   }
 

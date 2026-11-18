@@ -222,3 +222,11 @@ h3.collapsible:hover { color: #fff; }
 .dialog.menu .slot-btns button { margin-left: 4px; }
 .dialog.menu .slot-btns button.warn { outline: 1px solid var(--bad, #d2443a); }
 .dialog button.big small { display: block; font-size: 11px; opacity: 0.7; font-weight: normal; }
+
+/* round 12 #142: what a house search found, floating up over the house */
+.popup { position: absolute; left: 0; top: 0; pointer-events: none; font: 700 14px/1 var(--mono, monospace); letter-spacing: 0.04em; white-space: nowrap;
+  padding: 3px 7px; border-radius: 3px; background: #0d0f0cd0; text-shadow: 0 1px 2px #000; }
+.popup.good { color: var(--good); }
+.popup.bad { color: var(--bad); }
+.popup.muted { color: #b8b8a8; }
+.dname { cursor: pointer; } .dname:hover { text-decoration: underline; }

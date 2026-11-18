@@ -15,6 +15,8 @@ export interface Member {
   facing: number;
   /** Sim time of this member's last shot (drives the shooting animation). */
   lastShot: number;
+  /** At rest, walking back to their spot (round 12 #137); otherwise standing still. */
+  settling?: boolean;
   /** Per-member loadout/cosmetics hook for Armory customization (doc §7, Tier 4). */
   loadout?: { weapon?: string; attachments?: string[]; cosmetics?: Record<string, string> };
 }
@@ -48,6 +50,8 @@ export class Squad implements Targetable {
   targetId: number | null = null;
   holding = false;
   inCover = 0; // current cover damage reduction
+  /** Which way the formation is laid out (round 12 #137): follows the squad on the move, frozen at rest. */
+  formFacing: number | null = null;
   coverPropId: number | null = null;
   facing = 0;
   xp = 0;
@@ -149,6 +153,8 @@ export class Zombie implements Targetable {
   aggro = 0;
   /** Following the shared flow field (destination out of sight, or stuck). Re-checked every ~0.5 s. */
   useField = false;
+  /** Seconds spent idle or wandering (round 12 #144: leftovers eventually come for your structures). */
+  idleFor = 0;
   losTimer = 0;
   stuckFor = 0;
   /** Seconds spent pressed against a player structure while chasing a squad (v4.9). */

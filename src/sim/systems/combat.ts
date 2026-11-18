@@ -65,7 +65,7 @@ export function updateCombat(w: World, dt: number): void {
     if (!s.alive || s.stunned > 0 || s.climb) continue; // hands on the ladder
     if (s.def.category === 'civilian') continue; // unarmed
     const order = s.currentOrder;
-    const busy = order?.type === 'build' || order?.type === 'charge' || order?.type === 'deconstruct' || order?.type === 'repair';
+    const busy = order?.type === 'build' || order?.type === 'charge' || order?.type === 'deconstruct' || order?.type === 'repair' || order?.type === 'upgrade';
     // forced target (right-clicked zombie) overrides threat priority once it's in range and visible
     // up a guard tower: longer reach, and they see over cars and walls (v4.13)
     const tower = s.garrisonedIn != null ? w.get(s.garrisonedIn) : undefined;
@@ -78,7 +78,9 @@ export function updateCombat(w: World, dt: number): void {
     const t = forcedOk ? forced : acquire(w, s, s.faction, weapon, undefined, !!g);
     if (!t) continue;
     if (!s.moving) s.facing = Math.atan2(t.pos.y - s.pos.y, t.pos.x - s.pos.x);
-    // builders only defend themselves against danger-close threats
+    // round 12 #140: engineers at work (building, repairing, planting a charge, installing) don't shoot;
+    // on the way there they only answer danger-close threats
+    if (busy && !s.moving) continue;
     if (busy && dist(t.pos, s.pos) > BALANCE.combat.dangerCloseRadius + 2) continue;
     const accMult = s.moving ? 0.5 : 1; // round 11 #128: firing on the move (was 0.6)
     for (const m of s.members) {

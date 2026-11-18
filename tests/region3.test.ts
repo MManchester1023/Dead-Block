@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { World } from '../src/sim/World';
 import { findPath } from '../src/sim/pathfinding';
 import { Structure } from '../src/sim/entities';
+import { BALANCE } from '../src/config/balance';
 
 const inRect = (p: { x: number; y: number }, r: { x: number; y: number; w: number; h: number }) => p.x >= r.x && p.y >= r.y && p.x < r.x + r.w && p.y < r.y + r.h;
 
@@ -97,9 +98,11 @@ describe('tutorial region 3: Rail Siding and the power system (v4.17)', () => {
     expect(sq.hp).toBe(hp0); // no power yet
 
     station.built = true;
+    const before = w.supplies;
     for (let i = 0; i < 30 * 60; i++) w.step(1 / 30);
     expect(sq.hp).toBeGreaterThan(hp0);
     expect(sq.aliveCount).toBeGreaterThan(2);
-    expect(w.supplies).toBeLessThan(150);
+    // healing costs supplies: less than a minute's income was added (no cap since round 11 #136)
+    expect(w.supplies).toBeLessThan(before + BALANCE.economy.baseSuppliesPerMin);
   });
 });

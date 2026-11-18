@@ -96,7 +96,7 @@ export class CrowdLayer {
       if (!s.alive) continue;
       const crowd = C[squadCrowd(s.def.id)];
       const order = s.currentOrder?.type;
-      const working = !s.moving && (order === 'build' || order === 'repair' || order === 'deconstruct' || order === 'charge' || order === 'search');
+      const working = !s.moving && (order === 'upgrade' || order === 'build' || order === 'repair' || order === 'deconstruct' || order === 'charge' || order === 'search');
       const tgt = w.get(s.targetId);
       // round 6 #67: stay in the firing pose while engaged; dropping it between shots (fire every 0.9 s,
       // pose shown for 0.7 s) is what made the arms jump up and down once a second
@@ -122,8 +122,9 @@ export class CrowdLayer {
         if (!m.alive) return;
         const key = s.id * 8 + i + 1e7;
         const v = speedOf(key, m.pos.x, m.pos.y);
-        // soldiers drift around their spot at up to ~1.2 m/s while resting: that isn't walking
-        const walking = gait(key, v, s.moving ? 0.6 : 1.6, s.moving ? 0.3 : 1.2) > 0;
+        // round 12 #137: resting soldiers no longer drift (they stand still or walk to their spot at ~2 m/s),
+        // so the same walk threshold works at rest as on the move
+        const walking = gait(key, v, 0.6, 0.3) > 0;
         let clip: Clip = 'idle';
         let rate = 1;
         const firing = engaged && w.time - m.lastShot < s.def.weapon.cooldown * 2.5;

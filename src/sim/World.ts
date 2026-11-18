@@ -41,6 +41,8 @@ export interface DistrictState {
   roamTimer: number;
   /** Dead loose inside while secured (STATUS #11): set while it's contested, for the one-off warning. */
   contested: boolean;
+  /** Round 12 #149: until this sim time the noise meter stays empty (after a noise pulse). */
+  noiseLockUntil: number;
 }
 
 export interface NoiseEvent {
@@ -108,7 +110,7 @@ export class World {
     }
     for (const p of this.map.props) this.grid.setRect(p.cells.x, p.cells.y, p.cells.w, p.cells.h, true, p.id);
     for (const d of this.map.districts)
-      this.districts.set(d.id, { def: d, infestation: d.initialInfestation, noise: 0, noiseHold: 0, secured: d.id === 'base', outpostId: null, cleared: d.initialInfestation === 0, locked: !!d.locked, quietUntil: 0, roamTimer: 0, contested: false });
+      this.districts.set(d.id, { def: d, infestation: d.initialInfestation, noise: 0, noiseHold: 0, secured: d.id === 'base', outpostId: null, cleared: d.initialInfestation === 0, locked: !!d.locked, quietUntil: 0, roamTimer: 0, contested: false, noiseLockUntil: 0 });
     // locked tutorial regions are fenced off until they open
     for (const d of this.map.districts) if (d.locked && d.borders) Campaign.setBorder(this, d, true);
 
@@ -194,7 +196,25 @@ export class World {
     s.districtId = this.districtAt(s.pos)?.def.id ?? null;
     this.structures.push(s);
     this.byId.set(s.id, s);
-    if (def.blocksMovement) this.grid.setRect(tile.x, tile.y, s.size.w, s.size.h, true, s.id);
+    if (def.blocksMovement) {
+      this.grid.setRect(tile.x, tile.y, s.size.w, s.size.h, true, s.id);
+      // round 12 #147: anyone standing on the new footprint steps off it (engineers used to get walled in)
+      for (const q of this.squads) {
+        if (!q.alive) continue;
+        if (this.grid.isBlockedXY(q.pos.x, q.pos.y)) {
+          const f = this.grid.nearestFree(q.pos);
+          q.pos.x = f.x;
+          q.pos.y = f.y;
+          q.path = [];
+        }
+        for (const m of q.members)
+          if (m.alive && this.grid.isBlockedXY(m.pos.x, m.pos.y)) {
+            const f = this.grid.nearestFree(m.pos);
+            m.pos.x = f.x;
+            m.pos.y = f.y;
+          }
+      }
+    }
     if (built && def.slow) this.grid.setSlow(tile.x, tile.y, s.size.w, s.size.h, def.slow, s.id);
     return s;
   }
@@ -237,6 +257,12 @@ export class World {
     return undefined;
   }
 
+  /** Round 12 #143: the command cap only applies until Rail Siding (region 3) opens; no cap from then on. */
+  get hasCommandCap(): boolean {
+    const rail = this.districts.get('railSiding');
+    return !!rail && rail.locked;
+  }
+
   get commandUsed(): number {
     let n = 0;
     for (const s of this.squads) if (s.alive) n += s.def.command;
@@ -253,6 +279,29 @@ export class World {
     this.money -= cost.money;
     this.supplies -= cost.supplies;
     return true;
+  }
+
+  /**
+   * The structure under a point (round 12 #148): the one whose footprint holds `p`, or else the nearest
+   * footprint within `slack` metres. (Picking by a circle round the centre chose neighbours of long
+   * sandbag and wire runs.)
+   */
+  structureAt(p: Vec2, filter: (s: Structure) => boolean = () => true, slack = 1): Structure | undefined {
+    const c = this.grid.cell;
+    let best: Structure | undefined;
+    let bestD = slack;
+    for (const s of this.structures) {
+      if (!s.alive || !filter(s)) continue;
+      const x0 = s.tile.x * c, y0 = s.tile.y * c;
+      const dx = Math.max(x0 - p.x, 0, p.x - (x0 + s.size.w * c));
+      const dy = Math.max(y0 - p.y, 0, p.y - (y0 + s.size.h * c));
+      const d = Math.hypot(dx, dy);
+      if (d < bestD || (d === 0 && bestD === 0 && best && Math.hypot(s.pos.x - p.x, s.pos.y - p.y) < Math.hypot(best.pos.x - p.x, best.pos.y - p.y))) {
+        best = s;
+        bestD = d;
+      }
+    }
+    return best;
   }
 
   /** Dead walking around inside a district (not those still hidden in buildings). Round 11 #120. */
@@ -293,6 +342,14 @@ export class World {
   }
   upgradeStructure(st: Structure): string | null {
     return Commands.upgradeStructure(this, st);
+  }
+
+  orderUpgrade(squads: Squad[], st: Structure, queue = false): string | null {
+    return Commands.orderUpgrade(this, squads, st, queue);
+  }
+
+  upgradeBlocked(st: Structure): string | null {
+    return Commands.upgradeBlocked(this, st);
   }
 
   orderSearch(squads: Squad[], b: BuildingDef, queue = false): string | null {

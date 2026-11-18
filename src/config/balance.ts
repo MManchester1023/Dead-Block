@@ -24,6 +24,8 @@ export const BALANCE = {
     holdSec: 3,
     decayPerSec: 1.25,
     pulseThreshold: 100,
+    /** Round 12 #149: after a noise pulse the meter stays empty this long (the fight against it used to set off the next). */
+    pulseCooldownSec: 45,
     // Gunshots carry well beyond sight (zombie sight ~14 m). v4.15 (#76): a rifle (2.2) is heard ~60 m
     // away, a carbine (1.8) ~49 m, an MG (3.2) ~87 m; explosions further.
     hearingRadiusPerLoudness: 27.3, // metres per loudness point
@@ -102,6 +104,8 @@ export const BALANCE = {
     /** …up to this cap; at the cap the district pays no income. With none left inside it falls back. */
     securedCap: 30,
     securedRecoverPerMin: 6,
+    /** Round 12 #144: dead idle this long in a district with no live hive head for the nearest structure of yours. */
+    stragglerIdleSec: 120,
   },
 
   infestation: {

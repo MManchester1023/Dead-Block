@@ -63,7 +63,7 @@ export function queueProduction(w: World, defId: string): string | null {
   if (def.requires && !isEnabled(def.requires as never)) return `Locked — ${def.unlock}`;
   const producer = w.structures.find((s) => s.alive && s.def.id === def.producedAt);
   if (!producer) return `Needs ${def.producedAt}`;
-  if (w.commandUsed + def.command > w.commandCap) return 'Command cap reached';
+  if (w.hasCommandCap && w.commandUsed + def.command > w.commandCap) return 'Command cap reached';
   if (!w.spend(def.cost)) return 'Not enough money or supplies';
   producer.queue.push({ defId, remaining: def.buildTime });
   return null;
@@ -121,13 +121,43 @@ export function orderCharge(w: World, engineers: Squad[], hive: Hive, queue = fa
   return null;
 }
 
-/** Buy a structure's one-time upgrade (round 11 #129: the outpost garrison). */
-export function upgradeStructure(w: World, st: Structure): string | null {
+/** Why a structure's upgrade can't be installed right now, or null if it can. */
+export function upgradeBlocked(w: World, st: Structure): string | null {
   const up = st.def.upgrade;
   if (!up) return 'Nothing to upgrade';
-  if (st.upgraded) return `${up.name} already bought`;
+  if (st.upgraded) return `${up.name} already installed`;
   if (!st.built) return 'Finish building it first';
-  if (!w.spend(up.cost)) return 'Not enough money or supplies';
+  if (!w.canAfford(up.cost)) return 'Not enough money or supplies';
+  return null;
+}
+
+/**
+ * Round 12 #138: engineers install a structure's upgrade (the outpost Garrison): they walk over and work
+ * for `workSec`, then it's paid for and done. With no team given, the nearest engineer team goes.
+ */
+export function orderUpgrade(w: World, squads: Squad[], st: Structure, queue = false): string | null {
+  const err = upgradeBlocked(w, st);
+  if (err) return err;
+  let eng = squads.filter((s) => s.alive && s.def.canBuild?.length);
+  if (!squads.length) {
+    const all = w.squads.filter((s) => s.alive && s.def.canBuild?.length);
+    const free = all.filter((s) => !s.orders.length);
+    const pool = free.length ? free : all;
+    pool.sort((a, b) => Math.hypot(a.pos.x - st.pos.x, a.pos.y - st.pos.y) - Math.hypot(b.pos.x - st.pos.x, b.pos.y - st.pos.y));
+    eng = pool.slice(0, 1);
+  }
+  if (!eng.length) return 'Needs an engineer team';
+  issueOrder(w, eng, { type: 'upgrade', pos: st.pos, targetId: st.id }, queue);
+  w.events.emit('radio', { speaker: eng[0].name, text: `On our way to install the ${st.def.upgrade!.name.toLowerCase()}.`, tone: 'info' });
+  return null;
+}
+
+/** Finish an upgrade: pay and switch it on (called when the engineers' work is done). */
+export function upgradeStructure(w: World, st: Structure): string | null {
+  const up = st.def.upgrade;
+  const err = upgradeBlocked(w, st);
+  if (err || !up) return err;
+  w.spend(up.cost);
   st.upgraded = true;
   w.events.emit('radio', { speaker: 'Command', text: `${up.name} in place at the ${st.def.name.toLowerCase()}.`, tone: 'good' });
   return null;

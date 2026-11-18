@@ -42,10 +42,7 @@ const ok = (cond, what) => console.log(`${cond ? 'ok  ' : 'FAIL'} ${what}`);
   });
   await p.waitForSelector('[data-act="upgrade"]', { timeout: 10000 });
   const panel = await p.evaluate(() => document.querySelector('[data-act="upgrade"]').closest('div,section').textContent.replace(/\s+/g, ' ').trim());
-  await p.click('[data-act="upgrade"]');
-  await p.waitForTimeout(500);
-  const bought = await p.evaluate(() => window.game.world.structures.find((s) => s.id === window.__op).upgraded);
-  ok(bought, `outpost panel sells the Garrison and the click buys it (${panel.slice(0, 90)})`);
+  ok(/Garrison/.test(panel), `outpost panel offers the Garrison (${panel.slice(0, 90)}); since v4.36 engineers install it, see round12.cjs`);
   await p.screenshot({ path: 'tools/out/round11-outpost.png' });
 
   console.log(errs.join('\n') || 'no page errors');

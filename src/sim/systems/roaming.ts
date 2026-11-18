@@ -15,6 +15,7 @@ import type { DistrictState, World } from '../World';
  */
 export function updateRoaming(w: World, dt: number): void {
   if (!isEnabled('roaming')) return;
+  updateStragglers(w, dt);
   const R = BALANCE.roaming;
   for (const d of w.districts.values()) {
     if (d.def.id === 'base' || d.locked) continue;
@@ -86,4 +87,47 @@ export function sendPack(w: World, d: DistrictState, group: readonly [number, nu
   w.events.emit('roamers', { from: d.def.id, to: to.def.id, count: pack.length, outpostId: outpost?.id ?? null, pos: { ...lead.pos } });
   // round 11 #132: no radio call for a pack setting off (the CONTESTED alert on arrival stays)
   return pack.length;
+}
+
+/**
+ * Round 12 #144: dead left idle in a district whose hives are gone (stragglers, the last of a pack)
+ * don't stand around for ever. After `stragglerIdleSec` they head for the nearest structure of yours in
+ * that district, or failing that the nearest outpost next door, and tear into it (the 'roam' state, as packs do).
+ */
+export function updateStragglers(w: World, dt: number): void {
+  const R = BALANCE.roaming;
+  for (const z of w.zombies) {
+    if (!z.alive) continue;
+    if (z.state !== 'idle' && z.state !== 'wander') {
+      z.idleFor = 0;
+      continue;
+    }
+    z.idleFor += dt;
+    if (z.idleFor < R.stragglerIdleSec) continue;
+    z.idleFor = R.stragglerIdleSec / 2; // nothing to go for: look again in a minute
+    const d = w.districtAt(z.pos);
+    if (!d || d.def.id === 'base' || d.locked) continue;
+    if (w.hives.some((h) => h.alive && h.districtId === d.def.id)) continue;
+    const mine = (s: Structure) => s.alive && s.faction === 'player' && s.def.id !== 'baseWall' && !(s.def.restore && !s.built);
+    let best: Structure | undefined;
+    let bestD = Infinity;
+    for (const s of w.structures) {
+      if (!mine(s) || !inside(d.def.rect, s.pos)) continue;
+      const dd = (s.pos.x - z.pos.x) ** 2 + (s.pos.y - z.pos.y) ** 2;
+      if (dd < bestD) (best = s), (bestD = dd);
+    }
+    if (!best)
+      for (const o of neighbours(w, d)) {
+        const op = o.outpostId != null ? w.get(o.outpostId) : undefined;
+        if (!(op instanceof Structure) || !mine(op)) continue;
+        const dd = (op.pos.x - z.pos.x) ** 2 + (op.pos.y - z.pos.y) ** 2;
+        if (dd < bestD) (best = op), (bestD = dd);
+      }
+    if (!best) continue;
+    z.idleFor = 0;
+    z.state = 'roam';
+    z.targetId = null;
+    z.goal = w.grid.nearestFree({ x: best.pos.x + w.rng.range(-2, 2), y: best.pos.y + w.rng.range(-2, 2) });
+    z.useField = false;
+  }
 }

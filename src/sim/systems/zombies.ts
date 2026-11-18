@@ -120,6 +120,10 @@ export function updateZombies(w: World, dt: number): void {
       if (moved < 1 && !roaming) {
         z.stuckFor = 4;
         z.useField = true;
+      } else if (moved < 0.3 && roaming && z.goal) {
+        // round 12 #139: a wanderer pressed against something gives up on that spot
+        z.goal = null;
+        z.state = 'idle';
       }
     }
   }
@@ -204,8 +208,14 @@ function think(w: World, z: Zombie): void {
   if (z.state === 'chase' || z.state === 'attack') z.state = 'idle';
   if (!z.goal && z.state === 'idle' && w.rng.chance(0.15)) {
     const home = (z.homeHiveId && (w.get(z.homeHiveId) as Hive | undefined)?.pos) || z.pos;
-    z.goal = w.grid.nearestFree({ x: home.x + w.rng.range(-14, 14), y: home.y + w.rng.range(-14, 14) });
-    z.state = 'wander';
+    let goal = w.grid.nearestFree({ x: home.x + w.rng.range(-14, 14), y: home.y + w.rng.range(-14, 14) });
+    // round 12 #139: wanderers walk straight, so only to a spot they can see; otherwise a short
+    // shuffle near where they stand (they used to walk into the building between them and the spot)
+    if (!w.grid.lineClear(z.pos, goal)) goal = w.grid.nearestFree({ x: z.pos.x + w.rng.range(-6, 6), y: z.pos.y + w.rng.range(-6, 6) });
+    if (w.grid.lineClear(z.pos, goal)) {
+      z.goal = goal;
+      z.state = 'wander';
+    }
   }
 }
 

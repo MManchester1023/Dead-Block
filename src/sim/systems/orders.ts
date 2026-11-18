@@ -143,6 +143,9 @@ export function updateOrders(w: World, dt: number): void {
         case 'search':
           doSearch(w, s, dt);
           break;
+        case 'upgrade':
+          doUpgrade(w, s, dt);
+          break;
         case 'disband':
           // v4.9 (#55): walk into the Barracks and stand down
           if (moveToward(w, s, o.pos, dt, 2.5)) w.standDown(s);
@@ -190,6 +193,33 @@ export function moveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: n
   // a destination right against a car or wall can be unreachable for a body this wide: close enough is arrived
   if (blocked && left <= arrive + BODY * 2) return true;
   return !s.path.length && left <= arrive + 1.8;
+}
+
+/** Round 12 #138: engineers install a structure's upgrade (outpost Garrison): walk over, work, done. */
+function doUpgrade(w: World, s: Squad, dt: number): void {
+  const o = s.currentOrder!;
+  const st = w.get(o.targetId ?? null);
+  const up = st instanceof Structure ? st.def.upgrade : undefined;
+  if (!(st instanceof Structure) || !st.alive || !up || st.upgraded) {
+    s.orders.shift();
+    s.buildProgress = 0;
+    return;
+  }
+  const res = approach(w, s, st.pos, st.radius, st.radius + 4, dt);
+  if (res === 'moving') return;
+  if (res === 'blocked') {
+    w.events.emit('radio', { speaker: s.name, text: `Can't reach the ${st.def.name.toLowerCase()}.`, tone: 'warn' });
+    s.orders.shift();
+    return;
+  }
+  s.path = [];
+  s.facing = Math.atan2(st.pos.y - s.pos.y, st.pos.x - s.pos.x);
+  s.buildProgress += dt * (s.aliveCount / s.def.members);
+  if (s.buildProgress < up.workSec) return;
+  s.buildProgress = 0;
+  s.orders.shift();
+  const err = w.upgradeStructure(st);
+  if (err) w.events.emit('radio', { speaker: s.name, text: `Can't finish the ${up.name.toLowerCase()}: ${err.toLowerCase()}.`, tone: 'warn' });
 }
 
 function doBuild(w: World, s: Squad, dt: number): void {
@@ -461,9 +491,12 @@ function updateCover(w: World, s: Squad): void {
  */
 function updateMembers(w: World, s: Squad, dt: number): void {
   const t = w.time;
-  const c = Math.cos(s.facing + Math.PI / 2);
-  const si = Math.sin(s.facing + Math.PI / 2);
   const resting = !s.moving;
+  // round 12 #137: at rest the formation keeps the layout it arrived in; a squad turning to shoot turns
+  // its soldiers on the spot instead of swinging the whole formation round its centre (that read as gliding)
+  if (!resting || s.formFacing == null) s.formFacing = s.facing;
+  const c = Math.cos(s.formFacing + Math.PI / 2);
+  const si = Math.sin(s.formFacing + Math.PI / 2);
   // round 10 #106: resting soldiers stand still (the drift read as gliding with a still idle pose);
   // bring back a small sway once there's an idle animation with weight shifts. Moving squads stay loose.
   const amp = resting ? 0 : 0.6;
@@ -483,15 +516,24 @@ function updateMembers(w: World, s: Squad, dt: number): void {
     const dx = tx - m.pos.x;
     const dy = ty - m.pos.y;
     const d = Math.hypot(dx, dy);
-    // each soldier has their own pace; resting shuffles are slow
-    const pace = resting ? 0.9 + 0.3 * Math.sin(ph) : s.def.speed * (1.05 + 0.12 * Math.sin(ph * 3.1));
+    // each soldier has their own pace. Round 12 #137: at rest a soldier is either still or walking:
+    // within 0.3 m of their spot they stand dead still; further away they walk there at a real walking
+    // pace (fast enough for the walk animation), instead of sliding over in the idle pose
+    if (resting && d <= (m.settling ? 0.05 : 0.3)) m.settling = false;
+    else if (resting) m.settling = true;
+    const pace = resting ? (m.settling ? 2.2 + 0.2 * Math.sin(ph) : 0) : s.def.speed * (1.05 + 0.12 * Math.sin(ph * 3.1));
     const step = Math.min(d, pace * dt + (d > 4 ? (d - 4) * dt * 4 : 0)); // catch up if left far behind
-    if (d > 0.001) {
-      m.pos.x += (dx / d) * step;
-      m.pos.y += (dy / d) * step;
+    if (d > 0.001 && pace > 0) {
+      const nx = m.pos.x + (dx / d) * step;
+      const ny = m.pos.y + (dy / d) * step;
+      // round 12 #147: soldiers don't step into walls, sandbags or cars (they can always step out of one)
+      if (!w.grid.isBlockedXY(nx, ny) || w.grid.isBlockedXY(m.pos.x, m.pos.y)) {
+        m.pos.x = nx;
+        m.pos.y = ny;
+      }
     }
     const glance = Math.sin(t * 0.3 + ph * 2.1) * 0.5;
-    const want = d > 0.25 && !resting ? Math.atan2(dy, dx) : s.facing + (s.targetId ? glance * 0.3 : glance);
+    const want = d > 0.25 && (!resting || m.settling) ? Math.atan2(dy, dx) : s.facing + (s.targetId ? glance * 0.3 : glance);
     let diff = want - m.facing;
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
