@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.60** | Design: the Medic Team unlocks with the Med Bay (owner); recorded on STATUS #20, not built yet. |
 | **v4.59** | All trees are the owner's models now: the street palms and the house-yard trees use them too (procedural trees only as a fallback). |
 | **v4.58** | The owner's two tree packs (free use) as the street trees and shrubs: 20 trees and 3 shrubs, colours baked, ≤ 900 triangles, picked per spot; palms stay procedural. |
 | **v4.57** | Fix: the OBJ export for Mixamo's auto-rigger laid "Z up" models (the civilians) flat on their face; it now stands them up (and the right way up). Civilian zips re-exported. |
