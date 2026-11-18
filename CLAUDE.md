@@ -35,8 +35,9 @@ assets are free-licence downloads, credited in `CREDITS.md`.
   before using an upload. Check uploads before wiring them in: e.g. a Mixamo FBX whose strings say
   `MotionOnlyScene` has no mesh ("Without Skin"); a clip can be the wrong animation (`Walking.fbx` turned
   out to be a zombie walk).
-- All work so far is on branch `claude/magical-brown-7bsmza` (the repo's only branch). Push only to the
-  branch the session names. Don't rewrite history (the ~200 MB of old models in it) without Mat's OK.
+- Work up to v4.32 is on `claude/magical-brown-7bsmza`; from v4.33 it's on `claude/awesome-einstein-oapvzq`.
+  Each new session may get a new branch: push only to the one the session names, and **tell Mat the branch
+  name in the reply** so he tests the right one (round 12 began with him testing the old branch). Don't rewrite history (the ~200 MB of old models in it) without Mat's OK.
 
 ## Assets: what works
 
