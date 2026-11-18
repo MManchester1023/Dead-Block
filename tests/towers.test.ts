@@ -20,7 +20,7 @@ describe('guard towers (v4.13, introduced by tutorial region 2)', () => {
     const tower = w.addStructure('guardTower', { x: 20, y: 40 }, true);
     const sq = w.spawnSquad('rifle', M(26, 41));
     expect(w.orderGarrison([sq], tower)).toBeNull();
-    for (let i = 0; i < 30 * 6 && sq.garrisonedIn == null; i++) w.step(1 / 30);
+    for (let i = 0; i < 30 * 10 && sq.garrisonedIn == null; i++) w.step(1 / 30);
     expect(sq.garrisonedIn).toBe(tower.id);
     // a second squad can't climb up too
     const other = w.spawnSquad('rifle', M(26, 45));
@@ -51,9 +51,13 @@ describe('guard towers (v4.13, introduced by tutorial region 2)', () => {
     const tower = w.addStructure('guardTower', { x: 20, y: 40 }, true);
     const sq = w.spawnSquad('rifle', M(26, 41));
     w.orderGarrison([sq], tower);
-    for (let i = 0; i < 30 * 6 && sq.garrisonedIn == null; i++) w.step(1 / 30);
+    for (let i = 0; i < 30 * 10 && sq.garrisonedIn == null; i++) w.step(1 / 30);
     w.issueOrder([sq], { type: 'move', pos: M(30, 50) });
-    w.step(1 / 30);
+    // round 9 #97: ~2 s down the ladder first, then off they go
+    for (let i = 0; i < 30; i++) w.step(1 / 30);
+    expect(sq.garrisonedIn).toBe(tower.id);
+    expect(sq.climb?.up).toBe(false);
+    for (let i = 0; i < 40; i++) w.step(1 / 30);
     expect(sq.garrisonedIn).toBeNull();
   });
 });

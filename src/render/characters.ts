@@ -19,6 +19,10 @@ import { HUMAN_HEIGHT } from '../config/world';
 
 export type Clip = 'idle' | 'walk' | 'run' | 'shoot' | 'punch' | 'death' | 'work';
 
+/** Poses baked per second of animation (round 9 #96), and the most any one clip gets. */
+const POSES_PER_SEC = 10;
+const POSE_CAP = 48;
+
 // v4.9 (round 4 #33): roughly twice the poses per clip, so limbs no longer snap between few frames
 const CLIP_SOURCES: Record<Clip, { name: string; frames: number; loop: boolean }> = {
   idle: { name: 'Idle', frames: 12, loop: true },
@@ -201,6 +205,9 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
   const rifle = spec.rifle ? (spec.rifleModel ? await loadRifleModel(spec.rifleModel) : rifleGeometry(1)) : undefined; // built in metres
 
   const book: Flipbook = { key: spec.key, deathFalls: !!spec.deathFalls, frames: {}, durations: {}, loops: {} };
+  const baseColor = new THREE.BufferAttribute(colors, 3);
+  /** Shared colour + index for body-plus-rifle frames (built on first use). */
+  const rifleShared: { color?: THREE.BufferAttribute; index?: THREE.BufferAttribute } = {};
   // round 4 #33: one simplification plan (made from the first pose) is reused for every frame, so the
   // decimated mesh is identical frame to frame instead of shimmering
   let plan: ClusterPlan | null = null;
@@ -213,8 +220,11 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
     action.reset().play();
     const frames: THREE.BufferGeometry[] = [];
     const hold = spec.clipHold?.[clip];
-    for (let f = 0; f < (hold !== undefined ? 1 : src.frames); f++) {
-      const t = hold !== undefined ? hold * anim.duration : src.loop ? (f / src.frames) * anim.duration : (f / (src.frames - 1)) * anim.duration * 0.999;
+    // round 9 #96: sample by length, not a fixed count. A 4–6 s Mixamo idle or work loop with a dozen
+    // poses played at ~2–3 poses a second and looked choppy; aim for ~12 poses per second of animation.
+    const nFrames = hold !== undefined ? 1 : Math.max(src.frames, Math.min(POSE_CAP, Math.round(anim.duration * POSES_PER_SEC)));
+    for (let f = 0; f < nFrames; f++) {
+      const t = hold !== undefined ? hold * anim.duration : src.loop ? (f / nFrames) * anim.duration : (f / (nFrames - 1)) * anim.duration * 0.999;
       mixer.setTime(t);
       if (spec.inPlace && hips && hipsRest) {
         hips.position.x = hipsRest.x;
@@ -228,7 +238,9 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
       pose(pos, undefined, norm);
       let g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      // colours and triangles never change between poses: one shared attribute/index for every frame,
+      // so the GPU holds them once (round 9: long clips made the poses add up to ~240 MB)
+      g.setAttribute('color', baseColor);
       g.setIndex(mergedIndex);
       if (rifle && fist && clip !== 'work') { // hands are busy while working
         // place the rifle by the hand's position + orientation only (the bone matrix also carries the
@@ -240,7 +252,7 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
         const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2).multiply(hq);
         if (spec.rifleRot) q.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(...spec.rifleRot)));
         const r = rifle.clone().applyMatrix4(new THREE.Matrix4().compose(hp, q, new THREE.Vector3(1, 1, 1)));
-        g = mergeSimple(g, r);
+        g = spec.simplify ? mergeSimple(g, r) : mergeIndexed(g, r, rifleShared);
       }
       if (spec.simplify) {
         plan ??= makeClusterPlan(g, spec.simplify, spec.simplifyColors ?? 8);
@@ -298,12 +310,12 @@ function loadRifleModel(url: string): Promise<THREE.BufferGeometry> {
         const x = (pos.getX(i) - gripX) * s;
         const y = pos.getY(i) * s;
         const z = (pos.getZ(i) - gripZ) * s;
-        pos.setXYZ(i, -y, x, z); // barrel +X → +Y, keep -Z down (a proper rotation)
+        pos.setXYZ(i, -z, x, -y); // barrel +X → +Y; rolled 90° about the barrel so the magazine hangs down in the hand (round 9 #93)
       }
       pos.needsUpdate = true;
       // crowd LOD: ~6k triangles is a lot to carry in every soldier's hands
       const plan = makeClusterPlan(geo, 0.012, 6);
-      geo = applyClusterPlan(plan, geo);
+      geo = applyClusterPlan(plan, geo, true); // stays indexed: merged into indexed soldier frames
       geo.deleteAttribute('normal');
       return geo;
     })();
@@ -367,6 +379,8 @@ function texSampler(tex: THREE.Texture): ((u: number, v: number, out: THREE.Colo
  * stops the "shimmering limbs" of re-simplifying every pose independently.
  */
 interface ClusterPlan {
+  /** The expanded (non-indexed) colours, identical for every frame: shared so the GPU stores them once. */
+  sharedColor?: THREE.BufferAttribute;
   remap: Int32Array;
   clusters: number;
   counts: Float32Array;
@@ -407,7 +421,7 @@ function makeClusterPlan(g: THREE.BufferGeometry, cell: number, colorSteps = 8):
   return { remap, clusters: counts.length, counts: new Float32Array(counts), index, colors: new Float32Array(cols) };
 }
 
-function applyClusterPlan(plan: ClusterPlan, g: THREE.BufferGeometry): THREE.BufferGeometry {
+function applyClusterPlan(plan: ClusterPlan, g: THREE.BufferGeometry, indexed = false): THREE.BufferGeometry {
   const pos = g.attributes.position.array as Float32Array;
   const P = new Float32Array(plan.clusters * 3);
   for (let v = 0; v < plan.remap.length; v++) {
@@ -426,7 +440,42 @@ function applyClusterPlan(plan: ClusterPlan, g: THREE.BufferGeometry): THREE.Buf
   out.setAttribute('position', new THREE.BufferAttribute(P, 3));
   out.setAttribute('color', new THREE.BufferAttribute(plan.colors, 3));
   out.setIndex(plan.index);
-  return out.toNonIndexed(); // flat-shaded facets suit the stylised look
+  if (indexed) return out;
+  const flat = out.toNonIndexed(); // flat-shaded facets suit the stylised look
+  plan.sharedColor ??= flat.attributes.color as THREE.BufferAttribute;
+  flat.setAttribute('color', plan.sharedColor);
+  return flat;
+}
+
+/**
+ * Append geometry `b` to indexed geometry `a`, keeping it indexed (much smaller than non-indexed for
+ * an unsimplified model). Colours and index are the same every frame, so they're built once into `shared`.
+ */
+function mergeIndexed(a: THREE.BufferGeometry, b: THREE.BufferGeometry, shared: { color?: THREE.BufferAttribute; index?: THREE.BufferAttribute }): THREE.BufferGeometry {
+  const pa = a.attributes.position.array as Float32Array;
+  const pb = b.attributes.position.array as Float32Array;
+  const P = new Float32Array(pa.length + pb.length);
+  P.set(pa);
+  P.set(pb, pa.length);
+  const aCount = pa.length / 3;
+  if (!shared.color) {
+    const ca = a.attributes.color.array as Float32Array;
+    const cb = b.attributes.color.array as Float32Array;
+    const C = new Float32Array(ca.length + cb.length);
+    C.set(ca);
+    C.set(cb, ca.length);
+    shared.color = new THREE.BufferAttribute(C, 3);
+    const ia = a.index ? Array.from(a.index.array) : Array.from({ length: aCount }, (_, i) => i);
+    const bCount = pb.length / 3;
+    const ib = b.index ? Array.from(b.index.array, (i) => i + aCount) : Array.from({ length: bCount }, (_, i) => i + aCount);
+    const all = ia.concat(ib);
+    shared.index = new THREE.BufferAttribute(aCount + bCount > 65535 ? new Uint32Array(all) : new Uint16Array(all), 1);
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(P, 3));
+  out.setAttribute('color', shared.color);
+  out.setIndex(shared.index!);
+  return out;
 }
 
 /** Merge two geometries with position+color (index-free result). */

@@ -62,7 +62,7 @@ function fire(w: World, from: Vec2, t: Targetable, weapon: WeaponDef, dmgMult: n
 
 export function updateCombat(w: World, dt: number): void {
   for (const s of w.squads) {
-    if (!s.alive || s.stunned > 0) continue;
+    if (!s.alive || s.stunned > 0 || s.climb) continue; // hands on the ladder
     const order = s.currentOrder;
     const busy = order?.type === 'build' || order?.type === 'charge' || order?.type === 'deconstruct' || order?.type === 'repair';
     // forced target (right-clicked zombie) overrides threat priority once it's in range and visible

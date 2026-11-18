@@ -36,13 +36,20 @@ export function updateDistricts(w: World, dt: number): void {
         100,
         Math.max(BALANCE.infestation.floorWithHive, d.infestation + (BALANCE.infestation.regrowPerMinWithHive * hives.length * dt) / 60),
       );
-    } else if (d.infestation > 0) {
-      // v4.9 (playtest #40): with no hive left, infestation can't exceed what's still walking around,
-      // so a district with nothing left to kill drains to 0 instead of sticking at a few percent
+    } else if (!d.secured) {
+      // With no hive left, infestation tracks what's still walking around (v4.9 #40: it can't sit above
+      // it, so an empty district drains to 0) and round 9 #98: it can't reach 0 while anything is left
+      // (kills of zombies that wandered in or came out of buildings used to zero it early).
       const r = d.def.rect;
       let left = 0;
-      for (const z of w.zombies) if (z.alive && z.pos.x >= r.x && z.pos.y >= r.y && z.pos.x < r.x + r.w && z.pos.y < r.y + r.h) left += BALANCE.infestation.perKill[z.def.id] ?? 0.5;
-      if (d.infestation > left) d.infestation = Math.max(left, d.infestation - BALANCE.infestation.unpaidDrainPerSec * dt);
+      let alive = 0;
+      for (const z of w.zombies)
+        if (z.alive && z.pos.x >= r.x && z.pos.y >= r.y && z.pos.x < r.x + r.w && z.pos.y < r.y + r.h) {
+          left += BALANCE.infestation.perKill[z.def.id] ?? 0.5;
+          alive++;
+        }
+      if (alive > 0 && d.infestation < 1) d.infestation = 1;
+      else if (d.infestation > left) d.infestation = Math.max(alive > 0 ? 1 : left, d.infestation - BALANCE.infestation.unpaidDrainPerSec * dt);
     }
 
     if (!d.cleared && d.infestation <= 0) {

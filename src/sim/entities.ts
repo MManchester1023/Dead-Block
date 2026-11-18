@@ -63,6 +63,8 @@ export class Squad implements Targetable {
   lastBlockedMsg?: number;
   /** Sim time the squad last got treatment at a Med Bay. */
   healing = -99;
+  /** Climbing up into / down from a guard tower (round 9 #97): can't move or shoot meanwhile. */
+  climb: { towerId: number; t: number; up: boolean } | null = null;
   selected = false;
   moving = false;
   /**

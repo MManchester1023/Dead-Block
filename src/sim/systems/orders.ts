@@ -20,6 +20,31 @@ export function updateOrders(w: World, dt: number): void {
       continue;
     }
     s.moving = false;
+    // climbing a tower's ladder (round 9 #97): ~2 s up or down, nothing else meanwhile
+    if (s.climb) {
+      const tower = w.get(s.climb.towerId);
+      if (!(tower instanceof Structure) || !tower.alive) s.climb = null; // handled below if they were up there
+      else {
+        s.climb.t -= dt;
+        s.holding = true;
+        if (s.climb.t > 0) {
+          if (s.garrisonedIn != null) manTower(w, s, tower);
+          else updateMembers(w, s, dt);
+          continue;
+        }
+        const up = s.climb.up;
+        s.climb = null;
+        if (up) {
+          if (!w.squads.some((x) => x !== s && x.garrisonedIn === tower.id)) {
+            s.garrisonedIn = tower.id;
+            w.events.emit('radio', { speaker: s.name, text: 'In the tower. Good view from up here.', tone: 'info' });
+          }
+        } else {
+          w.leaveTower(s);
+          continue;
+        }
+      }
+    }
     // up a guard tower (v4.13): stay put until given another order, or the tower falls
     if (s.garrisonedIn != null) {
       const tower = w.get(s.garrisonedIn);
@@ -30,7 +55,10 @@ export function updateOrders(w: World, dt: number): void {
         s.stunned = 1.2; // dropped off a collapsing tower
         w.events.emit('radio', { speaker: s.name, text: "Tower's coming down! We're on the ground!", tone: 'bad' });
       } else if (next && next.type !== 'hold' && next.type !== 'garrison') {
-        w.leaveTower(s);
+        // climb down first; the order waits until they're on the ground
+        s.climb = { towerId: tower.id, t: tower.def.garrison!.climbSec, up: false };
+        manTower(w, s, tower);
+        continue;
       } else {
         if (next) s.orders.shift();
         s.pos.x = tower.pos.x;
@@ -108,10 +136,8 @@ export function updateOrders(w: World, dt: number): void {
           if (st === 'moving') break;
           s.orders.shift();
           s.path = [];
-          if (st === 'inReach' && !w.squads.some((x) => x !== s && x.garrisonedIn === tower.id)) {
-            s.garrisonedIn = tower.id;
-            w.events.emit('radio', { speaker: s.name, text: 'In the tower. Good view from up here.', tone: 'info' });
-          }
+          if (st === 'inReach' && !w.squads.some((x) => x !== s && (x.garrisonedIn === tower.id || x.climb?.towerId === tower.id)))
+            s.climb = { towerId: tower.id, t: tower.def.garrison!.climbSec, up: true };
           break;
         }
         case 'search':

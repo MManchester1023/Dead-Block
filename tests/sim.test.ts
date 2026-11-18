@@ -48,7 +48,7 @@ describe('world rules', () => {
     const w = new World();
     expect(w.money).toBe(250);
     expect(w.supplies).toBe(100);
-    expect(w.commandCap).toBe(16);
+    expect(w.commandCap).toBe(BALANCE.economy.commandCap);
     expect(w.squads.map((s) => s.def.id).sort()).toEqual(['engineer', 'rifle', 'rifle']);
   });
 

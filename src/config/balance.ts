@@ -7,8 +7,8 @@ export const BALANCE = {
     startMoney: 250,
     startSupplies: 100,
     supplyCap: 150,
-    commandCap: 16, // v4.9: was 8 (four squads); a stage-4 hive needs more than that
-    commandPerSecuredDistrict: 4,
+    commandCap: 14, // v4.9: 8 → 16; round 9 #99: a little lower
+    commandPerSecuredDistrict: 3,
     disbandRefund: 0.25, // share of a squad's cost returned when it stands down at the Barracks
     dayLengthSec: 720, // 12 real minutes per in-game day (playtest: 4 min felt far too fast)
     // v4.5: supplies trickle in continuously (a lump at the end of a 12-minute day starved the opening)
