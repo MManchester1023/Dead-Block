@@ -5,24 +5,29 @@ Short version of the roadmap (design doc §21). Ranked by importance in my opini
 ## Next, in order
 
 1. **Playtest region 3, the power station and the Med Bay**, and tune region 3's difficulty from that (the bots say it's beatable with losses; that needs a human check).
-2. **Open-world unlock**: what happens after region 3 is secured (the rest of the starter districts open up, §17).
-3. **Last model bits.** ✔ Riflemen, engineers (with a working animation) and female zombies are now Mixamo-rigged models with Mixamo animations; no cartoon models left. Every soldier and engineer carries a real M4 model, and female zombies have their attack. Still open (optional): a distinct look for engineers (currently the soldier, tinted).
-4. **Confirm the walking-animation fix in a playtest** (round 7 #79). Fixed in code but not visually verified at full frame rate.
-5. **Save / load.** A persistent city needs it before the open world opens.
-6. **Medic Team**: field healing, the mobile partner to the Med Bay (could also be unlocked by power).
-7. **Fog of war and recon**: unexplored areas show estimates; recon units reveal.
-8. **Special (medium) zombies**: Screamer, Brute, Dragger, Puker. The medium spawn pool is ready for them.
-9. **Vehicles**: Gun Jeep, Supply Truck, LAV, tank; overrun by pile-ups, re-crewable at half health (#64).
-10. **Outpost resupply** via Supply Truck.
-11. **Day/night cycle and flares.**
-12. **Building destruction and rubble**; tanks crushing cars.
-13. **Artillery tier**: unlocks the Command Post barrage (built, currently locked), Mortar Team, strike patterns.
-14. **Rooftops and pile-ups**, tall concrete walls, loudspeaker.
-15. **Air support**: gun run, bombing run, AC-130, drone (the supply-drop flyover is the template), then the Airfield units.
-16. **Bosses** (the uploaded muscular zombie is the first candidate model).
-17. **Human enemy faction.**
-18. **Polish**: armory customisation, Elite cosmetics, civilians and evacuation, vehicle levelling, airdrop upgrades, reward items, full campaign balance.
+2. **Longer sight**: riflemen 24 → ~30 m, MG emplacements 22 → ~35 m. Quick tuning.
+3. **Civilians from house searches**, introduced in region 3: controllable, walk them back to HQ for money and supplies.
+4. **Zombies roam between districts and attack outposts**, so outposts have to be fortified and maintained.
+5. **Open-world unlock** (the rest of the starter districts open after region 3, §17), **with an unlock-progress panel** showing what's left to unlock.
+6. **Police station and fire station** loot landmarks with a big one-time supply haul.
+7. **Last model bits.** ✔ Riflemen, engineers (with a working animation) and female zombies are now Mixamo-rigged models with Mixamo animations; no cartoon models left. Every soldier and engineer carries a real M4 model, and female zombies have their attack. Still open (optional): a distinct look for engineers (currently the soldier, tinted).
+8. **Confirm the walking-animation fix in a playtest** (round 7 #79). Fixed in code but not visually verified at full frame rate.
+9. **Save / load.** A persistent city needs it before the open world opens.
+10. **Medic Team**: field healing, the mobile partner to the Med Bay (could also be unlocked by power).
+11. **Fog of war and recon**: unexplored areas show estimates; recon units reveal.
+12. **Special (medium) zombies**: Screamer, Brute, Dragger, Puker. The medium spawn pool is ready for them.
+13. **Vehicles**: Gun Jeep, Supply Truck, LAV, tank; overrun by pile-ups, re-crewable at half health (#64).
+14. **Outpost resupply** via Supply Truck.
+15. **Day/night cycle and flares.**
+16. **Building destruction and rubble**; tanks crushing cars.
+17. **Artillery tier**: unlocks the Command Post barrage (built, currently locked), Mortar Team, strike patterns.
+18. **Rooftops and pile-ups**, tall concrete walls, loudspeaker.
+19. **Air support**: gun run, bombing run, AC-130, drone (the supply-drop flyover is the template), then the Airfield units.
+20. **Bosses** (the uploaded muscular zombie is the first candidate model).
+21. **Human enemy faction.**
+22. **Polish**: armory customisation, Elite cosmetics, civilians and evacuation, vehicle levelling, airdrop upgrades, reward items, full campaign balance.
 
+**Already works (confirm in the playtest):** the Med Bay unlocks with power and then has to be bought, placed and built by engineers in the base (N).
 **Parked** until better-animated soldier models: idle fidgeting, engineer build animation, leaning against cover.
 **Tabled:** Last Stand defeat mode.
 **Optional housekeeping:** remove the uploaded models from git history (needs a force-push, only if you ask); move the sim to a Web Worker if real-hardware testing shows it's the bottleneck.

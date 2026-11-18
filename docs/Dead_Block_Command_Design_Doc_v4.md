@@ -13,6 +13,8 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.19** | Round 8 to-dos logged (§22, #85–92): longer sight for riflemen and MG emplacements, zombies roaming between districts and hitting outposts, police/fire station loot, civilians from house searches (introduced in region 3), an unlock-progress UI for the open world. Ranked into §21. No code changes. |
+| **v4.18** | Character models replaced: riflemen and engineers (Military RTS Character 1) and female zombies rigged on Mixamo with Mixamo animations, real M4 rifle model. |
 | **v4.17** | Tutorial region 3 (Rail Siding), the power system and the Med Bay built (§17, §21 Tier 1 #14–16). |
 | **v4.16** | Round 7 fixes built (#76–84). Next up: tutorial region 3 with the power system. |
 | **v4.15** | Playtest round 7 logged (§22, #76–84): both regions cleared first try. Round 7 fixes ranked next on the roadmap, ahead of region 3. No code changes. |
@@ -746,6 +748,12 @@ Every feature, ranked by importance to the game being fun and shippable. **Work 
 14. ✔ **Tutorial region 3: Rail Siding** (v4.17). The open-world unlock after it is still to come (#58, §17)
 15. ✔ **Power stations**: the first one, in region 3 (v4.17). The wider network and the other base unlocks power drives come with the open world (§12)
 16. ✔ **Med Bay** (v4.17), unlocked by restoring region 3's power. **Medic Team still open.**
+**Round 8 to-dos [v4.19], ranked (§22 #85–92):**
+- 16a. **Longer sight for riflemen and MG emplacements** (#86, #87). Quick tuning.
+- 16b. **Civilians found by searching houses** (#91), introduced in tutorial region 3: a controllable civilian group that earns money and supplies when walked back to HQ. (Moves the civilians part of Tier 4 #36 forward.)
+- 16c. **Zombies roam between districts and attack outposts** (#88). Needed before the open world: holding ground has to mean defending it.
+- 16d. **Open-world unlock** (§17) with **an unlock-progress panel** (#92) showing what's left to unlock.
+- 16e. **Police station and fire station** as loot landmarks (#89, #90) with a decent amount of supplies.
 17. ✔ Region takeover → hive (§19)
 18. Save / load (a persistent city needs it before the open world)
 19. Fog of war and recon
@@ -961,4 +969,17 @@ Both tutorial regions cleared on the first try.
 | 84 | Clicking a squad's status (under its name) should select it too | Only the name text is a click target (v4.9 #39). | Make the whole label (name, status and bar) the click target. |
 
 **Status after v4.16 (round 7):** all done. #76 rifle heard ~60 m (carbine ~49, MG ~87) · #77 a newly opened region seeds its dead ≥50 m from the cut fence and ≥40 m from any squad, and ignores gunfire further than 25 m for its first 30 s · #78–80 animation: speed is only measured on frames where the sim stepped, then smoothed, and walking starts/stops at separate thresholds (shuffling in place never counts as walking). *Verified in code and tests; the headless test browser runs too slowly to reproduce the 60 fps flicker, so confirm in the next playtest* · #81 group cover: each squad gets its own spot, **two squads per car, three per sandbag wall**, from cover within 25 m; holding squads can stand closer together so they don't shove each other out of cover · #82 the parachute casts a shadow, plus a soft shadow disc under the falling crate · #83 squads path around Bloater gas (expensive cells, re-plan when clouds appear/clear) and idle squads step out of fresh gas · #84 the whole squad label (name, status, bar) selects it.
+
+### Round 8 [v4.19] (to-dos from the owner, not playtest-driven; logged, not started)
+
+| # | Note | Current state (from the code) | Proposed approach |
+|---|---|---|---|
+| 85 | The Med Bay shouldn't build itself: it should unlock, then be bought, built and placed | **Already works this way.** Restoring power only *unlocks* it; engineers then buy and place it inside the base (N, $150 · 40▣) and build it like any structure. (A test screenshot showed one placed by the test script.) | Confirm in the playtest; nothing to change unless it behaves otherwise. |
+| 86 | Riflemen should see a little further | Squads acquire targets within their weapon range: rifle 24 m, carbine 18 m (engineers). There's no separate sight radius for squads yet. | Rifle 24 → ~30 m (carbine 18 → ~22 m). Later, with fog of war, a sight radius separate from weapon range. |
+| 87 | MG emplacements should see a decent bit further | MG nest range 22 m (within its 120° arc). | 22 → ~35 m, keeping the arc. It becomes the long-reach anchor of a defence line. |
+| 88 | Zombies should wander between zones and attack outposts, so outposts and regions need fortifying and maintaining, especially once the world opens | Idle zombies only wander ~14 m around their home hive; horde pulses already go for the nearest outpost. Secured districts with no hive stay empty. | Roaming groups that drift between neighbouring districts (more often from districts with hives), sometimes in a secured district's direction; anything that finds an outpost attacks it. Secured districts slowly gain a little infestation from roamers that aren't killed, so a district has to be held, not just taken. Tune so a fortified outpost (sandbags, MG, tower) holds against roamers without the player babysitting it. |
+| 89 | Police station: loot to find a decent amount of supplies | Not on the map. Building searches give 4–12 supplies. | A police station landmark building (open world, or one of the remaining starter districts): searching it takes longer (~15 s) and gives a large one-time haul (e.g. 40–60 supplies, some money); it may be guarded by a nest. |
+| 90 | Fire station: loot to find a decent amount of supplies | "Fire Station" is in the doc's starter list (§2) but not built. | Same as #89: a landmark building with a big one-time haul. |
+| 91 | Searching houses can sometimes find civilians. They're controllable, and you earn money and supplies for getting them back to the main HQ building. Introduced in tutorial region 3 | Civilians are Tier 4 #36 (not built); house search gives supplies, money, nothing, or a nest. | Region 3 onward: a search can turn up a small civilian group (a new unit type: no weapon, slow, a small health pool, the dead love them). Walk them to the Command Post to "evacuate" them for money + supplies. Introduced with a briefing in region 3. Later: civilians can also be recruited as Guerrillas (§10). |
+| 92 | Once the world opens, the UI needs to show what's left to unlock | No such panel; unlocks happen silently plus a briefing card. | An "Unlocks" panel (e.g. on the ops map or a button in the top bar) listing what's unlocked and what's still locked, and how to get each (power station X, secure district Y, …), driven by the same data that gates them. |
 
