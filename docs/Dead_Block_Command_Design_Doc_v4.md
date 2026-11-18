@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.20** | Sound and a technical track added to the roadmap (§21 T1–T7): code split, map data format, chunked world, pre-baked animations, save/load moved up, real-hardware performance check, repo size. No code changes. |
 | **v4.19** | Round 8 to-dos logged (§22, #85–92): longer sight for riflemen and MG emplacements, zombies roaming between districts and hitting outposts, police/fire station loot, civilians from house searches (introduced in region 3), an unlock-progress UI for the open world. Ranked into §21. No code changes. |
 | **v4.18** | Character models replaced: riflemen and engineers (Military RTS Character 1) and female zombies rigged on Mixamo with Mixamo animations, real M4 rifle model. |
 | **v4.17** | Tutorial region 3 (Rail Siding), the power system and the Med Bay built (§17, §21 Tier 1 #14–16). |
@@ -790,6 +791,17 @@ Every feature, ranked by importance to the game being fun and shippable. **Work 
 - V4. Lighting pass: dusk grade, night lights/flares, smoke columns, fire
 - V5. UI restyle toward the §14 direction (unit-card strip, minimap, day clock). ✔ UI scale and collapsible panels
 - **Parked until better-animated soldier models:** idle realism (#22), engineer build animation (#23), leaning against cover (#25)
+
+### Technical track (v4.20) — groundwork the open world depends on
+These get more expensive the longer they wait, so they're scheduled *before* the open-world unlock (ranked together with the features in `STATUS.md`).
+- **T1. Real-hardware performance check.** Frame rate with a big horde on the owner's machine; so far only measured in a slow software browser.
+- **T2. Sound.** Gunfire per weapon, zombie groans/attacks, explosions, UI, ambience (CC0 packs). Noise is a core mechanic and the game is silent. The radio lines are ready for voice later.
+- **T3. Split the oversized code**: the renderer (~1,200 lines) and the World class into focused modules. No behaviour change.
+- **T4. Map data format** (+ simple editor or an existing tile editor). The layout is hand-typed coordinates in code today; a city needs data files.
+- **T5. Chunked ground and streaming.** One ground texture (2,550 × 2,280 px) won't survive a growing city; chunks that load near the camera.
+- **T6. Pre-baked character animations.** Bake the flipbooks offline instead of processing ~20 MB of models on every launch.
+- **T7. Save / load**, moved up from Tier 1 #18: the state keeps growing (searches, unlocks, power, crates, hives), so it only gets harder.
+- *Housekeeping:* ~200 MB of uploaded models in git history (rewrite needs a force-push and the owner's OK); Web Worker for the sim if T1 shows the sim is the bottleneck.
 
 ### Tier 4: Polish and attachment
 35. Armory weapon customization and Elite cosmetics
