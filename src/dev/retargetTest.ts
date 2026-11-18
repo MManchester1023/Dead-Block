@@ -1,4 +1,5 @@
 // Dev-only page (dev-retarget.html): check Mixamo → other-rig retargeting, side by side, with numbers.
+// (Round 10: the models it was written for are now Mixamo-rigged instead; their GLBs are in assets-src/models/.)
 //   ?model=models/characters/rifleman/low_poly_soldier.glb&map=kolos&clip=walk&t=0.3&bind=1
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';

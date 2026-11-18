@@ -47,11 +47,13 @@ Everything else in the city (buildings, vehicles, trees, street furniture, groun
 | [female zombie](https://sketchfab.com/3d-models/female-zombie-7ecd809925ba4459921cf67f4e652582) (in the game: female zombies, rigged on Mixamo) | jeferson | CC-BY-SA-4.0 (share-alike) |
 | [Mobile diesel generator set](https://sketchfab.com/3d-models/mobile-diesel-generator-set-125ad1f014da4186b2703ed733c0226c) | MrdT | CC-BY-4.0 |
 
-| [Low-poly M4 assault rifle](https://sketchfab.com/3d-models/low-poly-m4-assault-rifle-fb85c455cf374675a1db7988def2d926) (in the game: every soldier's and engineer's rifle) | szaw | CC-BY-4.0 |
+| [Low-poly M4 assault rifle](https://sketchfab.com/3d-models/low-poly-m4-assault-rifle-fb85c455cf374675a1db7988def2d926) (no longer carried since round 10; still in the rifle fitter) | szaw | CC-BY-4.0 |
+| [low poly soldier](https://sketchfab.com/3d-models/low-poly-soldier-daf5de38902e458aa57ff5ba9460ca02) (in the game: riflemen, re-rigged on Mixamo, with the model's own M4 cut out as `m4_kolos.glb`) | Kolos Studios | CC-BY-4.0 |
+| [Low Poly Soldiers Rigged Free](https://sketchfab.com/3d-models/low-poly-soldiers-rigged-free-8474871344b041b690d9c91d983cc214) (in the game: engineers = the SCAR soldier, re-rigged on Mixamo, with his SCAR cut out as `scar.glb`; the Barrett is cut out as `barrett.glb` for the sniper later) | MadTrollStudio | CC-BY-4.0 |
 
 ## Mixamo (`assets-src/models/mixamo/`)
 
-Rigs and animations from [Mixamo](https://www.mixamo.com) (Adobe), downloaded by the project owner. **In the game:** riflemen and engineers (Military RTS Character 1, rigged on Mixamo) with Rifle Idle, Walking, Firing Rifle, Dying and Working On Device; soldiers also use Shoot Rifle (walking while firing), Taking Cover and Taking Cover Idle; female zombies use Zombie Idle, Walking, Zombie Run, Zombie Attack and Zombie Dying (Zombie Punching kept in `assets-src/models/` as an alternative). Mixamo's terms allow royalty-free use in games; the raw files may not be redistributed as a standalone asset pack.
+Rigs and animations from [Mixamo](https://www.mixamo.com) (Adobe), downloaded by the project owner. **In the game:** riflemen and engineers (since round 10: Kolos Studios' and MadTrollStudio's soldiers, rigged on Mixamo) with Rifle Idle, Walking, Firing Rifle, Dying and Working On Device; soldiers also use Shoot Rifle (walking while firing), Taking Cover, Taking Cover Idle and Idle Crouching Aiming; female zombies use Zombie Idle, Walking, Zombie Run, Zombie Attack and Zombie Dying (Zombie Punching kept in `assets-src/models/` as an alternative). Mixamo's terms allow royalty-free use in games; the raw files may not be redistributed as a standalone asset pack.
 
 ## Sound effects (`public/audio/`, originals in `assets-src/audio/soundfx.zip`)
 
@@ -64,4 +66,12 @@ From [Pixabay](https://pixabay.com/sound-effects/) (Pixabay Content License: fre
 | Zombie sound | DRAGON-STUDIO | Ambient groans (`groan_1–4`) |
 | Zombie | vilches86 | Ambient groan (`groan_5`) |
 | Zombie death 2 | freesound_community | Zombie deaths (`zombie_death`) |
+
+Round 10 (in `assets-src/audio/`, uploaded by the owner; authors to fill in):
+
+| File | Used as |
+|---|---|
+| `cartoon-fx-explosion-paper-bag-05.wav` + `gore-rip-chest-opening-short-02.wav` | Bloater bursting, layered pop + gore (`bloater_death`) |
+| `satchelcharge.mp3` | Demo charges and other explosions (`explosion_1`) |
+| `engineergun.wav` | Engineers' carbine (`carbine_1`) |
 

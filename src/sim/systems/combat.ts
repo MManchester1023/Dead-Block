@@ -52,7 +52,7 @@ function fire(w: World, from: Vec2, t: Targetable, weapon: WeaponDef, dmgMult: n
   const acc = weapon.accuracy * (1 - 0.35 * Math.min(1, d / weapon.range)) * accMult;
   const hit = w.rng.chance(acc);
   const miss = hit ? { x: 0, y: 0 } : { x: w.rng.range(-1.6, 1.6), y: w.rng.range(-1.6, 1.6) };
-  w.events.emit('shot', { from: { ...from }, to: { x: t.pos.x + miss.x, y: t.pos.y + miss.y }, faction: 'player', heavy: weapon.damage >= 30 });
+  w.events.emit('shot', { from: { ...from }, to: { x: t.pos.x + miss.x, y: t.pos.y + miss.y }, faction: 'player', heavy: weapon.damage >= 30, weapon: weapon.name });
   w.makeNoise(from, weapon.loudness);
   if (!hit) return false;
   const wasAlive = t.alive;

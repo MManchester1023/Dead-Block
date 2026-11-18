@@ -7,7 +7,7 @@ import type { DamageType } from '../sim/types';
  * New features (building collapse, airstrikes, Last Stand…) add event types here.
  */
 export interface GameEvents {
-  shot: { from: Vec2; to: Vec2; faction: string; heavy?: boolean };
+  shot: { from: Vec2; to: Vec2; faction: string; heavy?: boolean; weapon?: string };
   explosion: { pos: Vec2; radius: number; type: DamageType };
   memberKilled: { squadId: number; squadName: string; pos: Vec2; facing: number; unitId: string };
   squadWiped: { squadId: number; squadName: string };

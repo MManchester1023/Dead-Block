@@ -9,12 +9,25 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { DEFAULT_FIT, SOLDIER_CLIPS, loadRifleFit, loadRifleModel, rifleFitMatrix, type RifleFit } from '../render/characters';
+import { CHARACTER_SPECS, DEFAULT_FIT, loadRifleFit, loadRifleModel, rifleFitMatrix, type RifleFit } from '../render/characters';
 
-const MODEL = 'models/characters/soldier/soldier_rts.fbx';
-const RIFLE = 'models/weapons/m4.glb';
-const HAND = 'mixamorigRightHand';
-const CLIPS: Record<string, string> = { ...(SOLDIER_CLIPS as Record<string, string>), work: 'models/characters/soldier/work.fbx' };
+// round 10: pick the unit (any Mixamo-rigged character that holds a gun) and the gun, from the panel:
+// dev-rifle.html?unit=engineer&gun=models/weapons/scar.glb (default: the unit's own gun)
+const UNITS: Record<string, string> = { soldier: 'Rifleman', engineer: 'Engineer' };
+const GUNS: Record<string, string> = {
+  'models/weapons/m4_kolos.glb': 'M4 (rifleman’s own)',
+  'models/weapons/scar.glb': 'SCAR (engineer’s own)',
+  'models/weapons/barrett.glb': 'Barrett (sniper, later)',
+  'models/weapons/m4.glb': 'M4 (old, szaw)',
+};
+const query = new URLSearchParams(location.search);
+const UNIT = query.get('unit') ?? 'soldier';
+const SPEC = CHARACTER_SPECS.find((s) => s.key === UNIT)!;
+const MODEL = SPEC.url;
+const RIFLE = query.get('gun') ?? SPEC.rifleModel!;
+const HAND = SPEC.rifleBone!;
+const CLIPS: Record<string, string> = SPEC.clipFiles as Record<string, string>;
+const FIT_FILE = RIFLE.split('/').pop()!.replace(/\.glb$/, '.json');
 
 // ---------------------------------------------------------------- scene
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -43,11 +56,16 @@ addEventListener('resize', () => {
 // ---------------------------------------------------------------- soldier, normalised like the game does
 const fbx = new FBXLoader();
 const soldier = await fbx.loadAsync(MODEL);
-const tex = await new THREE.TextureLoader().loadAsync('models/characters/soldier/soldier_rts.png');
-tex.colorSpace = THREE.SRGBColorSpace;
+const tex = SPEC.texture ? await new THREE.TextureLoader().loadAsync(SPEC.texture) : null;
+if (tex) tex.colorSpace = THREE.SRGBColorSpace;
 soldier.traverse((o) => {
   const m = o as THREE.SkinnedMesh;
-  if (m.isSkinnedMesh) m.material = new THREE.MeshLambertMaterial({ map: tex });
+  if (!m.isSkinnedMesh) return;
+  m.geometry.computeVertexNormals(); // the round 10 models came through OBJ without normals
+  // textured model: the texture; otherwise keep each material's own colour
+  const mats = Array.isArray(m.material) ? m.material : [m.material];
+  const lam = mats.map((x) => new THREE.MeshLambertMaterial(tex ? { map: tex } : { color: (x as THREE.MeshPhongMaterial).color }));
+  m.material = Array.isArray(m.material) ? lam : lam[0];
 });
 soldier.updateMatrixWorld(true);
 const box = new THREE.Box3().setFromObject(soldier, true);
@@ -107,14 +125,16 @@ ui.innerHTML = `
 <div id="fit">
   <h2>Rifle fitter</h2>
   <p>Line the pistol grip up with the right hand (the yellow dot is the grip point). Check several animations. Drag to orbit the view, scroll to zoom.</p>
+  <div class="row">Unit <select id="unit">${Object.entries(UNITS).map(([k, n]) => `<option value="${k}" ${k === UNIT ? 'selected' : ''}>${n}</option>`).join('')}</select>
+    Gun <select id="gun">${Object.entries(GUNS).map(([k, n]) => `<option value="${k}" ${k === RIFLE ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
   <div class="row">Animation <select id="clip"></select> <button id="play">Pause</button></div>
   <label>Time <input id="time" type="range" min="0" max="1" step="0.001" value="0"><span id="tval"></span></label>
   <div class="sep"></div>
   <div id="sliders"></div>
   <div class="row"><button id="reset">Reset to saved</button><button id="zero">Zero all</button></div>
   <div class="sep"></div>
-  <div class="row"><button id="dl"><b>Download m4.json</b></button><button id="copy">Copy</button></div>
-  <p>Then put <b>m4.json</b> in <code>public/models/weapons/</code> (replace the old one), or upload it there on GitHub. The game picks it up on the next load.</p>
+  <div class="row"><button id="dl"><b>Download ${FIT_FILE}</b></button><button id="copy">Copy</button></div>
+  <p>The fit belongs to the gun (one <b>${FIT_FILE}</b>, whoever holds it); which gun each unit carries in the game is set in <code>characters.ts</code>${RIFLE === SPEC.rifleModel ? '' : ` (the ${UNITS[UNIT]} carries a different one)`}. Put <b>${FIT_FILE}</b> in <code>public/models/weapons/</code> (replace the old one), or upload it there on GitHub. The game picks it up on the next load.</p>
   <textarea id="json" readonly></textarea>
 </div>`;
 document.body.appendChild(ui);
@@ -171,7 +191,7 @@ $('zero').onclick = () => {
 $('dl').onclick = () => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([fitJson() + '\n'], { type: 'application/json' }));
-  a.download = 'm4.json';
+  a.download = FIT_FILE;
   a.click();
 };
 $('copy').onclick = () => void navigator.clipboard?.writeText(fitJson());
@@ -228,3 +248,12 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, cam);
 });
 document.title = 'Rifle fitter';
+
+// unit / gun pickers reload the page with the new choice (each unit's model and clips load fresh)
+for (const id of ['unit', 'gun'] as const)
+  document.getElementById(id)!.addEventListener('change', (e) => {
+    const q = new URLSearchParams(location.search);
+    q.set(id, (e.target as HTMLSelectElement).value);
+    if (id === 'unit') q.delete('gun'); // a new unit starts with its own gun
+    location.search = q.toString();
+  });

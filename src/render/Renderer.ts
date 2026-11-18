@@ -1114,6 +1114,20 @@ export class Renderer {
       // up a guard tower: stand on the platform (v4.13)
       const tower = s.garrisonedIn != null ? w.structures.find((x) => x.id === s.garrisonedIn) : undefined;
       const lift = tower?.def.garrison ? tower.def.garrison.height + 0.15 : 0;
+      // round 10 #107: what the squad is hiding behind, so each soldier can tell if they're up against it
+      const prop = s.inCover > 0 && s.coverPropId != null ? w.map.props.find((p) => p.id === s.coverPropId) : undefined;
+      const coverSt = s.inCover > 0 && s.coverPropId != null && !prop ? w.structures.find((x) => x.id === s.coverPropId) : undefined;
+      /** Metres from a soldier to the cover's surface, and how far that can be while still leaning on it
+       *  (half the cover's reach beyond its footprint: ~1.1 m for a car, 1.5 m for sandbags). */
+      const offCover = (p: { x: number; y: number }): boolean => {
+        if (prop) {
+          const dx = Math.max(0, Math.abs(p.x - prop.pos.x) - prop.w / 2);
+          const dy = Math.max(0, Math.abs(p.y - prop.pos.y) - prop.h / 2);
+          return Math.hypot(dx, dy) > (4.5 - Math.max(prop.w, prop.h) / 2) / 2;
+        }
+        if (coverSt) return Math.hypot(p.x - coverSt.pos.x, p.y - coverSt.pos.y) - coverSt.radius > 1.5;
+        return false;
+      };
       s.members.forEach((m, i) => {
         if (!m.alive) return;
         const key = s.id * 8 + i + 1e7;
@@ -1131,6 +1145,7 @@ export class Renderer {
           clip = firing && crowd.has('walkShoot') ? 'walkShoot' : 'walk';
           rate = Math.min(3, Math.max(0.7, v / 2.2));
         } else if (firing) clip = 'shoot'; // stand up and fire, cover or not
+        else if (inCover && crowd.has('crouch') && offCover(m.pos)) clip = 'crouch'; // too far out to lean on it
         else if (inCover && crowd.has('cover')) {
           // v4.24: get into cover once, then hold the cover pose
           const since = this.coverSince.get(key) ?? (this.coverSince.set(key, this.animClock), this.animClock);

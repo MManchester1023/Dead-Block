@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { HUMAN_HEIGHT } from '../config/world';
-import { MIXAMO_TO_KOLOS, MIXAMO_TO_RIGIFY, RIGIFY_PARENTS, bonesByBase, makeRetargeter, rebuildHierarchy, type Retargeter } from './retarget';
+import { bonesByBase, makeRetargeter, rebuildHierarchy, type Retargeter } from './retarget';
 
 /**
  * Animated characters for crowds of thousands (doc §14 v4.1 crowd tech).
@@ -53,6 +53,8 @@ export interface CharacterSpec {
   height?: number;
   /** Vertex-clustering cell size in metres (crowd LOD); omit to keep full detail. */
   simplify?: number;
+  /** Keep the simplified mesh indexed (smooth shading, ~5x less memory per pose than flat). */
+  simplifyIndexed?: boolean;
   /** Colour steps per channel that the clustering keeps apart (default 8; lower = fewer triangles). */
   simplifyColors?: number;
   /** Animation names in this file, where they differ from the Quaternius names above. */
@@ -321,7 +323,7 @@ export async function bakeCharacter(spec: CharacterSpec): Promise<Flipbook> {
       }
       if (spec.simplify) {
         plan ??= makeClusterPlan(g, spec.simplify, spec.simplifyColors ?? 8);
-        g = applyClusterPlan(plan, g);
+        g = applyClusterPlan(plan, g, spec.simplifyIndexed);
       }
       g.computeVertexNormals();
       g.computeBoundingSphere();
@@ -390,7 +392,13 @@ export function loadRifleModel(url: string): Promise<THREE.BufferGeometry> {
         const c = col.clone().lerp(new THREE.Color(0x3a3a38), 0.35); // near-black PBR colours read better lifted a little
         const n = g.attributes.position.count;
         const colors = new Float32Array(n * 3);
-        for (let i = 0; i < n; i++) colors.set([c.r, c.g, c.b], i * 3);
+        // round 10: guns cut out of a character model (dev-gunexport.html) carry their colours per vertex
+        const vc = g.attributes.color as THREE.BufferAttribute | undefined;
+        const lift = new THREE.Color(0x3a3a38);
+        for (let i = 0; i < n; i++) {
+          if (vc) c.setRGB(vc.getX(i), vc.getY(i), vc.getZ(i)).lerp(lift, 0.25);
+          colors.set([c.r, c.g, c.b], i * 3);
+        }
         const out = new THREE.BufferGeometry();
         out.setAttribute('position', g.attributes.position.clone()); // raw mesh space (all parts share one parent)
         out.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -447,7 +455,7 @@ function rifleGeometry(unitsPerMetre: number): THREE.BufferGeometry {
 }
 
 /** Reads a texture's pixels once; returns a sampler (u, v) → colour (sRGB → linear). */
-function texSampler(tex: THREE.Texture): ((u: number, v: number, out: THREE.Color) => void) | null {
+export function texSampler(tex: THREE.Texture): ((u: number, v: number, out: THREE.Color) => void) | null {
   const img = tex.image as (CanvasImageSource & { width: number; height: number }) | undefined;
   if (!img || !img.width) return null;
   const w = Math.min(512, img.width);
@@ -682,65 +690,41 @@ export const SOLDIER_CLIPS: Partial<Record<Clip, string>> = {
   walkShoot: 'models/characters/soldier/walkshoot.fbx',
   coverIn: 'models/characters/soldier/cover_in.fbx',
   cover: 'models/characters/soldier/cover.fbx',
+  // round 10 #107: Mixamo "Idle Crouching Aiming"
+  crouch: 'models/characters/soldier/crouch.fbx',
 };
-
-/** Dev: the round 10 models on trial (not in the game yet). */
-export const TRIAL_SPECS: CharacterSpec[] = [
-  {
-    key: 'rifleman2',
-    url: 'models/characters/rifleman/low_poly_soldier.glb',
-    clips: ['idle', 'walk', 'shoot', 'death', 'walkShoot', 'coverIn', 'cover', 'crouch'],
-    clipFiles: { ...SOLDIER_CLIPS, crouch: 'models/characters/soldier/crouch.fbx' },
-    retarget: { map: MIXAMO_TO_KOLOS },
-    skipMeshes: ['Object_78', 'Object_80'],
-    inPlace: true,
-    deathFalls: true,
-    rifle: true,
-    rifleBone: 'handR',
-    rifleModel: 'models/weapons/m4.glb',
-  },
-  {
-    key: 'engineer2',
-    url: 'models/characters/engineer/low_poly_soldiers.glb',
-    clips: ['idle', 'walk', 'shoot', 'death', 'work', 'walkShoot', 'coverIn', 'cover', 'crouch'],
-    clipFiles: { ...SOLDIER_CLIPS, work: 'models/characters/soldier/work.fbx', crouch: 'models/characters/soldier/crouch.fbx' },
-    retarget: { map: MIXAMO_TO_RIGIFY, parents: RIGIFY_PARENTS, root: 'GLTF_created_1_rootJoint', meshes: ['Object_182', 'Object_184', 'Object_188', 'Object_190', 'Object_192', 'Object_194', 'Object_196'] },
-    inPlace: true,
-    deathFalls: true,
-    rifle: true,
-    rifleBone: 'DEF-handR',
-    rifleModel: 'models/weapons/m4.glb',
-  },
-];
 
 export const CHARACTER_SPECS: CharacterSpec[] = [
   // v4.18: "Military RTS Character 1" (britdawgmasterfunk, CC-BY 4.0), rigged on Mixamo, with Mixamo
   // shooter-pack animations; replaces the cartoon Quaternius soldier and worker (#66)
   {
+    // round 10: "low poly soldier" (Kolos Studios, CC-BY 4.0), re-rigged on Mixamo, with its own M4
     key: 'soldier',
-    url: 'models/characters/soldier/soldier_rts.fbx',
-    texture: 'models/characters/soldier/soldier_rts.png',
-    clips: ['idle', 'walk', 'shoot', 'death', 'walkShoot', 'coverIn', 'cover'],
+    url: 'models/characters/rifleman/rifleman.fbx',
+    clips: ['idle', 'walk', 'shoot', 'death', 'walkShoot', 'coverIn', 'cover', 'crouch'],
     clipFiles: SOLDIER_CLIPS,
     inPlace: true,
     deathFalls: true,
     rifle: true,
     rifleBone: 'mixamorigRightHand',
-    rifleModel: 'models/weapons/m4.glb',
+    rifleModel: 'models/weapons/m4_kolos.glb',
   },
   {
-    // same soldier, dustier, with Mixamo "Working On Device" while building / repairing / planting
+    // round 10: the SCAR soldier from "Low Poly Soldiers Rigged Free" (MadTrollStudio, CC-BY 4.0),
+    // re-rigged on Mixamo, with his own SCAR; Mixamo "Working On Device" while building / repairing / planting
     key: 'engineer',
-    url: 'models/characters/soldier/soldier_rts.fbx',
-    texture: 'models/characters/soldier/soldier_rts.png',
-    clips: ['idle', 'walk', 'shoot', 'death', 'work', 'walkShoot', 'coverIn', 'cover'],
+    url: 'models/characters/engineer/engineer.fbx',
+    texture: 'models/characters/engineer/engineer.png',
+    clips: ['idle', 'walk', 'shoot', 'death', 'work', 'walkShoot', 'coverIn', 'cover', 'crouch'],
     clipFiles: { ...SOLDIER_CLIPS, work: 'models/characters/soldier/work.fbx' },
     inPlace: true,
     deathFalls: true,
     rifle: true,
     rifleBone: 'mixamorigRightHand',
-    rifleModel: 'models/weapons/m4.glb',
-    tint: 0xe8d4a0,
+    rifleModel: 'models/weapons/scar.glb',
+    // ~25k vertices: simplified (kept indexed) to about a tenth per pose, which crowd distance hides
+    simplify: 0.03,
+    simplifyIndexed: true,
   },
   {
     // v4.9: "Zombie" by pxltiger (CC-BY 4.0, see CREDITS.md). Real fall-back death (#34), in-place walk/run.

@@ -11,11 +11,17 @@ import type { Vec2 } from '../core/math';
  *   zombie_death  a zombie going down
  *   groan_1–5     ambient groans from zombies near the camera
  *   scream_1–4    a horde wave starting / the noise meter filling
+ *   carbine_1     engineers' (and later medics'/recon's) carbine (round 10 #114)
+ *   explosion_1   demo charges, artillery (round 10 #109; the owner's satchel charge clip)
+ *   bloater_death a plastic pop layered over a wet gore rip (round 10 #108)
  */
 
-type Bank = 'rifle' | 'death' | 'groan' | 'scream';
+type Bank = 'rifle' | 'carbine' | 'death' | 'groan' | 'scream' | 'explosion' | 'bloater';
 const FILES: Record<Bank, string[]> = {
   rifle: ['rifle_1', 'rifle_2', 'rifle_3'],
+  carbine: ['carbine_1'],
+  explosion: ['explosion_1'],
+  bloater: ['bloater_death'],
   death: ['zombie_death'],
   groan: ['groan_1', 'groan_2', 'groan_3', 'groan_4', 'groan_5'],
   scream: ['scream_1', 'scream_2', 'scream_3', 'scream_4'],
@@ -23,6 +29,9 @@ const FILES: Record<Bank, string[]> = {
 /** Per bank: how many may play at once, and the minimum gap between starts (seconds). */
 const LIMITS: Record<Bank, { voices: number; gap: number; volume: number }> = {
   rifle: { voices: 10, gap: 0.035, volume: 0.42 },
+  carbine: { voices: 8, gap: 0.035, volume: 0.36 },
+  explosion: { voices: 3, gap: 0.08, volume: 0.8 },
+  bloater: { voices: 3, gap: 0.1, volume: 0.7 },
   death: { voices: 4, gap: 0.12, volume: 0.5 },
   groan: { voices: 3, gap: 0.6, volume: 0.55 },
   scream: { voices: 1, gap: 6, volume: 0.45 },
@@ -54,8 +63,8 @@ export class Sound {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private buffers: Partial<Record<Bank, AudioBuffer[]>> = {};
-  private playing: Record<Bank, number> = { rifle: 0, death: 0, groan: 0, scream: 0 };
-  private lastStart: Record<Bank, number> = { rifle: -9, death: -9, groan: -9, scream: -9 };
+  private playing = Object.fromEntries(Object.keys(FILES).map((b) => [b, 0])) as Record<Bank, number>;
+  private lastStart = Object.fromEntries(Object.keys(FILES).map((b) => [b, -9])) as Record<Bank, number>;
   private groanTimer = 2;
   /** Master volume, one of VOLUMES (remembered per browser). */
   volume = 1;
@@ -73,9 +82,17 @@ export class Sound {
     addEventListener('keydown', unlock);
 
     const ev = game.world.events;
-    ev.on('shot', (e) => this.play('rifle', e.from, e.heavy ? { rate: 0.82, gain: 1.35 } : { rate: 0.94 + Math.random() * 0.12 }));
+    ev.on('shot', (e) => {
+      if (e.weapon === 'Carbine') this.play('carbine', e.from, { rate: 0.93 + Math.random() * 0.14 });
+      else this.play('rifle', e.from, e.heavy ? { rate: 0.82, gain: 1.35 } : { rate: 0.94 + Math.random() * 0.12 });
+    });
     ev.on('zombieKilled', (e) => {
+      if (e.defId === 'bloater') return; // it bursts instead (the toxic explosion below)
       if (Math.random() < 0.65) this.play('death', e.pos, { rate: 0.85 + Math.random() * 0.3 });
+    });
+    ev.on('explosion', (e) => {
+      if (e.type === 'toxic') this.play('bloater', e.pos, { rate: 0.9 + Math.random() * 0.2 });
+      else this.play('explosion', e.pos, { rate: 0.9 + Math.random() * 0.15, gain: Math.min(1.3, 0.6 + e.radius / 8) });
     });
     ev.on('hordePulse', () => this.play('scream', null, { rate: 0.95 + Math.random() * 0.1 }));
     ev.on('noiseAlert', () => this.play('scream', null, { rate: 1.05 }));
