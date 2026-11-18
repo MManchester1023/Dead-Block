@@ -13,7 +13,7 @@ import type { Vec2 } from '../core/math';
  *   scream_1–4    a horde wave starting / the noise meter filling
  *   carbine_1     engineers' (and later medics'/recon's) carbine (round 10 #114)
  *   explosion_1   demo charges, artillery (round 10 #109; the owner's satchel charge clip)
- *   bloater_death a plastic pop layered over a wet gore rip (round 10 #108)
+ *   bloater_death the Bloater bursting, from the owner's recording (v4.40; replaced round 10's layered pop + gore rip)
  *   human_death_1–3  a soldier or survivor going down (v4.38)
  *   ui_click      HUD buttons (v4.38)
  *   build_loop    engineers at work: three construction recordings layered into one loop (v4.38, round 10 #111)

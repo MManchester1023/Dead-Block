@@ -71,7 +71,7 @@ Round 10 (in `assets-src/audio/`, uploaded by the owner; authors to fill in):
 
 | File | Used as |
 |---|---|
-| `cartoon-fx-explosion-paper-bag-05.wav` + `gore-rip-chest-opening-short-02.wav` | Bloater bursting, layered pop + gore (`bloater_death`) |
+| `cartoon-fx-explosion-paper-bag-05.wav` + `gore-rip-chest-opening-short-02.wav` | Bloater bursting, layered pop + gore (no longer used since v4.40) |
 | `satchelcharge.mp3` | Demo charges and other explosions (`explosion_1`) |
 | `engineergun.wav` | Engineers' carbine (`carbine_1`) |
 
@@ -94,7 +94,8 @@ v4.39 (uploaded by the owner; authors to fill in where blank):
 | `freesound_community-commercial-jet-flies-overhead-53746.mp3` (Pixabay, freesound_community) | Supply plane fly-by, 26 s cut around the loudest pass (`plane_flyby`) |
 | `foley-cloth-parachute-open-slide-impact-03.wav` | Supply crate's chute opening (`parachute`) |
 | `freesound_community-fighter-jets-passing-overhead-30115.mp3` | Not used yet (kept for air support later) |
-| `2026-11-18 11-19-32.mp4` | Meant for the new Bloater burst, but all four of its audio tracks are silent; the old layered burst stays until a version with sound arrives |
+| `2026-11-18 11-19-32.mp4` | First try at the new Bloater burst: silent audio, not used |
+| `2026-11-18 11-34-14.mp4` (owner's recording) | Bloater bursting, cut from its audio (`bloater_death`, v4.40) |
 
 ## Barbed wire model (v4.39)
 
