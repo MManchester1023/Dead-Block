@@ -100,6 +100,32 @@ const ok = (cond, what) => console.log(`${cond ? 'ok  ' : 'FAIL'} ${what}`);
   });
   ok(tris > 3000 && tris < 4000, `barbed wire drawn with the model (${tris} triangles)`);
 
+  // round 16: the power-on sound. The first restore used to be silent: the briefing paused the game a moment
+  // before the sound played (and nothing plays while paused). Restore it for real, with the camera on the station.
+  const power = await p.evaluate(async () => {
+    const g = window.game, w = g.world;
+    w.unlockDistrict('railSiding');
+    await new Promise((r) => setTimeout(r, 300));
+    if (document.querySelector('.modal.open')) document.querySelector('[data-act="continue"]')?.click();
+    g.paused = false;
+    for (const z of w.zombies) z.alive = false;
+    const st = w.structures.find((s) => s.def.restore);
+    g.renderer.rig.focus(st.pos);
+    st.buildProgress = st.def.buildTime - 0.05;
+    const eng = w.squads.find((s) => s.def.id === 'engineer');
+    eng.pos.x = st.pos.x - st.radius - 2;
+    eng.pos.y = st.pos.y;
+    for (const m of eng.members) (m.pos.x = eng.pos.x), (m.pos.y = eng.pos.y);
+    w.orderResume([eng], st);
+    let heard = 0;
+    for (let i = 0; i < 40 && !heard; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      heard = window.sound.playing.power;
+    }
+    return { heard, built: st.built, paused: g.paused };
+  });
+  ok(power.built && power.heard > 0, `restoring the power plays the power-on sound (${power.heard ? 'playing' : 'silent'}; game ${power.paused ? 'paused' : 'running'})`);
+
   console.log(errs.join('\n') || 'no page errors');
   await b.close();
 })();
