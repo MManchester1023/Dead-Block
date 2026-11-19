@@ -381,6 +381,9 @@ export class Hud {
         this.modal.classList.remove('open');
         g.paused = false;
         break;
+      case 'card-close':
+        (btn.closest('.hud-card') as HTMLElement | null)?.remove();
+        break;
       case 'restart':
         location.reload();
         break;
@@ -507,7 +510,7 @@ export class Hud {
       if (!b.landmark || w.districtAt({ x: b.rect.x + b.rect.w / 2, y: b.rect.y + b.rect.h / 2 })?.def.id !== id) continue;
       const done = !!w.buildingState.get(b.id)?.searched;
       const what = b.landmark === 'hospital' ? 'medical equipment to fix the Med Bay' : 'a big haul';
-      items.push([done, `Loot the ${b.landmark} <small>(optional: right-click it with a squad, ${BALANCE.landmarks[b.landmark]?.searchSec ?? BALANCE.search.timeSec} s; ${what})</small>`]);
+      items.push([done, `Loot the ${b.landmark} <small>(optional${b.landmark === 'hospital' ? ', red cross on the roof' : ''}: right-click it with a squad, ${BALANCE.landmarks[b.landmark]?.searchSec ?? BALANCE.search.timeSec} s; ${what})</small>`]);
     }
     const bay = w.structures.find((s) => s.alive && s.def.id === 'medBay');
     if (bay && !bay.built && w.unlocked.has('medBay'))
@@ -780,71 +783,79 @@ export class Hud {
     this.modal.classList.add('open');
   }
 
-  /** A tutorial region just opened (doc §17): what's new there, game paused while you read. */
-  private showBriefing(id: string, name: string, unlocks: string[]): void {
-    const tower = unlocks.includes('guardTower');
-    const T = STRUCTURES.guardTower;
-    const intro: Record<string, string> = {
-      gasStrip: `<p>The wire on the east road is cut. Expect a step up: a bigger crowd, <b>Runner packs</b> that hunt together, and a hive that's already at <b>stage 2</b>. Its hordes will go for your newest outpost, so leave it defended.</p>`,
-      railSiding: `<p>The fence south of the strip is down. <b>Rail Siding</b> is the last training region and the biggest: a goods yard cut in two by a line of boxcars, <b>two hives</b>, and the dead at full strength.</p>
-      <h3>New: the power system</h3>
-      <p>In the east yard stands a <b>power station</b>, dead. Clear the yard, then <b>right-click the station with engineers</b> to restore it. They can only work while no zombie is within 30 m, so hold the ground around them. Power brings the base back to life and unlocks the <b>Vehicle Bay</b>. If the dead wreck the station it goes dark again until your engineers restore it.</p>
-      <h3>New: survivors</h3>
-      <p>People are hiding in the houses here. <b>Searching a building</b> can turn up a group of <b>civilians</b>: select them like a squad and <b>walk them to the Command Post</b> to evacuate them for <b>$${BALANCE.civilians.perPerson.money} and ${BALANCE.civilians.perPerson.supplies} supplies each</b>. They're unarmed and slow, and the dead go for them first, so escort them.</p>`,
-    };
-    this.game.paused = true;
-    this.modal.innerHTML = `<div class="dialog small">
-      <p class="tag">NEW REGION OPEN</p>
-      <h1>${esc(name)}</h1>
-      ${intro[id] ?? `<p>The fence is down. Same drill: find the hive, kill it, plant an outpost.</p>`}
-      ${this.landmarkIn(id)}
-      ${tower ? `<h3>New: Guard Tower</h3>
-      <p>Engineers can now build a <b>Guard Tower</b> (<kbd>V</kbd>, $${T.cost.money} · ${T.cost.supplies}▣). <b>Right-click it</b> with a squad to man it: they shoot <b>${Math.round(((T.garrison?.rangeMult ?? 1) - 1) * 100)}% further</b>, see over cars and walls, and the dead can't claw at them. They have to tear the tower down first. Any other order brings the squad back down.</p>` : ''}
-      <button class="big" data-act="continue">GOT IT</button>
-    </div>`;
-    this.modal.classList.add('open');
+  /**
+   * Round 16 #194/#198: briefings are small cards at the side of the HUD that don't pause the game: a title
+   * and a few how-to lines (keys, clicks, costs). Closed with "Got it", or they fade after a while.
+   */
+  private card(tag: string, title: string, lines: string[], ttlSec = 45): void {
+    let box = this.root.querySelector('.hud-cards') as HTMLElement | null;
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'hud-cards';
+      this.root.appendChild(box);
+    }
+    const el = document.createElement('div');
+    el.className = 'hud-card';
+    el.innerHTML = `<p class="tag">${tag}</p><h3>${title}</h3><ul>${lines.map((l) => `<li>${l}</li>`).join('')}</ul><button class="cmd" data-act="card-close">Got it</button>`;
+    box.prepend(el);
+    window.setTimeout(() => el.classList.add('fade'), ttlSec * 1000);
+    window.setTimeout(() => el.remove(), ttlSec * 1000 + 1200);
+    while (box.children.length > 3) box.lastElementChild!.remove();
   }
 
-  /** STATUS #50: a region's significant building, for its opening briefing. */
-  private landmarkIn(id: string): string {
+  /** A region just opened (doc §17): what's new there and how to use it (round 16: a card, no pause). */
+  private showBriefing(id: string, name: string, unlocks: string[]): void {
+    const T = STRUCTURES.guardTower;
+    const C = BALANCE.civilians.perPerson;
+    const lines: string[] = [];
+    const hives = this.game.world.districts.get(id)?.def.hiveSites.length ?? 1;
+    const stage = this.game.world.hives.filter((h) => h.districtId === id && h.alive).reduce((m, h) => Math.max(m, h.stage), 1);
+    lines.push(`${hives > 1 ? `<b>${hives} hives</b>` : 'A hive'}${stage > 1 ? `, already at <b>stage ${stage}</b>` : ''}: engineers plant a demo charge on it (<kbd>C</kbd>, then click the hive).`);
+    if (id === 'gasStrip') lines.push('<b>Runner packs</b> hunt together: keep squads close, crouch (<kbd>G</kbd>) or get behind cover.');
+    if (unlocks.includes('guardTower'))
+      lines.push(`New: <b>Guard Tower</b> (<kbd>V</kbd>, $${T.cost.money} · ${T.cost.supplies}▣). Right-click it with a squad to man it: +${Math.round(((T.garrison?.rangeMult ?? 1) - 1) * 100)}% range, the dead can't reach them.`);
+    const lm = this.landmarkLine(id);
+    if (lm) lines.push(lm);
+    if (this.game.world.districts.get(id)?.def.powerStations?.length)
+      lines.push('<b>Power station</b>: clear everything within 30 m, then right-click it with engineers. Power unlocks the <b>Vehicle Bay</b> (<kbd>Y</kbd>).');
+    if (this.game.world.districts.get(id)?.def.civilians)
+      lines.push(`<b>Survivors</b>: searching houses can find civilians. Select them and walk them to the Command Post: $${C.money} + ${C.supplies}▣ each.`);
+    lines.push('To finish: kill the hives, clear it to 2%, build an outpost there (<kbd>O</kbd>).');
+    this.card('NEW REGION OPEN', esc(name), lines, 60);
+  }
+
+  /** STATUS #50: a region's significant building, as a briefing line. */
+  private landmarkLine(id: string): string {
     const w = this.game.world;
     const b = w.map.buildings.find((x) => x.landmark && w.districtAt({ x: x.rect.x + x.rect.w / 2, y: x.rect.y + x.rect.h / 2 })?.def.id === id);
     if (!b) return '';
-    const what = b.landmark === 'hospital' ? 'Its medical equipment would get the run-down <b>Med Bay</b> in the base working.' : 'It should hold a big haul.';
-    return `<h3>There's a ${b.landmark} here</h3><p>Marked on the map. Searching it takes a while (${BALANCE.landmarks[b.landmark!]?.searchSec ?? BALANCE.search.timeSec} s), but it always pays. ${what}</p>`;
+    const what = b.landmark === 'hospital' ? 'its equipment lets engineers repair the <b>Med Bay</b>' : 'a big haul';
+    const where = b.landmark === 'hospital' ? ' (red cross on the roof)' : '';
+    return `<b>${b.landmark![0].toUpperCase() + b.landmark!.slice(1)}</b>${where}: right-click it with a squad (${BALANCE.landmarks[b.landmark!]?.searchSec ?? BALANCE.search.timeSec} s): supplies, money, and ${what}.`;
   }
 
-  /** The first time the power comes on (v4.17; STATUS #50: it unlocks the Vehicle Bay now). */
+  /** The first time the power comes on (v4.17; STATUS #50: it unlocks the Vehicle Bay; round 16: a card). */
   private showPowerBriefing(): void {
     const V = STRUCTURES.vehicleBay;
-    this.game.paused = true;
-    this.modal.innerHTML = `<div class="dialog small">
-      <p class="tag">POWER RESTORED</p>
-      <h1>Vehicle Bay unlocked</h1>
-      <p>Engineers can now build a <b>Vehicle Bay</b> inside the main base (<kbd>Y</kbd>, $${V.cost.money} · ${V.cost.supplies}▣).</p>
-      <p>It's where vehicles come from. The first one, the <b>Humvee</b>, is on its way.</p>
-      <button class="big" data-act="continue">GOT IT</button>
-    </div>`;
-    this.modal.classList.add('open');
+    this.card('POWER RESTORED', 'Vehicle Bay unlocked', [
+      `Engineers: <kbd>Y</kbd> to build a <b>Vehicle Bay</b> inside the base ($${V.cost.money} · ${V.cost.supplies}▣).`,
+      'Vehicles are made there; the first, the Humvee, is on its way.',
+      'If the dead wreck the station, right-click it with engineers to restore it.',
+    ]);
   }
 
-  /** STATUS #50 (round 15 #185): the first significant building looted: what they are, and what this one did. */
+  /** STATUS #50: the first significant building looted (round 16: a card, how-to). */
   private showLandmarkBriefing(kind: string, supplies: number, money: number): void {
     const M = STRUCTURES.medBay;
     const H = M.heal!;
-    this.game.paused = true;
-    const what =
-      kind === 'hospital'
-        ? `<p>The hospital's <b>medical equipment</b> means engineers can now repair the <b>Med Bay</b> in the base (right-click it with engineers). Once it's running, squads that <b>rest next to it</b> (not moving, not hit for ${H.restAfterHitSec} s) heal about ${Math.round(H.perSec * 100 * 60)}% of their health a minute for supplies, lost soldiers rejoin as health comes back, and <b>Medic Teams</b> can be recruited at the Barracks.</p>`
-        : '';
-    this.modal.innerHTML = `<div class="dialog small">
-      <p class="tag">SIGNIFICANT BUILDING</p>
-      <h1>${kind[0].toUpperCase() + kind.slice(1)} looted</h1>
-      <p>Some buildings matter more than a house: <b>hospitals, police stations and fire stations</b>. Searching one takes longer, but it always pays (this one: ${supplies} supplies and $${money}) and it <b>unlocks something</b> for the base. Look out for them in each region.</p>
-      ${what}
-      <button class="big" data-act="continue">GOT IT</button>
-    </div>`;
-    this.modal.classList.add('open');
+    const lines = [`Found <b>${supplies}▣ and $${money}</b>. Hospitals, police and fire stations take longer to search, always pay, and unlock something.`];
+    if (kind === 'hospital')
+      lines.push(
+        `Engineers: right-click the <b>Med Bay</b> in the base to repair it (${M.buildTime} s).`,
+        `Working, it heals squads resting next to it (~${Math.round(H.perSec * 100 * 60)}% a minute, for supplies); lost soldiers rejoin.`,
+        'It also unlocks <b>Medic Teams</b> at the Barracks.',
+      );
+    this.card('SIGNIFICANT BUILDING', `${kind[0].toUpperCase() + kind.slice(1)} looted`, lines, 60);
   }
 
   private showEnd(win: boolean, reason: string): void {

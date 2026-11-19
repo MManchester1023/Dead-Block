@@ -77,6 +77,18 @@ describe('Medic Team (STATUS #20, v4.61)', () => {
     expect(w.orderHeal([medic], rifle)).toBeNull();
   });
 
+  it('medics earn XP from healing: ~8 for a full 40% heal (round 16 #199)', () => {
+    const w = quiet();
+    const rifle = w.squads.find((s) => s.def.id === 'rifle')!;
+    const medic = w.spawnSquad('medic', { x: rifle.pos.x + 3, y: rifle.pos.y });
+    w.issueOrder([rifle], { type: 'hold', pos: { ...rifle.pos } });
+    rifle.pool = rifle.poolMax * 0.3; // nobody lost: health only
+    const xp0 = medic.xp;
+    expect(w.orderHeal([medic], rifle)).toBeNull();
+    run(w, ABILITIES.heal.workSec + 3);
+    expect(medic.xp - xp0).toBe(8);
+  });
+
   it("won't treat a squad that isn't hurt, and only medics heal", () => {
     const w = quiet();
     const rifle = w.squads.find((s) => s.def.id === 'rifle')!;

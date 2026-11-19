@@ -22,6 +22,26 @@ function variants(base: string): string[] {
 }
 const carKinds = () => variants('car');
 
+/** Round 16 #193: the car pack's colours toned down (share of grey mixed in, then brightness). */
+const CAR_TONE = { desaturate: 0.3, brightness: 0.85 };
+const toned = new WeakSet<THREE.BufferGeometry>();
+/** Tone a car model's colours once (its geometry is shared by every car of that model). */
+function dullCar(model: THREE.Object3D): void {
+  model.traverse((o) => {
+    const g = (o as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
+    const col = g?.attributes.color as THREE.BufferAttribute | undefined;
+    if (!g || !col || toned.has(g)) return;
+    toned.add(g);
+    for (let i = 0; i < col.count; i++) {
+      const r = col.getX(i), gg = col.getY(i), b = col.getZ(i);
+      const lum = 0.299 * r + 0.587 * gg + 0.114 * b;
+      const k = CAR_TONE.desaturate, s = CAR_TONE.brightness;
+      col.setXYZ(i, (r + (lum - r) * k) * s, (gg + (lum - gg) * k) * s, (b + (lum - b) * k) * s);
+    }
+    col.needsUpdate = true;
+  });
+}
+
 /** Chunk size (metres): 64 nav cells. STATUS #14, v4.46. */
 const CHUNK = 192;
 /** Ground texels per metre far away / on the ops map (full detail is GROUND_PX). */
@@ -227,7 +247,7 @@ export class CityLayer {
           const cx = b.rect.x + b.rect.w / 2;
           const cz = b.rect.y + b.rect.h / 2;
           const side = Math.min(b.rect.w, b.rect.h) * 0.6;
-          const y = b.height + 0.9;
+          const y = b.floors * 3.2 + 0.06; // round 16 #197: on the roof (an apartment's roof is floors × 3.2 m; its height adds the parapet)
           const panel = new THREE.Mesh(new THREE.BoxGeometry(side, 0.12, side), new THREE.MeshLambertMaterial({ color: 0xf2efe6 }));
           panel.position.set(cx, y, cz);
           grp.add(panel);
@@ -276,6 +296,7 @@ export class CityLayer {
       const kinds = carKinds();
       const model = models.instance(kinds.length ? kinds[p.id % kinds.length] : 'car');
       if (model) {
+        dullCar(model);
         model.position.set(p.pos.x, 0, p.pos.y);
         model.rotation.y += (p.h > p.w ? Math.PI / 2 : 0) + ((p.id % 7) - 3) * 0.05 + (Math.floor(p.id / 3) % 2 ? Math.PI : 0);
         model.userData.shared = true;

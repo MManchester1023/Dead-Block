@@ -191,7 +191,8 @@ export const STRUCTURES: Record<string, StructureDef> = {
 
 export const ABILITIES = {
   /** STATUS #20: medics walk to a hurt squad, treat it for `workSec`, and restore `share` of its health (lost soldiers rejoin). */
-  heal: { name: 'Heal', reach: 7, workSec: 2, share: 0.4, cooldown: 30 },
+  // round 16 #199: XP per heal: xpPer5Pct for every 5% of the patient's health restored, xpPerRejoin per soldier back
+  heal: { name: 'Heal', reach: 7, workSec: 2, share: 0.4, cooldown: 30, xpPer5Pct: 1, xpPerRejoin: 2 },
   demoCharge: { name: 'Demo Charge', plantTime: 2, // round 14 #171: was 3
      fuse: 5, damage: 520, radius: 7, type: 'explosive' as DamageType, cost: { money: 25, supplies: 10 }, loudness: 30 },
 };

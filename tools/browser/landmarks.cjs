@@ -35,9 +35,6 @@ const ok = (cond, what) => console.log(`${cond ? 'ok  ' : 'FAIL'} ${what}`);
   const lab = await p.evaluate(() => [...document.querySelectorAll('.struct-label')].map((e) => e.innerText).join(' | '));
   ok(/MED BAY · OUT OF ACTION/.test(lab) && /hospital/i.test(lab), `its label: "${lab.replace(/\n/g, ' ')}"`);
 
-  // the hospital: no label while region 2 is locked
-  const hidden = await p.evaluate(() => [...document.querySelectorAll('.landmark-label')].every((e) => e.style.display === 'none'));
-  ok(hidden, 'no hospital label while its region is locked');
   await p.evaluate(() => {
     const g = window.game, w = g.world;
     w.unlockDistrict('gasStrip');
@@ -54,22 +51,24 @@ const ok = (cond, what) => console.log(`${cond ? 'ok  ' : 'FAIL'} ${what}`);
     window.__sq = sq.id;
   });
   await p.waitForTimeout(800);
-  const regionBrief = await p.evaluate(() => document.querySelector('.modal.open')?.innerText ?? '');
-  ok(/NEW REGION OPEN/.test(regionBrief) && /There's a hospital here/i.test(regionBrief), 'the region 2 briefing mentions the hospital');
-  if (regionBrief) await p.click('[data-act="continue"]');
+  // round 16 #194: a card at the side of the HUD, not a pausing dialog
+  const regionBrief = await p.evaluate(() => ({ card: document.querySelector('.hud-card')?.innerText ?? '', modal: !!document.querySelector('.modal.open'), paused: window.game.paused }));
+  ok(/NEW REGION OPEN/.test(regionBrief.card) && /Hospital/.test(regionBrief.card) && /red cross/.test(regionBrief.card), 'the region 2 card mentions the hospital (red cross on the roof)');
+  ok(!regionBrief.modal && !regionBrief.paused, 'no pausing dialog: the game keeps running');
+  await p.click('.hud-card [data-act="card-close"]');
+  ok(!(await p.$('.hud-card')), '"Got it" closes the card');
   await p.waitForTimeout(800);
-  const hl = await p.evaluate(() => [...document.querySelectorAll('.landmark-label')].filter((e) => e.style.display !== 'none').map((e) => e.innerText).join(' | '));
-  ok(/HOSPITAL/.test(hl), `the hospital is labelled once the region opens ("${hl.replace(/\n/g, ' ')}")`);
+  ok(!(await p.$('.landmark-label')), 'no floating hospital label (round 16 #196)');
   const cross = await p.evaluate(() => {
     const w = window.game.world;
     const hb = w.map.buildings.find((x) => x.landmark === 'hospital');
-    let reds = 0;
+    const ys = [];
     window.game.renderer.scene.traverse((o) => {
-      if (o.isMesh && o.material?.color?.getHex?.() === 0xc8302a && Math.abs(o.position.x - (hb.rect.x + hb.rect.w / 2)) < 1 && o.position.y > hb.height) reds++;
+      if (o.isMesh && o.material?.color?.getHex?.() === 0xc8302a && Math.abs(o.position.x - (hb.rect.x + hb.rect.w / 2)) < 1 && o.position.y > 2) ys.push(o.position.y);
     });
-    return reds;
+    return { n: ys.length, y: Math.max(...ys), roof: hb.floors * 3.2 };
   });
-  ok(cross === 2, `a red cross on its roof (${cross} bars)`);
+  ok(cross.n === 2 && cross.y - cross.roof < 0.3, `a red cross on the roof itself (${cross.n} bars, ${(cross.y - cross.roof).toFixed(2)} m above the roof surface)`);
   const obj0 = await p.evaluate(() => document.querySelector('.objectives, #objectives, [class*=objectives]')?.innerText ?? document.body.innerText);
 
   // right-click the hospital with the squad selected → search; wait for the briefing
@@ -82,17 +81,13 @@ const ok = (cond, what) => console.log(`${cond ? 'ok  ' : 'FAIL'} ${what}`);
   });
   const order = await p.evaluate(() => window.game.world.squads.find((s) => s.id === window.__sq).currentOrder?.type);
   ok(order === 'search', `right-clicking the hospital orders a search (${order})`);
-  await p.waitForFunction(() => document.querySelector('.modal.open')?.innerText.includes('SIGNIFICANT BUILDING'), null, { timeout: 90000 });
-  const brief = await p.evaluate(() => ({ text: document.querySelector('.modal.open').innerText, paused: window.game.paused, unlocked: window.game.world.unlocked.has('medBay') }));
-  ok(/Hospital looted/i.test(brief.text) && /hospitals, police stations and fire stations/i.test(brief.text) && /Med Bay/.test(brief.text), 'the significant-buildings briefing pops up (hospital → Med Bay)');
-  ok(brief.paused && brief.unlocked, 'the game pauses for it; the Med Bay can be repaired now');
-  await p.click('[data-act="continue"]');
+  await p.waitForFunction(() => document.querySelector('.hud-card')?.innerText.includes('SIGNIFICANT BUILDING'), null, { timeout: 90000 });
+  const brief = await p.evaluate(() => ({ text: document.querySelector('.hud-card').innerText, paused: window.game.paused, unlocked: window.game.world.unlocked.has('medBay') }));
+  ok(/Hospital looted/i.test(brief.text) && /police and fire stations/i.test(brief.text) && /Med Bay/.test(brief.text), 'the significant-buildings card pops up (hospital → repair the Med Bay)');
+  ok(!brief.paused && brief.unlocked, "it doesn't pause the game; the Med Bay can be repaired now");
+  await p.click('.hud-card [data-act="card-close"]');
   await p.waitForTimeout(800);
-  const after = await p.evaluate(() => ({
-    label: [...document.querySelectorAll('.landmark-label')].some((e) => e.style.display !== 'none'),
-    obj: document.body.innerText,
-  }));
-  ok(!after.label, 'the hospital label is gone once looted');
+  const after = await p.evaluate(() => ({ obj: document.body.innerText }));
   ok(/Repair the Med Bay/.test(after.obj), 'a new objective: repair the Med Bay');
   void obj0;
 
@@ -104,7 +99,6 @@ const ok = (cond, what) => console.log(`${cond ? 'ok  ' : 'FAIL'} ${what}`);
     g.select([eng.id]);
     g.commandAt(bay.pos, false);
     g.speed = 4;
-    g.paused = false;
   });
   await p.waitForFunction(() => window.game.world.structures.find((s) => s.def.id === 'medBay').built, null, { timeout: 120000 });
   const fixed = await p.evaluate(() => {

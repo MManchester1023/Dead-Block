@@ -14,7 +14,6 @@ import { PlacementGhost } from './PlacementGhost';
 import { SupplyDrops } from './SupplyDrops';
 import { Popups } from './Popups';
 import { RouteLayer } from './RouteLayer';
-import { LandmarkLayer } from './LandmarkLayer';
 import { HiveLayer, SquadLayer, StructureLayer } from './UnitLayers';
 
 export type Quality = 'high' | 'medium' | 'low';
@@ -57,7 +56,6 @@ export class Renderer {
   private ctx: RenderCtx;
   private city: CityLayer;
   /** Animated character crowds (null → box placeholders, e.g. if the models failed to load). */
-  private landmarks: LandmarkLayer;
   private crowds: CrowdLayer | null = null;
   /** Box zombies, only without the character models. */
   private zombieMeshes = new Map<string, THREE.InstancedMesh>();
@@ -127,7 +125,6 @@ export class Renderer {
     this.squads = new SquadLayer(this.ctx, !this.crowds);
     this.structures = new StructureLayer(this.ctx, (p) => this.fx.explosion(p, 1.5, 0x9a8a6a));
     this.hives = new HiveLayer(this.ctx);
-    this.landmarks = new LandmarkLayer(this.ctx);
     this.drops = new SupplyDrops(this.scene, world);
     this.popups = new Popups(this.ctx);
     this.routes = new RouteLayer(this.ctx);
@@ -144,7 +141,7 @@ export class Renderer {
       this.fx.tracer(e.from, e.to, !!e.heavy);
       this.fx.muzzleFlash(e.from, e.to, !!e.heavy || e.weapon === 'Mounted HMG');
     });
-    ev.on('explosion', (e) => this.fx.explosion(e.pos, e.radius, e.type === 'toxic' ? 0x8fbf3a : 0xffa040));
+    ev.on('explosion', (e) => this.fx.explosion(e.pos, e.radius, e.type === 'toxic' ? 0x8fbf3a : 0xffa040, e.type !== 'toxic'));
     // a tutorial region opens: the fence comes down in a cloud of dust
     ev.on('districtUnlocked', (e) => {
       for (const b of this.city.removeFence(e.districtId)) {
@@ -227,7 +224,6 @@ export class Renderer {
     if (!this.crowds) this.updateBoxZombies();
     this.structures.update(f);
     this.hives.update(f);
-    this.landmarks.update(f);
     this.drops.update();
     this.popups.update(realDt);
     this.routes.update(f, this.formationPreview);

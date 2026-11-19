@@ -7,6 +7,7 @@ import { findPath } from '../pathfinding';
 import type { World } from '../World';
 import type { BuildingDef } from '../map';
 import { moveWithCollision } from './movement';
+import { gainXp } from './combat';
 
 const ARRIVE = 1; // metres
 const BODY = 0.9; // squad-centre collision radius, metres
@@ -255,6 +256,10 @@ function doHeal(w: World, s: Squad, dt: number): void {
     rejoined++;
     w.events.emit('memberRejoined', { squadId: t.id, squadName: t.name, pos: { ...m.pos } });
   }
+  // round 16 #199: medics learn from it: XP by how much they restored (a full 40% heal ≈ 8)
+  const restored = (t.pool - before) / t.poolMax;
+  const xp = Math.round((restored / 0.05) * H.xpPer5Pct + rejoined * H.xpPerRejoin);
+  if (xp > 0) gainXp(w, s, xp);
   w.events.emit('squadHealed', { medicId: s.id, targetId: t.id, amount: t.pool - before, rejoined });
   w.events.emit('radio', { speaker: s.name, text: rejoined ? `${t.name} patched up. ${rejoined === 1 ? 'One' : rejoined} back on ${rejoined === 1 ? 'his' : 'their'} feet.` : `${t.name} patched up.`, tone: 'good' });
 }

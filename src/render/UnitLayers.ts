@@ -221,9 +221,13 @@ export class HiveLayer {
       const pulse = 1 + Math.sin(f.time * (1.5 + h.stage)) * 0.06;
       v.core.scale.setScalar((0.8 + h.stage * 0.18) * pulse);
       (v.core.material as THREE.MeshLambertMaterial).emissiveIntensity = 0.15 + h.stage * 0.12 + (pulse - 1) * 2;
+      // round 16 #195: nothing over a hive until it's hovered
+      if (f.hovered !== h.id) {
+        v.label.style.display = 'none';
+        continue;
+      }
       labels.place(v.label, h.pos, 7, () => {
         const pct = Math.max(0, h.hp / BALANCE.hive.hpByStage[h.stage - 1]) * 100;
-        if (f.hovered !== h.id) return `<b>HIVE</b> · stage ${h.stage}/4`;
         // round 11 #135: on hover, time to the next stage with a progress bar under the health bar
         const dur = BALANCE.hive.stageDurationSec[h.stage - 1];
         const grow = dur

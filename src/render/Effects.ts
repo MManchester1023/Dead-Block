@@ -59,9 +59,15 @@ export class Effects {
     this.fx.push({ obj, life, max: life, update });
   }
 
-  explosion(p: Vec2, r: number, color: number): void {
+  explosion(p: Vec2, r: number, color: number, flash = true): void {
     // round 15 #188: a bright flash at the blast (a sprite, and a glow on the ground) for the first instant.
     // No real light: every extra light costs every lit pixel every frame, explosion or not.
+    // Round 16 #192: not for a Bloater bursting (that's a gas puff, not a blast).
+    if (flash) this.blastFlash(p, r);
+    this.blastBall(p, r, color);
+  }
+
+  private blastFlash(p: Vec2, r: number): void {
     const flash = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTexture(), color: 0xfff2c8, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     flash.position.set(p.x, 1.6, p.y);
     flash.renderOrder = 6;
@@ -78,6 +84,9 @@ export class Effects {
       glow.scale.setScalar(r * (1.4 + k));
       (glow.material as THREE.MeshBasicMaterial).opacity = 0.85 * (1 - k);
     });
+  }
+
+  private blastBall(p: Vec2, r: number, color: number): void {
     const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false }));
     m.position.set(p.x, 1.2, p.y);
     this.add(m, 0.45, (t, fx) => {
