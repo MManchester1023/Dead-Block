@@ -53,7 +53,8 @@ const ok = (cond, what) => console.log(`${cond ? 'ok  ' : 'FAIL'} ${what}`);
   await p.waitForTimeout(800);
   // round 16 #194: a card at the side of the HUD, not a pausing dialog
   const regionBrief = await p.evaluate(() => ({ card: document.querySelector('.hud-card')?.innerText ?? '', modal: !!document.querySelector('.modal.open'), paused: window.game.paused }));
-  ok(/NEW REGION OPEN/.test(regionBrief.card) && /Hospital/.test(regionBrief.card) && /red cross/.test(regionBrief.card), 'the region 2 card mentions the hospital (red cross on the roof)');
+  // round 20 #235: vaguer: no red cross, no Med Bay
+  ok(/NEW REGION OPEN/.test(regionBrief.card) && /Hospital/.test(regionBrief.card) && /something important left inside/.test(regionBrief.card) && !/red cross/i.test(regionBrief.card), 'the region 2 card mentions the hospital, vaguely ("maybe there\'s something important left inside")');
   ok(!regionBrief.modal && !regionBrief.paused, 'no pausing dialog: the game keeps running');
   await p.click('.hud-card [data-act="card-close"]');
   ok(!(await p.$('.hud-card')), '"Got it" closes the card');

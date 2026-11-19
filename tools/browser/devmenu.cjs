@@ -1,4 +1,4 @@
-// STATUS #59 (v4.81): the dev menu in the real game, through the keyboard and mouse: ` opens it, pick Runners ×10
+// STATUS #59 (v4.81): the dev menu in the real game (round 20 #234: switched on in Settings first; off by default), through the keyboard and mouse: ` opens it, pick Runners ×10
 // and click the map (they appear there, hunting), Shift+click keeps placing, a stage 2 hive by click, clear all
 // zombies, +$1000, ` closes it. Round 18 #221 (v4.86): units (a Humvee, Shift+click Mortar Teams) and buildings
 // (a finished Vehicle Bay, free, with nobody selected). Prints ok/FAIL per check.
@@ -28,9 +28,22 @@ const ok = (cond, what) => console.log(`${cond ? 'ok  ' : 'FAIL'} ${what}`);
   await p.waitForTimeout(500);
   const screen = await p.evaluate((at) => window.game.renderer.worldToScreen(at), spot);
   await p.mouse.move(700, 450);
+  const panelShown = () => p.evaluate(() => !!document.querySelector('.dev-panel') && document.querySelector('.dev-panel').style.display !== 'none');
+  // round 20 #234: off by default: the key does nothing until it's switched on in Settings
   await p.keyboard.press('Backquote');
   await p.waitForTimeout(200);
-  ok(await p.evaluate(() => !!document.querySelector('.dev-panel') && document.querySelector('.dev-panel').style.display !== 'none'), 'the ` key opens the dev menu');
+  ok(!(await panelShown()), 'off by default: the ` key does nothing');
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(200);
+  await p.click('[data-act="menu-page:settings"]');
+  await p.click('[data-act="devallow"]');
+  ok(/On/.test(await p.$eval('[data-act="devallow"]', (e) => e.textContent)), 'Settings: Dev menu switched On');
+  await p.click('[data-act="resume"]');
+  await p.waitForTimeout(200);
+  await p.mouse.move(700, 450);
+  await p.keyboard.press('Backquote');
+  await p.waitForTimeout(200);
+  ok(await panelShown(), 'then the ` key opens the dev menu');
   await p.click('[data-act="devz:runner"]');
   await p.click('[data-act="devn:10"]');
   await p.click('[data-act="devplace:zombies"]');

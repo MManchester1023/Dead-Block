@@ -157,30 +157,7 @@ export class Renderer {
         for (let s = 6; s < (vertical ? b.h : b.w); s += 24) this.fx.smoke(vertical ? { x: b.x + b.w / 2, y: b.y + s } : { x: b.x + s, y: b.y + b.h / 2 }, 0x9a8a6a, 3);
       }
     });
-    // a searched building gets a spray-painted X by the door (v4.9 #46)
-    ev.on('buildingSearched', (e) => {
-      const mat = new THREE.MeshBasicMaterial({ color: e.found === 'zombies' ? 0xd2443a : 0xe0802a, transparent: true, opacity: 0.85, depthWrite: false });
-      const x = new THREE.Group();
-      for (const a of [Math.PI / 4, -Math.PI / 4]) {
-        const bar = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.28), mat);
-        bar.rotation.set(-Math.PI / 2, 0, a);
-        x.add(bar);
-      }
-      // round 11 #124: on the searched building's own wall (nearest the squad), not where the squad
-      // stood, which between two close houses could look like the other one was searched
-      const b = this.world.map.buildings.find((bb) => bb.id === e.buildingId);
-      let at = e.pos;
-      if (b) {
-        const ex = Math.max(b.rect.x, Math.min(b.rect.x + b.rect.w, e.pos.x));
-        const ey = Math.max(b.rect.y, Math.min(b.rect.y + b.rect.h, e.pos.y));
-        const dx = e.pos.x - ex;
-        const dy = e.pos.y - ey;
-        const l = Math.hypot(dx, dy) || 1;
-        at = { x: ex + (dx / l) * 1.2, y: ey + (dy / l) * 1.2 };
-      }
-      x.position.set(at.x, 0.07, at.y);
-      this.scene.add(x);
-    });
+    // round 20 #236 (owner): no spray-painted X after a search any more (it was v4.9 #46)
     ev.on('zombieKilled', (e) => {
       this.fx.splat(e.pos);
       this.crowds?.zombieDied(e);

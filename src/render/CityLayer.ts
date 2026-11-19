@@ -86,6 +86,8 @@ export class CityLayer {
   private fences = new Map<string, THREE.Object3D>();
   private districtOverlays = new Map<string, THREE.Mesh>();
   private districtLabels = new Map<string, HTMLDivElement>();
+  /** Round 20 #244: every region's outline, faint, on the ops map only. */
+  private districtEdges: THREE.LineSegments | null = null;
 
   constructor(private ctx: RenderCtx) {
     const { scene, world } = ctx;
@@ -139,6 +141,18 @@ export class CityLayer {
       this.districtOverlays.set(d.id, ov);
       this.districtLabels.set(d.id, ctx.labels.make(ctx.overlay, 'district-label'));
     }
+    const pts: number[] = [];
+    for (const d of m.districts) {
+      const { x, y, w, h } = d.rect;
+      const c = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+      for (let i = 0; i < 4; i++) pts.push(c[i][0], 0.12, c[i][1], c[(i + 1) % 4][0], 0.12, c[(i + 1) % 4][1]);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    this.districtEdges = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xe8e0c8, transparent: true, opacity: 0.28, depthWrite: false }));
+    this.districtEdges.visible = false;
+    this.districtEdges.renderOrder = 2;
+    scene.add(this.districtEdges);
   }
 
   /** Every frame: build what the camera is near (within the paint budget), let go of what's far past the budget. */
@@ -367,6 +381,7 @@ export class CityLayer {
   /** District overlays (infestation → red tint) and their ops-map labels. */
   updateDistricts(): void {
     const { world: w, rig, labels } = this.ctx;
+    if (this.districtEdges) this.districtEdges.visible = rig.strategic;
     for (const [id, ov] of this.districtOverlays) {
       const d = w.districts.get(id)!;
       const mat = ov.material as THREE.MeshBasicMaterial;

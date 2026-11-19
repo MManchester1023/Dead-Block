@@ -97,7 +97,7 @@ const CONTROLS: [string, [string, string][]][] = [
     [K('K'), 'Medics: heal a squad (or right-click a hurt squad)'],
     [K('U'), 'Humvee: unload its squad (right-click a Humvee with infantry to board)'],
     [K('N'), 'Engineers: repair (then click a vehicle or a building); right-clicking a vehicle boards it'],
-    [K('`'), 'Dev menu: spawn zombies and hives for testing'],
+    [K('`'), 'Dev menu: spawn zombies, hives, units and buildings for testing (switch it on in Settings first)'],
     [`${K('Ctrl')}+${K('S')}`, 'Stop'],
     [`${K('Ctrl')}+${K('1')}–${K('9')} / ${K('1')}–${K('9')}`, 'Save / recall a group (press twice to centre)'],
   ]],
@@ -139,6 +139,8 @@ export class Hud {
   private uiScale = 1;
   /** STATUS #47: the performance readout (Settings). */
   private showPerf = false;
+  /** Round 20 #234: the dev menu (` key) only works with this switched on in Settings (off by default). */
+  private devAllowed = false;
   private perfEl: HTMLElement | null = null;
   private perfLast = 0;
   private buildBar!: HTMLElement;
@@ -173,6 +175,7 @@ export class Hud {
     // v4.9 (round 4 #38): UI scale setting, remembered per browser
     this.uiScale = Number(pref.get('uiScale')) || 1;
     this.showPerf = pref.get('perf') === '1';
+    this.devAllowed = pref.get('dev') === '1';
     const quality = pref.get('quality') as Quality | null;
     if (quality && quality in QUALITY) this.game.renderer.setQuality(quality);
     this.applyScale();
@@ -294,6 +297,12 @@ export class Hud {
       case 'perf':
         this.showPerf = !this.showPerf;
         pref.set('perf', this.showPerf ? '1' : '');
+        if (g.menuOpen) this.showMenu('settings');
+        break;
+      case 'devallow':
+        this.devAllowed = !this.devAllowed;
+        pref.set('dev', this.devAllowed ? '1' : '');
+        if (!this.devAllowed && g.dev.open) this.toggleDev();
         if (g.menuOpen) this.showMenu('settings');
         break;
       case 'heal': g.startHeal(); break;
@@ -443,6 +452,7 @@ export class Hud {
   private devEl: HTMLElement | null = null;
   toggleDev(): void {
     const g = this.game;
+    if (!this.devAllowed && !g.dev.open) return; // round 20 #234: switched off in Settings
     g.dev.open = !g.dev.open;
     if (!g.dev.open && g.mode.kind === 'dev') g.setMode({ kind: 'normal' });
     this.renderDev();
@@ -581,8 +591,9 @@ export class Hud {
     for (const b of w.map.buildings) {
       if (!b.landmark || w.districtAt({ x: b.rect.x + b.rect.w / 2, y: b.rect.y + b.rect.h / 2 })?.def.id !== id) continue;
       const done = !!w.buildingState.get(b.id)?.searched;
-      const what = b.landmark === 'hospital' ? 'medical equipment to fix the Med Bay' : 'a big haul';
-      items.push([done, `Loot the ${b.landmark} <small>(optional${b.landmark === 'hospital' ? ', red cross on the roof' : ''}: right-click it with a squad, ${BALANCE.landmarks[b.landmark]?.searchSec ?? BALANCE.search.timeSec} s; ${what})</small>`]);
+      // round 20 #235 (owner): keep the hospital's prize a mystery
+      const what = b.landmark === 'hospital' ? "maybe there's something important left inside" : 'a big haul';
+      items.push([done, `Loot the ${b.landmark} <small>(optional: right-click it with a squad, ${BALANCE.landmarks[b.landmark]?.searchSec ?? BALANCE.search.timeSec} s; ${what})</small>`]);
     }
     const bay = w.structures.find((s) => s.alive && s.def.id === 'medBay');
     if (bay && !bay.built && w.unlocked.has('medBay'))
@@ -853,7 +864,8 @@ export class Hud {
         <tr><td>Interface size</td><td><button data-act="uiscale">${Math.round(this.uiScale * 100)}%</button></td></tr>
         <tr><td>Graphics quality</td><td><button data-act="quality">${QUALITY[this.game.renderer.quality].label}</button></td></tr>
         <tr><td>Performance readout</td><td><button data-act="perf">${this.showPerf ? 'On' : 'Off'}</button></td></tr>
-      </table><p class="hint">All remembered in this browser. Graphics quality: Medium and Low draw fewer pixels on sharp screens, use smaller shadows and fewer zombie shadows. The readout (top right) shows frames per second and where each frame's time goes.</p>`;
+        <tr><td>Dev menu (<kbd>\`</kbd> key)</td><td><button data-act="devallow">${this.devAllowed ? 'On' : 'Off'}</button></td></tr>
+      </table><p class="hint">All remembered in this browser. Graphics quality: Medium and Low draw fewer pixels on sharp screens, use smaller shadows and fewer zombie shadows. The readout (top right) shows frames per second and where each frame's time goes. The dev menu spawns zombies, hives, units and buildings for testing.</p>`;
     } else {
       body = `<p>Restart the campaign from the beginning? Anything since your last save is lost.</p>
         <button class="big" data-act="restart">YES, RESTART</button> <button class="big ghost" data-act="menu-page:main">CANCEL</button>`;
@@ -910,9 +922,9 @@ export class Hud {
     const w = this.game.world;
     const b = w.map.buildings.find((x) => x.landmark && w.districtAt({ x: x.rect.x + x.rect.w / 2, y: x.rect.y + x.rect.h / 2 })?.def.id === id);
     if (!b) return '';
-    const what = b.landmark === 'hospital' ? 'its equipment lets engineers repair the <b>Med Bay</b>' : 'a big haul';
-    const where = b.landmark === 'hospital' ? ' (red cross on the roof)' : '';
-    return `<b>${b.landmark![0].toUpperCase() + b.landmark!.slice(1)}</b>${where}: right-click it with a squad (${BALANCE.landmarks[b.landmark!]?.searchSec ?? BALANCE.search.timeSec} s): supplies, money, and ${what}.`;
+    // round 20 #235 (owner): vaguer; what it holds is explained once it's looted
+    const what = b.landmark === 'hospital' ? "maybe there's something important left inside" : 'supplies, money, and a big haul';
+    return `<b>${b.landmark![0].toUpperCase() + b.landmark!.slice(1)}</b>: right-click it with a squad (${BALANCE.landmarks[b.landmark!]?.searchSec ?? BALANCE.search.timeSec} s): ${what}.`;
   }
 
   /** The first time the power comes on (v4.17; STATUS #50: it unlocks the Vehicle Bay; round 16: a card). */

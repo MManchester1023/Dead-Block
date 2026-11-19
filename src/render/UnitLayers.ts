@@ -101,7 +101,7 @@ export class SquadLayer {
   private labelHtml(s: Squad, sel: boolean, hover = false): string {
     const k = s.hp / s.maxHp;
     const bar = `<span class="hpbar"><i class="${k < 0.35 ? 'low' : k < 0.7 ? 'mid' : ''}" style="width:${(k * 100).toFixed(0)}%"></i></span>`;
-    const pips = bar + s.members.map((m) => `<span class="pip ${m.alive ? '' : 'dead'}"></span>`).join('');
+    const pips = bar; // round 20 #240 (owner): no per-soldier dots, just the health bar
     const st = squadStatus(s, this.ctx.world);
     const cover = st.tone === 'idle' && st.text === 'IDLE' ? '' : `<span class="status ${st.tone}">${st.text}</span>`;
     const lvl = s.level ? `<span class="tag lvl">${s.levelName.toUpperCase()}</span>` : '';
