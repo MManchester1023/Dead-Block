@@ -42,14 +42,14 @@ describe('tutorial region 3: Rail Siding and the power system (v4.17)', () => {
     expect(w.over).toBeFalsy();
   });
 
-  it('engineers restore the power station only with the yard clear; power unlocks the Med Bay', () => {
+  it('engineers restore the power station only with the yard clear; power unlocks the Vehicle Bay (STATUS #50)', () => {
     const w = new World({ populate: false });
     w.unlockDistrict('gasStrip');
     w.unlockDistrict('railSiding');
     for (const z of w.zombies) z.alive = false;
     const station = w.structures.find((s) => s.def.id === 'powerStation')!;
     const eng = w.spawnSquad('engineer', { x: station.pos.x - 14, y: station.pos.y });
-    expect(w.canPlace('medBay', { x: 10, y: 30 })).toBe('Not unlocked yet');
+    expect(w.canPlace('vehicleBay', { x: 10, y: 30 })).toBe('Not unlocked yet');
     // a zombie in the yard stops the work
     const z = w.spawnZombie('walker', { x: station.pos.x + 12, y: station.pos.y + 14 })!;
     z.def = { ...z.def, speed: 0, sight: 0, hearing: 0, damage: 0 };
@@ -66,8 +66,8 @@ describe('tutorial region 3: Rail Siding and the power system (v4.17)', () => {
     expect(first).toBe(true);
     w.money = 999;
     w.supplies = 150;
-    expect(w.canPlace('medBay', { x: 10, y: 30 })).toBeNull(); // inside the base
-    expect(w.canPlace('medBay', { x: 70, y: 30 })).toMatch(/inside the main base/);
+    expect(w.canPlace('vehicleBay', { x: 10, y: 30 })).toBeNull(); // inside the base
+    expect(w.canPlace('vehicleBay', { x: 70, y: 30 })).toMatch(/inside the main base/);
   });
 
   it('a wrecked power station goes offline instead of disappearing', () => {
@@ -83,7 +83,7 @@ describe('tutorial region 3: Rail Siding and the power system (v4.17)', () => {
     expect(w.powerOnline).toBe(false);
   });
 
-  it('a powered Med Bay heals resting squads for supplies and soldiers rejoin; no power, no healing', () => {
+  it('a working Med Bay heals resting squads for supplies and soldiers rejoin (no power needed since STATUS #50)', () => {
     const w = new World({ populate: false });
     w.unlockDistrict('railSiding');
     const station = w.structures.find((s) => s.def.id === 'powerStation')!;
@@ -94,10 +94,7 @@ describe('tutorial region 3: Rail Siding and the power system (v4.17)', () => {
     expect(sq.aliveCount).toBe(2);
     w.supplies = 150;
     const hp0 = sq.hp;
-    for (let i = 0; i < 30 * 10; i++) w.step(1 / 30);
-    expect(sq.hp).toBe(hp0); // no power yet
-
-    station.built = true;
+    expect(station.built).toBe(false); // the power is off: it heals anyway
     const before = w.supplies;
     for (let i = 0; i < 30 * 60; i++) w.step(1 / 30);
     expect(sq.hp).toBeGreaterThan(hp0);

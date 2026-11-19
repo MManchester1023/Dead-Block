@@ -64,10 +64,10 @@ export function updateEconomy(w: World, dt: number): void {
  * soldiers rejoin as the squad's health climbs back past each member's share. A wiped squad is gone.
  */
 export function updateMedical(w: World, dt: number): void {
-  if (!w.powerOnline) return;
   for (const bay of w.structures) {
     const H = bay.def.heal;
     if (!H || !bay.alive || !bay.built) continue;
+    if (bay.def.needsPower && !w.powerOnline) continue; // (STATUS #50: the Med Bay has its own generator now)
     for (const s of w.squadHash.query(bay.pos, H.radius + bay.radius + 4)) {
       if (!s.alive || s.moving || s.pool >= s.poolMax) continue;
       if (Math.hypot(s.pos.x - bay.pos.x, s.pos.y - bay.pos.y) > H.radius + bay.radius) continue;

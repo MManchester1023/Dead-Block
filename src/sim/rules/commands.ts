@@ -336,6 +336,8 @@ export function orderDeconstruct(w: World, engineers: Squad[], s: Structure, que
 
 /** Engineers pick an unfinished site back up where it was left (v4.4). */
 export function orderResume(w: World, engineers: Squad[], site: Structure, queue = false): string | null {
+  // STATUS #50: a run-down Med Bay waits for the hospital's equipment
+  if (site.def.derelict && !w.unlocked.has(site.def.derelict.needs)) return `${site.def.derelict.why} first`;
   const eng = engineers.filter((e) => e.def.canBuild?.length);
   if (!eng.length) return 'Only engineers can build';
   if (site.built) return 'Already built';

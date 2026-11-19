@@ -18,6 +18,10 @@ export function finishSearch(w: World, s: Squad, b: BuildingDef): void {
   st.searched = true;
   const S = BALANCE.search;
   const door = { ...s.pos };
+  if (b.landmark) {
+    lootLandmark(w, s, b, door);
+    return;
+  }
   if (st.nest > 0) {
     releaseNest(w, b, door);
     w.events.emit('buildingSearched', { buildingId: b.id, pos: door, found: 'zombies' });
@@ -42,6 +46,29 @@ export function finishSearch(w: World, s: Squad, b: BuildingDef): void {
   }
   w.events.emit('buildingSearched', { buildingId: b.id, pos: door, found });
   w.events.emit('radio', { speaker: s.name, text: found === 'nothing' ? 'Building clear. Nothing worth taking.' : `Building clear. Found ${found.replace(/^\+/, '')}.`, tone: found === 'nothing' ? 'info' : 'good' });
+}
+
+/**
+ * STATUS #50: a significant building always pays out, and the first of its kind unlocks something
+ * (hospital → engineers can repair the Med Bay in the base).
+ */
+function lootLandmark(w: World, s: Squad, b: BuildingDef, door: Vec2): void {
+  const kind = b.landmark!;
+  const L = BALANCE.landmarks[kind];
+  const sup = L ? w.rng.int(L.supplies[0], L.supplies[1]) : 0;
+  const money = L ? w.rng.int(L.money[0], L.money[1]) : 0;
+  w.addSupplies(sup);
+  w.money += money;
+  const firstEver = !w.unlocked.has('landmark');
+  const firstOfKind = !w.unlocked.has(`looted:${kind}`);
+  w.unlocked.add('landmark');
+  w.unlocked.add(`looted:${kind}`);
+  if (kind === 'hospital') w.unlocked.add('medBay');
+  const found = `+${sup} supplies, +$${money}`;
+  w.events.emit('buildingSearched', { buildingId: b.id, pos: door, found });
+  w.events.emit('landmarkLooted', { buildingId: b.id, kind, pos: { ...door }, first: firstEver, firstOfKind, supplies: sup, money });
+  const extra = kind === 'hospital' && firstOfKind ? ' And medical equipment: engineers can get the Med Bay in the base running now.' : '';
+  w.events.emit('radio', { speaker: s.name, text: `${kind[0].toUpperCase() + kind.slice(1)} cleared out. ${sup} supplies and $${money}.${extra}`, tone: 'good' });
 }
 
 /** A group of survivors comes out of a searched house (STATUS #10). */

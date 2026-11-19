@@ -42,7 +42,7 @@ const BUILD_MENU: { kind: 'structure' | 'tool'; id: string; name: string; key: s
   { kind: 'structure', id: 'wire', name: 'Barbed Wire', key: 'Z', icon: 'wire', tip: 'Slows everything that crosses it, yours included' },
   { kind: 'structure', id: 'mgNest', name: 'MG Nest', key: 'T', icon: 'mg', tip: '35 m, 120° field of fire aimed with R' },
   { kind: 'structure', id: 'guardTower', name: 'Guard Tower', key: 'V', icon: 'tower', tip: 'One squad mans it: +40% range, sees over cover', unlock: 'opens with Gas Station Strip' },
-  { kind: 'structure', id: 'medBay', name: 'Med Bay', key: 'N', icon: 'med', tip: 'In the base; resting squads heal (needs power)', unlock: 'restore the Rail Siding power station' },
+  { kind: 'structure', id: 'vehicleBay', name: 'Vehicle Bay', key: 'Y', icon: 'garage', tip: 'In the base; builds vehicles (the Humvee is on its way)', unlock: 'restore the Rail Siding power station' },
   { kind: 'structure', id: 'outpost', name: 'Outpost', key: 'O', icon: 'outpost', tip: 'Secures a district once its hives are dead and infestation is 2% or less' },
   { kind: 'tool', id: 'charge', name: 'Demo Charge', key: 'C', icon: 'charge', tip: `Click a hive: ${ABILITIES.demoCharge.plantTime} s to plant, getting hit restarts it` },
   { kind: 'tool', id: 'deconstruct', name: 'Deconstruct', key: 'X', icon: 'decon', tip: 'Take down something you built (full refund if unstarted, half if built)' },
@@ -55,6 +55,7 @@ const ICON: Record<string, string> = {
   wire: svg('<path d="M2 12h20"/><path d="M5 9l3 6M8 9l-3 6M13 9l3 6M16 9l-3 6"/>'),
   mg: svg('<path d="M4 18h8l1-4H5z"/><path d="M12 13l9-5"/><path d="M8 18v3M6 21h4"/>'),
   tower: svg('<path d="M6 21l2-11M18 21l-2-11M7 16h10"/><rect x="6" y="6" width="12" height="4"/><path d="M8 6V4h8v2"/>'),
+  garage: svg('<path d="M3 11l9-6 9 6v9H3z"/><path d="M7 20v-6h10v6M7 17h10"/>'),
   med: svg('<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M12 8v8M8 12h8"/>'),
   outpost: svg('<path d="M6 21V3"/><path d="M6 4h11l-3 4 3 4H6"/>'),
   charge: svg('<circle cx="10" cy="14" r="6"/><path d="M14 10l3-3M17 4v2M20 7h-2M19.5 4.5l-1.5 1.5"/>'),
@@ -98,7 +99,7 @@ const CONTROLS: [string, [string, string][]][] = [
   ]],
   ['Engineers', [
     [K('F'), 'Sandbags'], [K('Z'), 'Barbed wire'], [K('T'), 'MG nest'], [K('V'), 'Guard tower (region 2)'],
-    [K('N'), 'Med Bay (after power)'], [K('O'), 'Outpost'], [K('C'), 'Demo charge (click a hive)'], [K('X'), 'Deconstruct'],
+    [K('Y'), 'Vehicle Bay (after power)'], [K('O'), 'Outpost'], [K('C'), 'Demo charge (click a hive)'], [K('X'), 'Deconstruct'],
     [K('R'), 'Rotate while placing (MG: turn its field of fire)'],
     ['Right-click own structure', 'Resume building / repair (or restore the power station)'],
   ]],
@@ -188,6 +189,7 @@ export class Hud {
     });
     game.world.events.on('districtUnlocked', (e) => this.showBriefing(e.districtId, e.name, e.unlocks));
     game.world.events.on('powerRestored', (e) => e.first && this.showPowerBriefing());
+    game.world.events.on('landmarkLooted', (e) => e.first && this.showLandmarkBriefing(e.kind, e.supplies, e.money));
     game.world.events.on('civiliansFound', (e) => this.toast(`${e.count} survivors found! Select them and walk them to the Command Post.`));
     game.world.events.on('civiliansEvacuated', (e) => this.toast(`${e.count} survivor${e.count === 1 ? '' : 's'} evacuated: +$${e.money}, +${e.supplies} supplies`));
     game.world.events.on('victory', (e) => this.showEnd(true, e.reason));
@@ -495,11 +497,21 @@ export class Hud {
     const items: [boolean, string][] = [
       [hiveDown, `Destroy the ${hiveCount > 1 ? `${hiveCount} hives` : 'hive'} <small>(engineer demo charge — bullets won't do it)</small>`],
       ...(cur.def.powerStations?.length
-        ? [[!!station?.built || w.unlocked.has('medBay'), `Restore the power station <small>(clear the yard, then right-click it with engineers${station && !station.built ? `: ${Math.floor((station.buildProgress / station.def.buildTime) * 100)}%` : ''})</small>`] as [boolean, string]]
+        ? [[!!station?.built || w.unlocked.has('vehicleBay'), `Restore the power station <small>(clear the yard, then right-click it with engineers${station && !station.built ? `: ${Math.floor((station.buildProgress / station.def.buildTime) * 100)}%` : ''})</small>`] as [boolean, string]]
         : []),
       [cur.cleared || cur.secured, `Clear ${cur.def.name} to ${BALANCE.infestation.outpostMax}% or less <small>(${Math.ceil(cur.infestation)}%${hiveDown && !cur.secured ? `, ${w.deadIn(id)} dead left` : ''})</small>`],
       [cur.secured, 'Build an outpost there with engineers'],
     ];
+    // STATUS #50: significant buildings in this region (optional), and the Med Bay once its parts are in
+    for (const b of w.map.buildings) {
+      if (!b.landmark || w.districtAt({ x: b.rect.x + b.rect.w / 2, y: b.rect.y + b.rect.h / 2 })?.def.id !== id) continue;
+      const done = !!w.buildingState.get(b.id)?.searched;
+      const what = b.landmark === 'hospital' ? 'medical equipment to fix the Med Bay' : 'a big haul';
+      items.push([done, `Loot the ${b.landmark} <small>(optional: right-click it with a squad, ${BALANCE.landmarks[b.landmark]?.searchSec ?? BALANCE.search.timeSec} s; ${what})</small>`]);
+    }
+    const bay = w.structures.find((s) => s.alive && s.def.id === 'medBay');
+    if (bay && !bay.built && w.unlocked.has('medBay'))
+      items.push([false, `Repair the Med Bay in the base <small>(right-click it with engineers${bay.buildProgress > 0 ? `: ${Math.floor((bay.buildProgress / bay.def.buildTime) * 100)}%` : ''})</small>`]);
     // survivors out in the field (STATUS #10): a standing reminder until they're evacuated
     const civ = w.squads.filter((s) => s.alive && s.def.category === 'civilian');
     const waiting = civ.reduce((n, s) => n + s.aliveCount, 0);
@@ -776,7 +788,7 @@ export class Hud {
       gasStrip: `<p>The wire on the east road is cut. Expect a step up: a bigger crowd, <b>Runner packs</b> that hunt together, and a hive that's already at <b>stage 2</b>. Its hordes will go for your newest outpost, so leave it defended.</p>`,
       railSiding: `<p>The fence south of the strip is down. <b>Rail Siding</b> is the last training region and the biggest: a goods yard cut in two by a line of boxcars, <b>two hives</b>, and the dead at full strength.</p>
       <h3>New: the power system</h3>
-      <p>In the east yard stands a <b>power station</b>, dead. Clear the yard, then <b>right-click the station with engineers</b> to restore it. They can only work while no zombie is within 30 m, so hold the ground around them. Power brings the base back to life and unlocks the <b>Med Bay</b>. If the dead wreck the station it goes dark again until your engineers restore it.</p>
+      <p>In the east yard stands a <b>power station</b>, dead. Clear the yard, then <b>right-click the station with engineers</b> to restore it. They can only work while no zombie is within 30 m, so hold the ground around them. Power brings the base back to life and unlocks the <b>Vehicle Bay</b>. If the dead wreck the station it goes dark again until your engineers restore it.</p>
       <h3>New: survivors</h3>
       <p>People are hiding in the houses here. <b>Searching a building</b> can turn up a group of <b>civilians</b>: select them like a squad and <b>walk them to the Command Post</b> to evacuate them for <b>$${BALANCE.civilians.perPerson.money} and ${BALANCE.civilians.perPerson.supplies} supplies each</b>. They're unarmed and slow, and the dead go for them first, so escort them.</p>`,
     };
@@ -785,6 +797,7 @@ export class Hud {
       <p class="tag">NEW REGION OPEN</p>
       <h1>${esc(name)}</h1>
       ${intro[id] ?? `<p>The fence is down. Same drill: find the hive, kill it, plant an outpost.</p>`}
+      ${this.landmarkIn(id)}
       ${tower ? `<h3>New: Guard Tower</h3>
       <p>Engineers can now build a <b>Guard Tower</b> (<kbd>V</kbd>, $${T.cost.money} · ${T.cost.supplies}▣). <b>Right-click it</b> with a squad to man it: they shoot <b>${Math.round(((T.garrison?.rangeMult ?? 1) - 1) * 100)}% further</b>, see over cars and walls, and the dead can't claw at them. They have to tear the tower down first. Any other order brings the squad back down.</p>` : ''}
       <button class="big" data-act="continue">GOT IT</button>
@@ -792,17 +805,43 @@ export class Hud {
     this.modal.classList.add('open');
   }
 
-  /** The first time the power comes on (v4.17): the Med Bay is unlocked. */
+  /** STATUS #50: a region's significant building, for its opening briefing. */
+  private landmarkIn(id: string): string {
+    const w = this.game.world;
+    const b = w.map.buildings.find((x) => x.landmark && w.districtAt({ x: x.rect.x + x.rect.w / 2, y: x.rect.y + x.rect.h / 2 })?.def.id === id);
+    if (!b) return '';
+    const what = b.landmark === 'hospital' ? 'Its medical equipment would get the run-down <b>Med Bay</b> in the base working.' : 'It should hold a big haul.';
+    return `<h3>There's a ${b.landmark} here</h3><p>Marked on the map. Searching it takes a while (${BALANCE.landmarks[b.landmark!]?.searchSec ?? BALANCE.search.timeSec} s), but it always pays. ${what}</p>`;
+  }
+
+  /** The first time the power comes on (v4.17; STATUS #50: it unlocks the Vehicle Bay now). */
   private showPowerBriefing(): void {
-    const M = STRUCTURES.medBay;
-    const H = M.heal!;
+    const V = STRUCTURES.vehicleBay;
     this.game.paused = true;
     this.modal.innerHTML = `<div class="dialog small">
       <p class="tag">POWER RESTORED</p>
-      <h1>Med Bay unlocked</h1>
-      <p>Engineers can now build a <b>Med Bay</b> inside the main base (<kbd>N</kbd>, $${M.cost.money} · ${M.cost.supplies}▣).</p>
-      <p>A squad that <b>rests next to it</b> (not moving, not hit for ${H.restAfterHitSec} s) heals about ${Math.round(H.perSec * 100 * 60)}% of its health a minute, paid for in supplies. As its health climbs back, <b>lost soldiers rejoin</b> the squad. A squad that's wiped out is still gone for good.</p>
-      <p>The Med Bay runs on the station's power: if the dead wreck the station, the Med Bay goes dark until your engineers restore it.</p>
+      <h1>Vehicle Bay unlocked</h1>
+      <p>Engineers can now build a <b>Vehicle Bay</b> inside the main base (<kbd>Y</kbd>, $${V.cost.money} · ${V.cost.supplies}▣).</p>
+      <p>It's where vehicles come from. The first one, the <b>Humvee</b>, is on its way.</p>
+      <button class="big" data-act="continue">GOT IT</button>
+    </div>`;
+    this.modal.classList.add('open');
+  }
+
+  /** STATUS #50 (round 15 #185): the first significant building looted: what they are, and what this one did. */
+  private showLandmarkBriefing(kind: string, supplies: number, money: number): void {
+    const M = STRUCTURES.medBay;
+    const H = M.heal!;
+    this.game.paused = true;
+    const what =
+      kind === 'hospital'
+        ? `<p>The hospital's <b>medical equipment</b> means engineers can now repair the <b>Med Bay</b> in the base (right-click it with engineers). Once it's running, squads that <b>rest next to it</b> (not moving, not hit for ${H.restAfterHitSec} s) heal about ${Math.round(H.perSec * 100 * 60)}% of their health a minute for supplies, lost soldiers rejoin as health comes back, and <b>Medic Teams</b> can be recruited at the Barracks.</p>`
+        : '';
+    this.modal.innerHTML = `<div class="dialog small">
+      <p class="tag">SIGNIFICANT BUILDING</p>
+      <h1>${kind[0].toUpperCase() + kind.slice(1)} looted</h1>
+      <p>Some buildings matter more than a house: <b>hospitals, police stations and fire stations</b>. Searching one takes longer, but it always pays (this one: ${supplies} supplies and $${money}) and it <b>unlocks something</b> for the base. Look out for them in each region.</p>
+      ${what}
       <button class="big" data-act="continue">GOT IT</button>
     </div>`;
     this.modal.classList.add('open');

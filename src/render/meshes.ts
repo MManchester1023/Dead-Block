@@ -16,6 +16,9 @@ export const MAX_ZOMBIES = 320;
 export const ZOMBIE_TYPES = ['walker', 'runner', 'bloater'] as const;
 
 /** A structure's model, centred on its footprint (metres), at ground level. */
+/** STATUS #50: structures drawn with a loaded model (manifest key) instead of their procedural shapes. */
+const STRUCTURE_MODELS: Record<string, string> = { medBay: 'medTent', vehicleBay: 'vehicleBay' };
+
 export function buildStructureMesh(s: Structure): THREE.Group {
   const g = new THREE.Group();
   const w = s.size.w * CELL; // metres
@@ -27,6 +30,21 @@ export function buildStructureMesh(s: Structure): THREE.Group {
     g.add(m);
     return m;
   };
+  // STATUS #50: the owner's models where there are some (Medical Tent by Aidan Callaghan; Salah3D's garage)
+  const modelKey = STRUCTURE_MODELS[s.def.id];
+  const model = modelKey ? models.instance(modelKey) : null;
+  if (model) {
+    model.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      m.material = (m.material as THREE.Material).clone(); // its own, so this one can be tinted / faded
+      (m.material as THREE.Material).transparent = true;
+      m.castShadow = m.receiveShadow = true;
+    });
+    if (s.size.w !== s.def.size.w) model.rotation.y = Math.PI / 2; // placed turned 90°
+    g.add(model);
+    return g;
+  }
   switch (s.def.id) {
     case 'baseWall':
       add(new THREE.BoxGeometry(w, 4, h), PAL.concrete, 2);
@@ -96,6 +114,13 @@ export function buildStructureMesh(s: Structure): THREE.Group {
       add(new THREE.BoxGeometry(0.15, 0.15, 4.5), 0x5a5a5a, 10.2, w * 0.42, 0); // pylon arm
       const lamp = add(new THREE.SphereGeometry(0.45, 10, 8), 0xc83a2a, 7.9, -w * 0.05, 0);
       lamp.name = 'lamp';
+      break;
+    }
+    case 'vehicleBay': {
+      // fallback when the owner's garage model (Salah3D's modular pack) isn't loaded: a shed with a roller door
+      add(new THREE.BoxGeometry(w - 0.6, 4, h - 0.6), 0x8a8478, 2);
+      add(new THREE.BoxGeometry(w - 0.2, 0.3, h - 0.2), 0x5a5c5e, 4.15);
+      add(new THREE.BoxGeometry(w * 0.55, 3, 0.1), 0x6a6e70, 1.5, 0, -h / 2 + 0.25);
       break;
     }
     case 'medBay': {

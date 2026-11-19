@@ -5,6 +5,7 @@ import { Hive, Squad, Structure } from '../entities';
 import { newId } from '../entities';
 import { findPath } from '../pathfinding';
 import type { World } from '../World';
+import type { BuildingDef } from '../map';
 import { moveWithCollision } from './movement';
 
 const ARRIVE = 1; // metres
@@ -302,6 +303,12 @@ function doBuild(w: World, s: Squad, dt: number): void {
   }
   s.path = [];
   s.facing = Math.atan2(site.pos.y - s.pos.y, site.pos.x - s.pos.x);
+  // STATUS #50: a run-down Med Bay can't be repaired until the hospital's been looted
+  if (site.def.derelict && !w.unlocked.has(site.def.derelict.needs)) {
+    w.events.emit('radio', { speaker: s.name, text: `No parts to fix the ${site.def.name} with. ${site.def.derelict.why}.`, tone: 'warn' });
+    s.orders.shift();
+    return;
+  }
   // restoring a power station only happens with the area held (v4.17)
   if (site.def.restore) {
     const near = w.zombieHash.query(site.pos, site.def.restore.clearRadius + site.radius).some((z) => z.alive);
@@ -328,12 +335,13 @@ function doBuild(w: World, s: Squad, dt: number): void {
       w.events.emit('radio', { speaker: 'Command', text: 'Med Bay is up. Medic Teams can be recruited at the Barracks now.', tone: 'good' });
     }
     if (site.def.restore) {
-      const first = !w.unlocked.has('medBay');
+      // STATUS #50: the power brings the Vehicle Bay (it brought the Med Bay before)
+      const first = !w.unlocked.has('vehicleBay');
       w.unlocked.add('power');
-      w.unlocked.add('medBay');
+      w.unlocked.add('vehicleBay');
       w.events.emit('powerRestored', { id: site.id, first });
       w.makeNoise(site.pos, BALANCE.noise.powerOnLoudness); // round 13 #156: generators roaring to life draw the dead
-      w.events.emit('radio', { speaker: s.name, text: first ? "Power's on! Lights, pumps, the lot. Tell the doc the Med Bay's a go." : 'Station is back online.', tone: 'good' });
+      w.events.emit('radio', { speaker: s.name, text: first ? "Power's on! Lights, pumps, the lot. Tell the motor pool: the Vehicle Bay's a go." : 'Station is back online.', tone: 'good' });
     }
     s.orders.shift();
   }
@@ -460,6 +468,11 @@ function doCharge(w: World, s: Squad, dt: number): void {
  * "as close as we can get" within a small tolerance instead of standing there forever.
  */
 /** v4.9 (#46): walk to the nearest wall, stand at the door for a few seconds, see what's inside. */
+/** STATUS #50: how long searching a building takes (significant buildings take longer). */
+export function searchTime(b: BuildingDef): number {
+  return (b.landmark && BALANCE.landmarks[b.landmark]?.searchSec) || BALANCE.search.timeSec;
+}
+
 function doSearch(w: World, s: Squad, dt: number): void {
   const o = s.currentOrder!;
   const b = w.map.buildings.find((x) => x.id === o.targetId);
@@ -485,7 +498,7 @@ function doSearch(w: World, s: Squad, dt: number): void {
   }
   if (s.buildProgress === 0) w.makeNoise(s.pos, BALANCE.search.loudness);
   s.buildProgress += dt;
-  if (s.buildProgress < BALANCE.search.timeSec) return;
+  if (s.buildProgress < searchTime(b)) return;
   s.buildProgress = 0;
   s.orders.shift();
   w.finishSearch(s, b);

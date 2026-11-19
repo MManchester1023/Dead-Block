@@ -5,7 +5,7 @@
  * "Save" downloads the JSON (upload it to src/data/maps/ on GitHub); "Play" opens the game on the edit.
  */
 import starter from '../data/maps/starter.json';
-import { buildMap, Tile, type BuildingKind, type GroundTile, type MapData } from '../sim/map';
+import { buildMap, Tile, type BuildingKind, type GroundTile, type MapData, type Landmark } from '../sim/map';
 import type { Rect, Vec2 } from '../core/math';
 
 type Sel =
@@ -328,6 +328,7 @@ function drawSide(): void {
       field('Kind', `<select data-f="kind">${KINDS.map((k) => `<option ${k === b.kind ? 'selected' : ''}>${k}</option>`).join('')}</select>`) +
       field('Floors', `<input type="number" min="1" max="12" data-f="floors" value="${b.floors}">`) +
       field('Colour', `<input type="color" data-f="color" value="${b.color}">`) +
+      field('Significant', `<select data-f="landmark">${['', 'hospital', 'police', 'fire'].map((k) => `<option value="${k}" ${k === (b.landmark ?? '') ? 'selected' : ''}>${k || '(no: an ordinary building)'}</option>`).join('')}</select>`) +
       rectFields(b.rect) +
       `<p style="color:#999">A row of houses (kind "houses") is split into one house per ~13 m of street front.</p>`;
   } else if (s?.t === 'prop') {
@@ -375,6 +376,11 @@ side.addEventListener('change', (e) => {
     if (f === 'kind') b.kind = el.value as BuildingKind;
     if (f === 'floors') b.floors = Math.max(1, Math.round(Number(el.value)));
     if (f === 'color') b.color = el.value;
+    // STATUS #50: a significant building (a long search, a big haul, an unlock: hospital → the Med Bay)
+    if (f === 'landmark') {
+      if (el.value) b.landmark = el.value as Landmark;
+      else delete b.landmark;
+    }
   }
   if (s.t === 'prop' && f) {
     const p = data.props[s.i];

@@ -11,6 +11,8 @@ export interface GameEvents {
   explosion: { pos: Vec2; radius: number; type: DamageType };
   /** STATUS #20: a medic team treated a squad. */
   squadHealed: { medicId: number; targetId: number; amount: number; rejoined: number };
+  /** STATUS #50: a significant building was looted (`first`: the first one ever, for the tutorial pop-up). */
+  landmarkLooted: { buildingId: number; kind: string; pos: Vec2; first: boolean; firstOfKind: boolean; supplies: number; money: number };
   memberKilled: { squadId: number; squadName: string; pos: Vec2; facing: number; unitId: string; low?: boolean; member?: number };
   squadWiped: { squadId: number; squadName: string };
   zombieKilled: { id: number; defId: string; pos: Vec2; facing: number; districtId: string | null };

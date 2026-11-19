@@ -128,12 +128,18 @@ export class StructureLayer {
         this.views.set(s.id, o);
       }
       // a power station being restored is a whole (dead) building, not a half-built site (v4.17)
-      const whole = s.built || !!s.def.restore;
+      const whole = s.built || !!s.def.restore || !!s.def.derelict;
       const k = whole ? 1 : 0.15 + 0.85 * Math.min(1, s.buildProgress / s.def.buildTime);
       o.scale.y = k;
+      // STATUS #50: a run-down Med Bay stands whole but dark until it's repaired
+      const dim = s.def.derelict && !s.built ? 0.42 : 1;
       o.traverse((c) => {
         const mat = (c as THREE.Mesh).material as THREE.MeshLambertMaterial | undefined;
         if (mat && 'opacity' in mat) mat.opacity = whole ? 1 : 0.55;
+        if (mat?.color) {
+          mat.userData.base ??= mat.color.getHex();
+          mat.color.setHex(mat.userData.base).multiplyScalar(dim);
+        }
       });
       // power lamps: red = offline / no power, green = running (v4.17)
       const lamp = o.getObjectByName('lamp') as THREE.Mesh | undefined;
@@ -148,7 +154,10 @@ export class StructureLayer {
       // build progress always shows; health only on hover / selection (#35)
       const focus = f.hovered === s.id || f.selectedStructure === s.id;
       // power objects always say what state they're in
-      const powerNote = s.def.restore ? (s.built ? 'POWER STATION · ONLINE' : 'POWER STATION · OFFLINE') : s.def.needsPower && s.built && !w.powerOnline ? 'MED BAY · NO POWER' : '';
+      const powerNote = s.def.restore
+        ? s.built ? 'POWER STATION · ONLINE' : 'POWER STATION · OFFLINE'
+        : s.def.derelict && !s.built ? `${s.def.name.toUpperCase()} · OUT OF ACTION`
+        : s.def.needsPower && s.built && !w.powerOnline ? 'MED BAY · NO POWER' : '';
       const needsBar = !s.built || (focus && s.hp < s.def.hp - 0.5) || !!powerNote;
       let lab = this.labelEls.get(s.id);
       if (needsBar) {
@@ -157,10 +166,12 @@ export class StructureLayer {
           this.labelEls.set(s.id, lab);
         }
         const pct = s.built ? (s.hp / s.def.hp) * 100 : Math.min(100, (s.buildProgress / s.def.buildTime) * 100);
-        const what = s.def.restore && !s.built ? `${s.buildProgress > 0 ? 'Restoring' : 'Offline · engineers can restore it'}` : s.built ? 'Damaged' : 'Unfinished';
-        const showBar = !s.built || (focus && s.hp < s.def.hp - 0.5);
-        labels.place(lab, s.pos, s.def.restore ? 9 : 2.5, () =>
-          `${powerNote ? `<b class="${powerNote.includes('ONLINE') ? 'good' : 'bad'}">${powerNote}</b><br>` : ''}${showBar ? `<span>${what} ${Math.floor(pct)}%</span><div class="bar ${s.built ? 'hp' : 'build'}"><i style="width:${pct.toFixed(0)}%"></i></div>` : ''}`,
+        const what = s.def.restore && !s.built ? `${s.buildProgress > 0 ? 'Restoring' : 'Offline · engineers can restore it'}`
+          : s.def.derelict && !s.built ? (s.buildProgress > 0 ? 'Repairing' : w.unlocked.has(s.def.derelict.needs) ? 'Engineers can repair it' : s.def.derelict.why)
+          : s.built ? 'Damaged' : 'Unfinished';
+        const showBar = (!s.built && !(s.def.derelict && s.buildProgress <= 0)) || (focus && s.hp < s.def.hp - 0.5);
+        labels.place(lab, s.pos, s.def.restore ? 9 : s.def.derelict ? 4.5 : 2.5, () =>
+          `${powerNote ? `<b class="${powerNote.includes('ONLINE') ? 'good' : 'bad'}">${powerNote}</b><br>` : ''}${showBar ? `<span>${what} ${Math.floor(pct)}%</span><div class="bar ${s.built ? 'hp' : 'build'}"><i style="width:${pct.toFixed(0)}%"></i></div>` : s.def.derelict && !s.built ? `<span>${what}</span>` : ''}`,
         );
       } else if (lab) {
         lab.remove();

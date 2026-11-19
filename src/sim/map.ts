@@ -34,9 +34,14 @@ export interface BuildingDef {
   roofCapacity: number;
   /** Side facing the street (round 12 #141: set for houses, which are split into one building per house). */
   front?: Side;
+  /** STATUS #50: a significant building (hospital, police or fire station). */
+  landmark?: Landmark;
 }
 
 export type Side = 'n' | 's' | 'e' | 'w';
+
+/** Significant buildings (round 15 #185, STATUS #50): a long search with a big haul that unlocks something. */
+export type Landmark = 'hospital' | 'police' | 'fire';
 
 /** Which side faces the most street/parking: that's the front. (Was in render/procgen; the sim needs it to split house rows.) */
 export function frontOf(map: Pick<CityMap, 'cols' | 'rows' | 'tiles'>, b: Pick<BuildingDef, 'cells'>): Side {
@@ -176,7 +181,7 @@ export interface MapData {
     /** A rail line: rail tiles, except where it crosses a road (rails are drawn over the road there). */
     | { rail: Rect }
   )[];
-  buildings: { rect: Rect; kind: BuildingKind; floors: number; color: string }[];
+  buildings: { rect: Rect; kind: BuildingKind; floors: number; color: string; landmark?: Landmark }[];
   /** Gas-station canopies: roofs on posts, walkable underneath. */
   canopies: Rect[];
   /** Cars (top-left cell; 2×1 cells horizontal, 1×2 vertical) and pump islands (2×1), in this order (their ids). */
@@ -238,7 +243,7 @@ export function buildMap(data: MapData): CityMap {
   for (const b of data.buildings) {
     // `height` is set in cells here and converted with everything else below
     const h = (b.floors * FLOOR + (b.kind === 'houses' ? 2.5 : 0.8)) / CELL;
-    buildings.push({ id: buildings.length + 1, kind: b.kind, floors: b.floors, rect: { ...b.rect }, cells: { ...b.rect }, height: h, color: hex(b.color), hp: 800 * b.floors, roofCapacity: Math.max(1, Math.floor((b.rect.w * b.rect.h) / 12)) });
+    buildings.push({ id: buildings.length + 1, kind: b.kind, floors: b.floors, rect: { ...b.rect }, cells: { ...b.rect }, height: h, color: hex(b.color), hp: 800 * b.floors, roofCapacity: Math.max(1, Math.floor((b.rect.w * b.rect.h) / 12)), ...(b.landmark ? { landmark: b.landmark } : {}) });
     fill(b.rect, Tile.Building);
   }
 

@@ -49,7 +49,7 @@
   {"rect": {"x": 141, "y": 44, "w": 8, "h": 5}, "kind": "shop", "floors": 1, "color": "#6a5e55"},
   {"rect": {"x": 107, "y": 57, "w": 8, "h": 8}, "kind": "houses", "floors": 1, "color": "#6a5e55"},
   {"rect": {"x": 119, "y": 57, "w": 8, "h": 8}, "kind": "houses", "floors": 2, "color": "#5f6466"},
-  {"rect": {"x": 140, "y": 56, "w": 9, "h": 9}, "kind": "apartment", "floors": 3, "color": "#73786f"},
+  {"rect": {"x": 140, "y": 56, "w": 9, "h": 9}, "kind": "apartment", "floors": 3, "color": "#c9c4b8", "landmark": "hospital"},
   {"rect": {"x": 40, "y": 76, "w": 8, "h": 7}, "kind": "houses", "floors": 1, "color": "#5f6466"},
   {"rect": {"x": 40, "y": 86, "w": 8, "h": 7}, "kind": "houses", "floors": 2, "color": "#6f6a60"},
   {"rect": {"x": 62, "y": 76, "w": 10, "h": 6}, "kind": "shop", "floors": 1, "color": "#5f6466"},

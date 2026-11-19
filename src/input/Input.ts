@@ -360,8 +360,9 @@ export class Input {
         if (b) g.selectStructure(b.id);
         break;
       }
-      case 'n':
-        g.startBuild('medBay');
+      case 'y':
+        // STATUS #50: the Vehicle Bay (the Med Bay isn't built any more: it's in the base, run down)
+        g.startBuild('vehicleBay');
         break;
       case 'v':
         g.startBuild('guardTower');

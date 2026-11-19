@@ -119,9 +119,18 @@ export function damageStructure(w: World, s: Structure, amount: number): void {
       s.buildProgress = s.def.buildTime * 0.5;
       if (wasOn) {
         w.events.emit('powerLost', { id: s.id });
-        w.events.emit('radio', { speaker: 'Command', text: 'We just lost the power station. The Med Bay is dark until engineers get it running again.', tone: 'bad' });
+        w.events.emit('radio', { speaker: 'Command', text: 'We just lost the power station. Engineers need to get it running again.', tone: 'bad' });
       }
     }
+    return;
+  }
+  if (s.def.derelict && s.hp <= 0 && s.alive) {
+    // STATUS #50: the Med Bay is wrecked back to run down, not destroyed; engineers can repair it again
+    const was = s.built;
+    s.hp = s.def.hp * 0.2;
+    s.built = false;
+    s.buildProgress = 0;
+    if (was) w.events.emit('radio', { speaker: 'Command', text: `The ${s.def.name} has been wrecked. Get engineers on it.`, tone: 'bad' });
     return;
   }
   if (s.hp <= 0 && s.alive) {

@@ -80,5 +80,11 @@
   },
   "shrub3": {
     "url": "trees/forest_bush012.glb"
+  },
+  "medTent": {
+    "url": "props/med_tent.glb"
+  },
+  "vehicleBay": {
+    "url": "props/vehicle_bay.glb"
   }
 }

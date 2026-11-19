@@ -222,6 +222,21 @@ export class CityLayer {
         grp.add(mesh);
         // v4.59: the yard trees are the owner's tree models too
         for (const t of trees) plant(t.x, t.z, t.scale, Math.floor(t.x * 131 + t.z * 977));
+        // STATUS #50: a hospital gets a white roof panel with a red cross, readable from above
+        if (b.landmark === 'hospital') {
+          const cx = b.rect.x + b.rect.w / 2;
+          const cz = b.rect.y + b.rect.h / 2;
+          const side = Math.min(b.rect.w, b.rect.h) * 0.6;
+          const y = b.height + 0.9;
+          const panel = new THREE.Mesh(new THREE.BoxGeometry(side, 0.12, side), new THREE.MeshLambertMaterial({ color: 0xf2efe6 }));
+          panel.position.set(cx, y, cz);
+          grp.add(panel);
+          for (const [sx, sz] of [[0.62, 0.2], [0.2, 0.62]]) {
+            const bar = new THREE.Mesh(new THREE.BoxGeometry(side * sx, 0.14, side * sz), new THREE.MeshLambertMaterial({ color: 0xc8302a }));
+            bar.position.set(cx, y + 0.05, cz);
+            grp.add(bar);
+          }
+        }
         const top = b.height + (b.kind === 'houses' ? 4 : b.kind === 'apartment' ? 4 : 2.5); // roofs, tanks, signs
         c.occluders.push({ mesh, mat, box: new THREE.Box3(new THREE.Vector3(b.rect.x, 0, b.rect.y), new THREE.Vector3(b.rect.x + b.rect.w, top, b.rect.y + b.rect.h)), opacity: 1 });
       },

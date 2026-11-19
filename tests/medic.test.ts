@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { World } from '../src/sim/World';
 import { ABILITIES, STRUCTURES, UNITS } from '../src/config/units';
-import { CELL } from '../src/config/world';
 import { queueProduction } from '../src/sim/rules/commands';
 
 /** A quiet world: no zombies, hives asleep. */
@@ -34,18 +33,16 @@ describe('Medic Team (STATUS #20, v4.61)', () => {
     expect(queueProduction(w, 'medic')).toBeNull();
   });
 
-  it('engineers finishing a Med Bay unlock the Medic Team', () => {
+  it('engineers repairing the run-down Med Bay (after the hospital) unlock the Medic Team (STATUS #50)', () => {
     const w = quiet();
+    const bay = w.structures.find((s) => s.def.id === 'medBay')!;
+    expect(bay.built).toBe(false); // run down from the start
     const eng = w.squads.find((s) => s.def.id === 'engineer')!;
-    w.unlocked.add('medBay');
-    const b = w.map.baseRect;
-    let tile: { x: number; y: number } | null = null;
-    for (let y = Math.floor(b.y / CELL); y < (b.y + b.h) / CELL && !tile; y++)
-      for (let x = Math.floor(b.x / CELL); x < (b.x + b.w) / CELL && !tile; x++) if (!w.canPlace('medBay', { x, y })) tile = { x, y };
-    expect(tile, 'somewhere in the base for a Med Bay').not.toBeNull();
-    expect(w.orderBuild([eng], 'medBay', tile!)).toBeNull();
+    expect(w.orderResume([eng], bay)).toMatch(/hospital/);
+    w.unlocked.add('medBay'); // what looting the hospital does
+    expect(w.orderResume([eng], bay)).toBeNull();
     run(w, STRUCTURES.medBay.buildTime + 40);
-    expect(w.structures.some((s) => s.def.id === 'medBay' && s.built)).toBe(true);
+    expect(bay.built).toBe(true);
     expect(w.unlocked.has('medic')).toBe(true);
   });
 

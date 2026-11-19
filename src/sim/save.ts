@@ -152,6 +152,12 @@ export function loadWorld(data: SaveData, seed = 1337): World {
   }
   w.restoreNav(s.nav);
   resetIds(data.nextId);
+  // STATUS #50: saves from before the run-down Med Bay (it used to be built) get one in the base
+  if (!w.structures.some((x) => x.alive && x.def.id === 'medBay')) {
+    const b = w.map.baseCells;
+    const tile = { x: b.x + 12, y: b.y + 26 };
+    if (!w.canPlace('medBay', tile)) w.addStructure('medBay', tile, false).hp = STRUCTURES.medBay.hp * 0.4;
+  }
   return w;
 }
 

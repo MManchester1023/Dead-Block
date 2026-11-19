@@ -214,7 +214,7 @@ export class Game {
     // engineers + right-click own structure: resume an unfinished site, or repair damage (v4.4)
     const eng = sq.filter((s) => s.def.canBuild?.length);
     // (a power station counts too: engineers restore it, v4.17)
-    const own = w.structureAt(p, (s) => s.def.cost.money + s.def.cost.supplies > 0 || !!s.def.restore);
+    const own = w.structureAt(p, (s) => s.def.cost.money + s.def.cost.supplies > 0 || !!s.def.restore || !!s.def.derelict); // (STATUS #50: the run-down Med Bay)
     // round 12 #138: an outpost without its Garrison: the engineers install it
     if (eng.length && own && own.built && own.hp >= own.def.hp && own.def.upgrade && !own.upgraded) {
       const err = w.orderUpgrade(eng, own, queue);

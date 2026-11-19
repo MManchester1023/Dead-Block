@@ -126,6 +126,10 @@ v4.39 (uploaded by the owner; authors to fill in where blank):
 
 **No longer used (v4.58–v4.65):** two low-poly tree packs uploaded by the owner (`assets-src/models/low-poly-tree-pack.zip`, `low-poly-tree-set.zip`), **free to use** per the owner (authors to fill in). **Changed:** each tree merged with its material colours baked in, big ones simplified to ~900 triangles, trees scaled to 6–9.5 m and three small ones used as shrubs at 1–1.6 m; from v4.59 to v4.65 every tree in the game was one of these (`tools/assets/export-trees.cjs`); replaced by the forest pack at the owner's request.
 
-## Medical tent (uploaded, not in the game yet)
+## Medical tent (v4.72): the Med Bay
 
-"[Medical Tent](https://sketchfab.com/3d-models/medical-tent-6f00cbd2cfd54743bad4c056d04ba236)" by [Aidan Callaghan](https://sketchfab.com/aidancallaghan), licensed under [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). In `assets-src/models/medical_tent.glb`; intended for the Med Bay (STATUS #50).
+"[Medical Tent](https://sketchfab.com/3d-models/medical-tent-6f00cbd2cfd54743bad4c056d04ba236)" by [Aidan Callaghan](https://sketchfab.com/aidancallaghan), licensed under [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). **Changed:** merged, textures baked into vertex colours, simplified from 38,208 to 3,000 triangles and fitted to the Med Bay's 12 × 9 m footprint (`src/dev/propExport.ts`, `tools/assets/export-prop.cjs`). Original `assets-src/models/medical_tent.glb`, game copy `public/models/props/med_tent.glb`.
+
+## Military buildings (v4.72): the Vehicle Bay
+
+"[Military Environment Buildings. Modular](https://sketchfab.com/3d-models/military-environment-buildings-modular-371eb5dc09a9448aa932b957100f86c8)" by [Salah3D](https://sketchfab.com/abbasyounis214), licensed under [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). **Changed:** the garage on its own, textures baked into vertex colours, fitted to the Vehicle Bay's 15 × 12 m footprint (504 triangles; `tools/assets/export-prop.cjs`). Original `assets-src/models/military_environment_buildings._modular.zip`, game copy `public/models/props/vehicle_bay.glb`. The pack's other buildings aren't used yet.

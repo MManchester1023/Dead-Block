@@ -17,7 +17,7 @@ export function populate(w: World): void {
   for (const b of w.map.buildings) {
     const d = w.districtAt({ x: b.rect.x + b.rect.w / 2, y: b.rect.y + b.rect.h / 2 });
     const infested = !!d && d.def.id !== 'base' && d.infestation > 0;
-    const nest = infested && w.rng.chance(S.nestChance) ? Math.round(w.rng.int(S.nestSize[0], S.nestSize[1]) * HORDE.count) : 0;
+    const nest = infested && !b.landmark && w.rng.chance(S.nestChance) ? Math.round(w.rng.int(S.nestSize[0], S.nestSize[1]) * HORDE.count) : 0;
     w.buildingState.set(b.id, { searched: false, nest });
   }
   const m = w.map;
@@ -25,6 +25,10 @@ export function populate(w: World): void {
   w.addStructure('commandPost', { x: b.x + 3, y: b.y + 4 }, true);
   w.addStructure('barracks', { x: b.x + 3, y: b.y + 26 }, true);
   w.addStructure('supplyDepot', { x: b.x + 12, y: b.y + 4 }, true);
+  // STATUS #50: the Med Bay stands in the base from the start, run down until the hospital is looted and
+  // engineers repair it
+  const bay = w.addStructure('medBay', { x: b.x + 12, y: b.y + 26 }, false);
+  bay.hp = bay.def.hp * 0.4;
   // perimeter wall with a gate on the east side
   for (let y = b.y - 1; y <= b.y + b.h; y++) {
     const gy = m.baseGate.y / m.cell; // gate is in metres; walls are placed in cells

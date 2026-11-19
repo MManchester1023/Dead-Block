@@ -110,6 +110,15 @@ export const BALANCE = {
     loudness: 0.8,
   },
 
+  /**
+   * Significant buildings (round 15 #185, STATUS #50): searching one takes longer and always pays out, and
+   * the first loot of each kind unlocks something (hospital → the Med Bay can be repaired). Police and fire
+   * stations (STATUS #18) will join with their own numbers.
+   */
+  landmarks: {
+    hospital: { searchSec: 15, supplies: [45, 60], money: [90, 130] },
+  } as Record<string, { searchSec: number; supplies: readonly [number, number]; money: readonly [number, number] }>,
+
   /** Roaming packs (STATUS #11, round 8 #88); how often and how big is per difficulty tier (`roam`). */
   roaming: {
     /** Districts this close (metres) count as neighbours. */
