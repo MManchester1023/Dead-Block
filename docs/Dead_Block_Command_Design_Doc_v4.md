@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.96** | Plans written (§21 "Technical and polish plans", STATUS #77–#85): docs split, repo size (assets-src is 470 MB of every download), splitting orders.ts and Hud.ts, faster pathfinding, a proper vehicle planner, end-of-region summary card, level-up sound, idle squad button, minimap. No code changes. |
 | **v4.95** | STATUS #70 (round 21 #249, #250, #253, #255, #256): region 2's hive at stage 1; noise cooldown 60 s; hive stages 15 / 10.5 / 12 min; "Heavy MG Nest"; horde waves only from noise (no timer). |
 | **v4.94** | Round 21 #246: the owner picked all five bottom-HUD ideas (STATUS #76): an RTS command grid with the build menu as a page of it, a compact selection strip, objectives as one line under the top bar, radio as one line with the log on hover, and nothing at the bottom until something is selected. No code changes. |
 | **v4.93** | Round 21 answers recorded, plus #256 (no timed horde waves, noise only): troops = soldiers, clock from 06:00, pause/speed stay; the tutorial covers all three starter regions and pauses per prompt; open-world start later (with a bit more money and supplies); hive stages 15 / 10.5 / 12 min. No code changes. |
@@ -889,6 +890,46 @@ These get more expensive the longer they wait, so they're scheduled *before* the
 *Design status: v3 decisions remain confirmed. v4 additions are confirmed direction except where marked "candidate", "proposed" or "open question". All numbers are subject to playtesting.*
 
 ---
+
+### Technical and polish plans [v4.96] (owner asked for plans; STATUS #77–#85)
+
+**#77 Docs.** The design doc is 1,322 lines, about 430 of them the playtest log (§22) and ~100 the version table.
+1. Move §22 (every round, as is) to `docs/Playtest_Log.md`; §22 here keeps a short summary and a link.
+2. Move the version table to `docs/Changelog.md` (newest first, same rows); the design doc keeps a line saying where it is.
+3. Tidy the design doc's own sections where later rounds changed them (e.g. horde waves are noise-only since v4.95, the Heavy MG Nest's name), so it reads as the game today.
+4. Group the tests by feature instead of by round (`r14`, `humvee19`, `r21` → `vehicles`, `hives`, `hud`, …), same tests, nothing dropped; the browser checks keep their round names (they're a record of each round).
+5. Update CLAUDE.md, STATUS.md and tools/README.md to point at the new places. No game changes.
+
+**#78 Repo size (measured).** The download is big because of the *current* files, not just history: `assets-src/` (the original downloads: model packs, sound zips, recordings) is **470 MB** and is in every ZIP you download; the game itself (`public/` + `src/`) is ~38 MB. The history adds ~180 MB packed (deleted models, six old 17 MB copies of `cast.bin`).
+- Step 1 (the big win, no history rewrite): move `assets-src/` into a separate repository (e.g. `dead-block-assets`), where you upload originals from now on; this repo keeps only what the game ships plus a note of where each original lives (CREDITS.md already lists them). ZIP downloads drop from ~510 MB to ~40 MB. I'd add the assets repo to a session when an upload needs converting.
+- Alternative to step 1: Git LFS for `assets-src/` (ZIPs then contain small pointer files instead). Simpler for uploads, but GitHub's free LFS allowance is 1 GB of storage and 1 GB of downloads a month, and every new cloud session would download them again: I'd rather not.
+- Step 2 (optional, needs your OK): rewrite the history to drop the deleted big files and old `cast.bin` copies (clone ~180 MB → a few tens of MB). Every branch gets rewritten; old copies must be re-downloaded; links to old commits stop working.
+- Also: `cast.bin` (17 MB) is re-committed after each character change; that's fine for now (a few times a year).
+
+**#79 Two oversized files.**
+- `src/sim/systems/orders.ts` (1,099 lines): split into `orders.ts` (the order dispatcher and infantry), `vehicles.ts` (all the driving: route, steering, reversing, parking, getting unstuck, running over) and `engineering.ts` (build, repair, demo charges). Pure move: checked with the sim-hash probe (identical before and after) and the tests.
+- `src/ui/Hud.ts` (965 lines): split as part of #71 and #76 into `ui/hud/` pieces: top bar, districts, objectives line, selection strip, command grid, menu and settings, cards, dev panel, with `Hud.ts` just wiring them.
+- Do the `orders.ts` split before #81.
+
+**#80 Pathfinding speed.** Each route search builds fresh lookup tables (maps and sets) and stops after 6,000 squares.
+1. Rewrite the search on reused fixed-size arrays (no allocation per search), same results.
+2. A benchmark (1,000 random routes on the starter map) before and after; I'd expect several times faster (a guess until measured).
+3. With the time saved: a bigger search budget (fixes long routes that stop short, #75) and a straighter first leg.
+4. For the open world later: a coarse region-to-region route first, then the detailed one (only if the map grows enough to need it).
+
+**#81 Vehicle driving, properly.** Today it's a coarse route plus a dozen special rules (settle, orbit, K-turn, reverse, bump memory, unstuck). Plan: a planner that knows how a car moves (hybrid A*: it searches over position *and* heading using short forward and reverse arcs at the vehicle's turning circle, checks the vehicle's real outline against buildings, cars, trees and posts, and charges extra for reversing and changing direction). It produces a drivable path that already includes K-turns, backing up and the final facing; a simple follower drives it. Long trips keep the coarse route for the far part and plan the last ~40 m (or any tight part) properly. Most special rules go; bump memory and re-planning stay as a safety net. Measured on the 40-drive soak test (today: 40/40 arrive, 23 bumps). When: with the second vehicle class (LAV or tank), after #79.
+
+**#82 End-of-region summary card.** When a region is secured, a card at the side (not pausing, like the others): time taken, zombies killed (this region and the campaign total), hives destroyed, buildings searched, supplies and money found, civilians rescued, soldiers and squads lost, the top squad (most kills) and promotions. Needs a small per-region tally in the game state (saved with the game); the same tally gives the total kill counter (#252) in the top bar.
+
+**#83 Squad level-up sound.** A short sting (under ~1.5 s) when a squad is promoted, placed at the squad and heard at any zoom, plus a brief gold flash on its label. Needs a sound: a bugle note, a radio chirp or a short "rank up" chime (free-licence; Pixabay or Freesound). Until then, nothing (no placeholder).
+
+**#84 Idle squad button.** A small "IDLE n" button with the bottom HUD (#76) and a key (`.`, as in many RTS games, if it's free): each press selects the next squad with nothing to do (no orders, not riding, not in a tower, not working) and centres the camera on it; Shift+click selects all of them. Hidden when nobody's idle.
+
+**#85 Minimap.** A small square map in a corner (about 180 px, bottom left, with the radio line above it):
+- drawn once from the map (roads, buildings, the base), then 4–10 times a second: region outlines (infestation tint, locked dimmed), your squads (blue), structures (squares), hives (red), zombies as faint red dots, and the camera's view as an outline (it turns with the camera);
+- click or drag on it to move the camera; later, right-click on it to send selected squads;
+- a Settings switch to hide it; it stays on the ops map too.
+- Cheap: a 2D canvas, a fraction of a millisecond per update.
 
 ## 22. Playtest feedback log [v4.2]
 
