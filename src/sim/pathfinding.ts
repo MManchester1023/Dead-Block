@@ -3,12 +3,20 @@ import type { NavGrid } from './grid';
 
 /** Extra cost of stepping through a hazard cell (Bloater gas, v4.15 #83): go round unless it's a long way. */
 const HAZARD_COST = 10;
+/** Round 20 #241: what a vehicle's route adds for a square next to a building, parked car or structure. */
+const NEAR_COST = 1.5;
+
+/** Round 20 #241: a vehicle's extra route rules: squares it can't use (trees, posts) and squares it'd rather not (hugging walls). */
+export interface VehicleRoute {
+  walls: Uint8Array;
+  near: Uint8Array;
+}
 
 /**
  * Binary-heap A* over the nav grid, 8-connected with no corner cutting, plus line-of-sight smoothing.
  * `hazard` (optional, one byte per cell) marks cells to avoid, such as toxic clouds: expensive, not blocked.
  */
-export function findPath(grid: NavGrid, from: Vec2, to: Vec2, maxNodes = 6000, hazard?: Uint8Array): Vec2[] | null {
+export function findPath(grid: NavGrid, from: Vec2, to: Vec2, maxNodes = 6000, hazard?: Uint8Array, vehicle?: VehicleRoute): Vec2[] | null {
   const W = grid.width;
   const sx = grid.c(from.x);
   const sy = grid.c(from.y);
@@ -88,7 +96,11 @@ export function findPath(grid: NavGrid, from: Vec2, to: Vec2, maxNodes = 6000, h
         if (dx && dy && (grid.isBlocked(cx + dx, cy) || grid.isBlocked(cx, cy + dy))) continue;
         const ni = ny * W + nx;
         if (closed.has(ni)) continue;
-        const cost = (g.get(cur) ?? 0) + (dx && dy ? Math.SQRT2 : 1) / grid.slow[ni] + (hazard && hazard[ni] ? HAZARD_COST : 0);
+        // round 20 #241: a vehicle doesn't drive through a tree's or a post's square (where it is or where it's going excepted)
+        if (vehicle && vehicle.walls[ni] && ni !== target) continue;
+        if (vehicle && dx && dy && (vehicle.walls[cy * W + cx + dx] || vehicle.walls[(cy + dy) * W + cx])) continue;
+        const cost =
+          (g.get(cur) ?? 0) + (dx && dy ? Math.SQRT2 : 1) / grid.slow[ni] + (hazard && hazard[ni] ? HAZARD_COST : 0) + (vehicle && vehicle.near[ni] ? NEAR_COST : 0);
         if (cost < (g.get(ni) ?? Infinity)) {
           g.set(ni, cost);
           came.set(ni, cur);
@@ -108,10 +120,10 @@ export function findPath(grid: NavGrid, from: Vec2, to: Vec2, maxNodes = 6000, h
   tilePath.reverse();
   const pts = tilePath.map((i) => ({ x: grid.center(i % W), y: grid.center((i / W) | 0) }));
   if (best === target) pts[pts.length - 1] = goal;
-  return smooth(grid, from, pts, hazard);
+  return smooth(grid, from, pts, hazard, vehicle?.walls);
 }
 
-function walkable(grid: NavGrid, a: Vec2, b: Vec2, hazard?: Uint8Array): boolean {
+function walkable(grid: NavGrid, a: Vec2, b: Vec2, hazard?: Uint8Array, walls?: Uint8Array): boolean {
   const d = Math.hypot(b.x - a.x, b.y - a.y);
   const steps = Math.ceil(d / (0.25 * grid.cell));
   for (let i = 1; i <= steps; i++) {
@@ -123,17 +135,19 @@ function walkable(grid: NavGrid, a: Vec2, b: Vec2, hazard?: Uint8Array): boolean
     for (const [ox, oy] of [[f, f], [-f, f], [f, -f], [-f, -f]]) if (grid.isBlockedXY(x + ox, y + oy)) return false;
     // don't let smoothing cut a corner straight back through the gas the path went around
     if (hazard && i < steps && hazard[grid.c(y) * grid.width + grid.c(x)]) return false;
+    // …nor a vehicle's straight back through a tree it went round
+    if (walls && i < steps) for (const [ox, oy] of [[0, 0], [f, f], [-f, f], [f, -f], [-f, -f]]) if (walls[grid.c(y + oy) * grid.width + grid.c(x + ox)]) return false;
   }
   return true;
 }
 
-function smooth(grid: NavGrid, from: Vec2, pts: Vec2[], hazard?: Uint8Array): Vec2[] {
+function smooth(grid: NavGrid, from: Vec2, pts: Vec2[], hazard?: Uint8Array, walls?: Uint8Array): Vec2[] {
   const out: Vec2[] = [];
   let anchor = from;
   let i = 0;
   while (i < pts.length) {
     let j = pts.length - 1;
-    while (j > i && !walkable(grid, anchor, pts[j], hazard)) j--;
+    while (j > i && !walkable(grid, anchor, pts[j], hazard, walls)) j--;
     out.push(pts[j]);
     anchor = pts[j];
     i = j + 1;

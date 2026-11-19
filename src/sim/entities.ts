@@ -65,6 +65,14 @@ export class Squad implements Targetable {
   /** Round 19 #226: spots it ran into lately (nav cells), planned around until `until`; bumps in a row. */
   avoid: { c: number; until: number }[] = [];
   bumps = 0;
+  /** Round 20 #242: goes at getting unstuck on this drive, and how far it still had to go last time. */
+  stuckTries = 0;
+  stuckLeft = Infinity;
+  /** …bumps in a row without getting closer, and how far it had to go at the last one. */
+  bumpStreak = 0;
+  bumpLeft = Infinity;
+  /** Round 20 #242: the nearest point it can reach, when it can't get to where it was sent. */
+  reachEnd: { x: number; y: number } | null = null;
   /** …and the spot it's backing away from. */
   backFrom: { x: number; y: number } | null = null;
   /** Round 19 #227: backing straight up to a spot close behind it. */

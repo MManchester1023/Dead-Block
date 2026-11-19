@@ -260,6 +260,8 @@ const BACK_UP_RANGE = 12;
 /** Round 19 #226: how long it plans round something it ran into, and the longest it backs away from it. */
 const AVOID_SEC = 20;
 const BACK_OUT_MAX_SEC = 3.5;
+/** Round 20 #242: goes at getting unstuck before it stops and radios in. */
+const STUCK_TRIES = 4;
 
 /**
  * Round 17 #203: vehicles drive like cars. They follow their route by steering toward a point a few metres
@@ -277,9 +279,14 @@ function driveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: number,
     s.bumps = 0;
     s.backingUp = false;
     s.driveAnchor = null;
+    s.stuckTries = 0;
+    s.stuckLeft = Infinity;
   }
   s.drivenAt = w.time;
-  const left = dist(s.pos, dest);
+  const asked = dest;
+  // round 20 #242: a spot it can't get to: it drives to the nearest point it can and stops there
+  if (s.reachEnd && s.pathFor && dist(s.pathFor, asked) <= 3) dest = s.reachEnd;
+  let left = dist(s.pos, dest);
   if (s.aligning) return alignTo(w, s, order?.face ?? s.facing, H, dt);
   if (left <= arrive) {
     if (through) return true; // round 19 #229: on to the next waypoint at speed
@@ -294,15 +301,29 @@ function driveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: number,
     stepVehicle(w, s, H, dt);
     return false;
   }
-  if (s.pathFor && dist(s.pathFor, dest) > 3) {
+  if (s.pathFor && dist(s.pathFor, asked) > 3) {
     s.path = [];
+    s.reachEnd = null;
+    dest = asked;
+    left = dist(s.pos, dest);
+    s.bumpStreak = 0;
+    s.bumpLeft = Infinity;
     s.driveAnchor = null; // somewhere new: the stuck clock starts again (a re-plan round something doesn't)
+    s.bumps = 0;
+    s.stuckTries = 0;
+    s.stuckLeft = Infinity;
   }
   if (!s.path.length || s.pathVersion !== w.navVersion) {
-    s.path = findPath(w.grid, s.pos, dest, 6000, vehicleRouteCosts(w, s)) ?? [];
+    s.path = vehicleRoute(w, s, asked);
     s.pathVersion = w.navVersion;
-    s.pathFor = { ...dest };
+    s.pathFor = { ...asked };
     if (!s.path.length) return true; // unreachable: give up gracefully
+    const end = s.path[s.path.length - 1];
+    s.reachEnd = dist(end, w.grid.nearestFree(asked)) > w.grid.cell * 1.5 ? { ...end } : null;
+    if (s.reachEnd) {
+      dest = s.reachEnd;
+      left = dist(s.pos, dest);
+    }
     // round 19 #227: close behind it, with a clear line: back straight up to it rather than turn round
     // (not once it has bumped into something on this drive)
     const behind = Math.abs(wrapAngle(Math.atan2(dest.y - s.pos.y, dest.x - s.pos.x) - s.facing)) > 2.3;
@@ -316,10 +337,24 @@ function driveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: number,
     s.driveAnchor = { x: s.pos.x, y: s.pos.y };
     s.driveSince = w.time;
   } else if (w.time - s.driveSince > 4) {
-    s.vel = 0;
-    s.moving = false;
+    // round 20 #242: stuck: don't give up: mark what's in front, back away and plan another way; only after a
+    // few goes without getting any closer does it stop (and says so)
+    if (left < s.stuckLeft - 15) s.stuckTries = 0; // it had got well on since the last time
+    s.stuckLeft = left;
+    s.stuckTries++;
     s.backingUp = false;
-    return true;
+    if (s.stuckTries > STUCK_TRIES) return giveUp(w, s);
+    const ahead = { x: s.pos.x + Math.cos(s.facing) * (H.length / 2 + 1.5), y: s.pos.y + Math.sin(s.facing) * (H.length / 2 + 1.5) };
+    s.avoid = s.avoid.filter((a) => a.until > w.time);
+    s.avoid.push({ c: w.grid.c(ahead.y) * w.grid.width + w.grid.c(ahead.x), until: w.time + AVOID_SEC });
+    s.backFrom = ahead;
+    s.reverseFor = BACK_OUT_MAX_SEC;
+    s.reverseSteer = s.stuckTries % 2 ? s.reverseSteer || 1 : -(s.reverseSteer || 1);
+    s.vel = 0;
+    s.path = [];
+    s.driveAnchor = { x: s.pos.x, y: s.pos.y };
+    s.driveSince = w.time;
+    return false;
   }
   if (s.backingUp) return backUp(w, s, dest, dt, arrive, H, through);
   // round 19 #226: no cutting corners: a route point is skipped, or aimed at, only if it can drive straight
@@ -386,6 +421,13 @@ function driveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: number,
     s.avoid = s.avoid.filter((a) => a.until > w.time);
     s.avoid.push({ c: w.grid.c(ahead.y) * w.grid.width + w.grid.c(ahead.x), until: w.time + AVOID_SEC });
     s.bumps++;
+    // round 20 #242: bumping again and again without getting any closer counts as being stuck
+    s.bumpStreak = left < s.bumpLeft - 5 ? 1 : s.bumpStreak + 1;
+    s.bumpLeft = left;
+    if (s.bumpStreak >= 4) {
+      s.bumpStreak = 0;
+      if (++s.stuckTries > STUCK_TRIES) return giveUp(w, s);
+    }
     s.backFrom = ahead;
     s.reverseFor = BACK_OUT_MAX_SEC;
     s.reverseSteer = s.bumps >= 2 ? -(s.reverseSteer || 1) : Math.abs(err) > 0.25 ? Math.sign(err) : s.reverseSteer || 1;
@@ -406,14 +448,36 @@ function driveClear(w: World, a: Vec2, b: Vec2, r: number): boolean {
   return true;
 }
 
-/** Round 19 #226: the vehicles' route costs, plus the spots this one has run into lately. */
-function vehicleRouteCosts(w: World, s: Squad): Uint8Array {
-  const base = w.vehicleHazard();
+/** Round 20 #242: every way it tried is shut: stop and say so. */
+function giveUp(w: World, s: Squad): boolean {
+  s.vel = 0;
+  s.moving = false;
+  s.backingUp = false;
+  s.reverseFor = 0;
+  s.stuckTries = 0;
+  w.events.emit('radio', { speaker: s.name, text: "Can't find a way through here. Give us another route.", tone: 'warn' });
+  return true;
+}
+
+/**
+ * A vehicle's route: round trees and posts (round 20 #241), off the walls where it can, and round the spots it ran
+ * into lately (round 19 #226). If trees close every way, it tries again treating them as only something to avoid.
+ */
+function vehicleRoute(w: World, s: Squad, dest: Vec2): Vec2[] {
   s.avoid = s.avoid.filter((a) => a.until > w.time);
-  if (!s.avoid.length) return base;
-  const cells = Uint8Array.from(base);
-  for (const a of s.avoid) cells[a.c] = 1;
-  return cells;
+  let costs = w.hazard;
+  if (s.avoid.length) {
+    costs = Uint8Array.from(w.hazard);
+    for (const a of s.avoid) costs[a.c] = 1;
+  }
+  const route = w.vehicleRoute();
+  const path = findPath(w.grid, s.pos, dest, 6000, costs, route) ?? [];
+  const goal = w.grid.nearestFree(dest);
+  if (path.length && dist(path[path.length - 1], goal) <= w.grid.cell * 1.5) return path;
+  // walled in by trees: the old way (they cost, they don't block)
+  const both = Uint8Array.from(costs);
+  for (let i = 0; i < both.length; i++) if (route.walls[i]) both[i] = 1;
+  return findPath(w.grid, s.pos, dest, 6000, both, { walls: new Uint8Array(both.length), near: route.near }) ?? path;
 }
 
 /** Round 19 #227: back straight up to a spot close behind, the tail swinging toward it on the turning circle. */

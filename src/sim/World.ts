@@ -1,3 +1,4 @@
+import type { VehicleRoute } from './pathfinding';
 import { EventBus } from '../core/events';
 import { Rng } from '../core/rng';
 import { inRect, type Vec2 } from '../core/math';
@@ -140,7 +141,8 @@ export class World {
     if (!this.obstacles) {
       const list = this.decor()
         .filter((d) => d.kind === 'streetlight' || d.kind === 'tree' || d.kind === 'palm')
-        .map((d) => ({ x: d.x, y: d.z, r: d.kind === 'streetlight' ? 0.3 : 0.6 }));
+        // round 20 #241: a tree's canopy is ~3 m across: vehicles keep 1.2 m off its trunk (a palm's fronds, 0.8)
+        .map((d) => ({ x: d.x, y: d.z, r: d.kind === 'streetlight' ? 0.3 : d.kind === 'tree' ? 1.2 : 0.8 }));
       const byCell = new Map<number, { x: number; y: number; r: number }[]>();
       for (const o of list) {
         const c = this.grid.c(o.y) * this.grid.width + this.grid.c(o.x);
@@ -158,14 +160,32 @@ export class World {
     for (let y = cy - 1; y <= cy + 1; y++) for (let x = cx - 1; x <= cx + 1; x++) for (const o of this.obstacles!.byCell.get(y * this.grid.width + x) ?? []) out.push(o);
     return out;
   }
-  private vHazard: { version: number; nav: number; cells: Uint8Array } | null = null;
-  /** Route costs for vehicles: the toxic clouds everyone avoids, plus every cell with a lamp post or a tree. */
-  vehicleHazard(): Uint8Array {
-    if (this.vHazard && this.vHazard.version === this.hazardVersion) return this.vHazard.cells;
-    const cells = Uint8Array.from(this.hazard);
-    for (const p of this.vehicleObstacles()) cells[this.grid.c(p.y) * this.grid.width + this.grid.c(p.x)] = 1;
-    this.vHazard = { version: this.hazardVersion, nav: this.navVersion, cells };
-    return cells;
+  private vRoute: { nav: number; route: VehicleRoute } | null = null;
+  /**
+   * Round 20 #241: vehicles' route rules: every square a tree or a lamp post reaches into is a wall to them,
+   * and squares next to buildings, parked cars and structures cost a bit more (they keep to the middle of
+   * the street where they can).
+   */
+  vehicleRoute(): VehicleRoute {
+    const g = this.grid;
+    if (this.vRoute && this.vRoute.nav === g.version) return this.vRoute.route;
+    const W = g.width, H = g.height;
+    const walls = new Uint8Array(W * H);
+    for (const o of this.vehicleObstacles()) {
+      const r = o.r + 0.2;
+      for (let y = g.c(o.y - r); y <= g.c(o.y + r); y++)
+        for (let x = g.c(o.x - r); x <= g.c(o.x + r); x++) if (x >= 0 && y >= 0 && x < W && y < H) walls[y * W + x] = 1;
+    }
+    const near = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        if (g.isBlocked(x, y)) continue;
+        let n = 0;
+        for (let dy = -1; dy <= 1 && !n; dy++) for (let dx = -1; dx <= 1 && !n; dx++) if ((dx || dy) && g.isBlocked(x + dx, y + dy)) n = 1;
+        near[y * W + x] = n;
+      }
+    this.vRoute = { nav: g.version, route: { walls, near } };
+    return this.vRoute.route;
   }
 
   // ---------- setup ----------

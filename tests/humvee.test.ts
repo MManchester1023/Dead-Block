@@ -159,22 +159,23 @@ describe('the Humvee (STATUS #51, v4.77)', () => {
 
   it('runs zombies over while driving, not while parked (round 18 #213)', () => {
     const w = quiet();
-    const hv = w.spawnSquad('humvee', w.grid.nearestFree({ x: 150, y: 100 }));
-    hv.facing = 0;
+    // (round 20: on the open street; y = 100 is the lamp-post line, which routes now keep off)
+    const hv = w.spawnSquad('humvee', w.grid.nearestFree({ x: 172, y: 105.5 }));
+    hv.facing = Math.PI;
     hv.def = { ...hv.def, weapon: { ...hv.def.weapon, damage: 0 } }; // the gun stays out of it
     // parked next to one: nothing happens
-    const z0 = w.spawnZombie('walker', { x: hv.pos.x + 1.5, y: hv.pos.y })!;
+    const z0 = w.spawnZombie('walker', { x: hv.pos.x - 1.5, y: hv.pos.y })!;
     z0.def = { ...z0.def, speed: 0, sight: 0, hearing: 0, damage: 0 };
     run(w, 1);
     expect(z0.alive).toBe(true);
     z0.alive = false;
     // a line of them in its path while it drives
     const zs = [0, 1, 2].map((i) => {
-      const z = w.spawnZombie('walker', { x: hv.pos.x + 12 + i * 3, y: hv.pos.y })!;
+      const z = w.spawnZombie('walker', { x: hv.pos.x - 12 - i * 3, y: hv.pos.y })!;
       z.def = { ...z.def, speed: 0, sight: 0, hearing: 0, damage: 0 };
       return z;
     });
-    w.issueOrder([hv], { type: 'move', pos: w.grid.nearestFree({ x: hv.pos.x + 30, y: hv.pos.y }) });
+    w.issueOrder([hv], { type: 'move', pos: w.grid.nearestFree({ x: hv.pos.x - 30, y: hv.pos.y }) });
     run(w, 6);
     expect(zs.filter((z) => !z.alive).length).toBeGreaterThanOrEqual(2);
     expect(hv.kills).toBeGreaterThanOrEqual(2);
