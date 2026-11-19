@@ -34,72 +34,51 @@
     "url": "cars/wagon.glb"
   },
   "tree1": {
-    "url": "trees/circle006.glb"
+    "url": "trees/forest_oak_big.glb"
   },
   "tree2": {
-    "url": "trees/circle.glb"
+    "url": "trees/forest_oak_mid.glb"
   },
   "tree3": {
-    "url": "trees/circle004.glb"
+    "url": "trees/forest_oak_small.glb"
   },
   "tree4": {
-    "url": "trees/circle007.glb"
+    "url": "trees/forest_birch.glb"
   },
   "tree5": {
-    "url": "trees/circle001.glb"
+    "url": "trees/forest_pine000.glb"
   },
   "tree6": {
-    "url": "trees/circle002.glb"
+    "url": "trees/forest_pine001.glb"
   },
   "tree7": {
-    "url": "trees/circle005.glb"
+    "url": "trees/forest_pine002.glb"
   },
   "tree8": {
-    "url": "trees/circle003.glb"
+    "url": "trees/forest_pine003.glb"
   },
   "tree9": {
-    "url": "trees/lowpoly_tree_05.glb"
+    "url": "trees/forest_pine004.glb"
   },
   "tree10": {
-    "url": "trees/lowpoly_tree_07.glb"
+    "url": "trees/forest_pine005.glb"
   },
   "tree11": {
-    "url": "trees/lowpoly_tree_04.glb"
+    "url": "trees/forest_pine006.glb"
   },
   "tree12": {
-    "url": "trees/lowpoly_tree_03.glb"
+    "url": "trees/forest_pine007.glb"
   },
   "tree13": {
-    "url": "trees/lowpoly_tree_08.glb"
-  },
-  "tree14": {
-    "url": "trees/lowpoly_tree_02.glb"
-  },
-  "tree15": {
-    "url": "trees/lowpoly_tree_10.glb"
+    "url": "trees/forest_pine009.glb"
   },
   "shrub1": {
-    "url": "trees/lowpoly_tree_14.glb"
+    "url": "trees/forest_bush010.glb"
   },
   "shrub2": {
-    "url": "trees/lowpoly_tree_12.glb"
-  },
-  "tree16": {
-    "url": "trees/lowpoly_tree_09.glb"
+    "url": "trees/forest_bush011.glb"
   },
   "shrub3": {
-    "url": "trees/lowpoly_tree_13.glb"
-  },
-  "tree17": {
-    "url": "trees/lowpoly_tree_01.glb"
-  },
-  "tree18": {
-    "url": "trees/lowpoly_tree_15.glb"
-  },
-  "tree19": {
-    "url": "trees/lowpoly_tree_06.glb"
-  },
-  "tree20": {
-    "url": "trees/lowpoly_tree_11.glb"
+    "url": "trees/forest_bush012.glb"
   }
 }

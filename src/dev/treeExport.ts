@@ -91,5 +91,118 @@ async function exportTrees(jobs: Job[]): Promise<{ kind: 'tree' | 'shrub'; name:
   return out;
 }
 
+interface TexturedJob {
+  url: string;
+  /** Per material name: its base colour and (for leaf cards) opacity image. */
+  mats: Record<string, { diffuse: string; opacity?: string }>;
+  /** Each tree or shrub: the object names that make it up (a trunk and its branches, or one piece). */
+  items: { name: string; parts: string[]; kind: 'tree' | 'shrub' }[];
+}
+
+const loadImage = async (url: string) => {
+  const im = new Image();
+  im.src = url;
+  await im.decode();
+  return im;
+};
+
+/**
+ * v4.66: the owner's forest pack (99.Miles): leaves are cards with cut-out textures, so these keep their
+ * UVs and a texture (opacity folded into its alpha, alpha-tested, double-sided) instead of baked colours.
+ * A tree drawn from the shared atlas gets only its own crop of it (≤ 256 px); tiling textures (the detailed
+ * trees' bark and branches) are just shrunk. Trunk base at the origin, scaled like exportTrees.
+ */
+async function exportTexturedTrees(job: TexturedJob): Promise<{ kind: 'tree' | 'shrub'; name: string; b64: string; tris: number; height: number }[]> {
+  const root = await new FBXLoader().loadAsync(job.url);
+  root.updateMatrixWorld(true);
+  const byName = new Map<string, THREE.Mesh>();
+  root.traverse((o) => {
+    if ((o as THREE.Mesh).isMesh) byName.set(o.name, o as THREE.Mesh);
+  });
+  const images = new Map<string, HTMLImageElement>();
+  const img = async (u: string) => images.get(u) ?? (images.set(u, await loadImage(u)), images.get(u)!);
+  const heightOf = (it: TexturedJob['items'][number]) => {
+    const bb = new THREE.Box3();
+    for (const n of it.parts) bb.expandByObject(byName.get(n)!);
+    return bb.max.y - bb.min.y;
+  };
+  const tallestTree = Math.max(...job.items.filter((i) => i.kind === 'tree').map(heightOf));
+  const tallestShrub = Math.max(1e-6, ...job.items.filter((i) => i.kind === 'shrub').map(heightOf));
+  const out: { kind: 'tree' | 'shrub'; name: string; b64: string; tris: number; height: number }[] = [];
+
+  for (const it of job.items) {
+    // world-space parts
+    const parts = it.parts.map((n) => {
+      const m = byName.get(n);
+      if (!m) throw new Error(`no object ${n}`);
+      const g = (m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone()).applyMatrix4(m.matrixWorld);
+      return { g, mat: (Array.isArray(m.material) ? m.material[0] : m.material).name };
+    });
+    const bb = new THREE.Box3();
+    for (const p of parts) bb.union((p.g.computeBoundingBox(), p.g.boundingBox!));
+    // trunk base: the centre of the lowest tenth
+    let sx = 0, sz = 0, n = 0;
+    const low = bb.min.y + (bb.max.y - bb.min.y) * 0.1;
+    for (const p of parts) {
+      const a = p.g.attributes.position.array as Float32Array;
+      for (let i = 0; i < a.length; i += 3) if (a[i + 1] <= low) (sx += a[i]), (sz += a[i + 2]), n++;
+    }
+    const h = bb.max.y - bb.min.y;
+    const target = it.kind === 'shrub' ? 1 + 0.6 * (h / tallestShrub) : 6 + 3.5 * Math.max(0, (h / tallestTree - 0.55) / 0.45);
+    const s = target / h;
+    const group = new THREE.Group();
+    let tris = 0;
+    for (const p of parts) {
+      p.g.translate(-(n ? sx / n : 0), -bb.min.y, -(n ? sz / n : 0));
+      p.g.scale(s, s, s);
+      p.g.deleteAttribute('normal');
+      p.g.computeVertexNormals();
+      tris += p.g.attributes.position.count / 3;
+      const spec = job.mats[p.mat];
+      if (!spec) throw new Error(`no textures for material ${p.mat}`);
+      const uv = p.g.attributes.uv as THREE.BufferAttribute;
+      let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+      for (let i = 0; i < uv.count; i++) (u0 = Math.min(u0, uv.getX(i))), (u1 = Math.max(u1, uv.getX(i))), (v0 = Math.min(v0, uv.getY(i))), (v1 = Math.max(v1, uv.getY(i)));
+      const dif = await img(spec.diffuse);
+      const crop = u0 >= -0.001 && u1 <= 1.001 && v0 >= -0.001 && v1 <= 1.001; // inside the atlas: take just this part
+      if (crop) {
+        const m = 0.01;
+        (u0 = Math.max(0, u0 - m)), (u1 = Math.min(1, u1 + m)), (v0 = Math.max(0, v0 - m)), (v1 = Math.min(1, v1 + m));
+      } else (u0 = 0), (u1 = 1), (v0 = 0), (v1 = 1);
+      const sw = (u1 - u0) * dif.width, sh = (v1 - v0) * dif.height;
+      const k = Math.min(1, 256 / Math.max(sw, sh));
+      const cw = Math.max(4, Math.round(sw * k)), ch = Math.max(4, Math.round(sh * k));
+      const draw = (im: HTMLImageElement) => {
+        const cv = document.createElement('canvas');
+        cv.width = cw;
+        cv.height = ch;
+        const ctx = cv.getContext('2d')!;
+        ctx.drawImage(im, u0 * im.width, (1 - v1) * im.height, (u1 - u0) * im.width, (v1 - v0) * im.height, 0, 0, cw, ch);
+        return { cv, ctx };
+      };
+      const { cv, ctx } = draw(dif);
+      if (spec.opacity) {
+        const op = draw(await img(spec.opacity)).ctx.getImageData(0, 0, cw, ch).data;
+        const d = ctx.getImageData(0, 0, cw, ch);
+        for (let i = 0; i < d.data.length; i += 4) d.data[i + 3] = op[i];
+        ctx.putImageData(d, 0, 0);
+      }
+      if (crop) for (let i = 0; i < uv.count; i++) uv.setXY(i, (uv.getX(i) - u0) / (u1 - u0), (uv.getY(i) - v0) / (v1 - v0));
+      const tex = new THREE.CanvasTexture(cv);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = tex.wrapT = crop ? THREE.ClampToEdgeWrapping : THREE.RepeatWrapping;
+      const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 1, metalness: 0, side: THREE.DoubleSide, alphaTest: spec.opacity ? 0.5 : 0 });
+      group.add(new THREE.Mesh(p.g, mat));
+    }
+    const glb = (await new GLTFExporter().parseAsync(group, { binary: true })) as ArrayBuffer;
+    const bytes = new Uint8Array(glb);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    out.push({ kind: it.kind, name: it.name, b64: btoa(bin), tris, height: +target.toFixed(2) });
+  }
+  return out;
+}
+
+(window as unknown as Record<string, unknown>).exportTexturedTrees = exportTexturedTrees;
 (window as unknown as Record<string, unknown>).exportTrees = exportTrees;
 document.title = 'ready';
