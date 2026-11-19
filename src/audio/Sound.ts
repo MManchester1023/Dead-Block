@@ -144,7 +144,7 @@ export class Sound {
   /** Round 18 #211: each vehicle's drive-off sound now playing (one at a time). */
   private driving = new Map<number, { src: AudioBufferSourceNode; g: GainNode }>();
   private idles = new Map<number, { src: AudioBufferSourceNode; g: GainNode; p: StereoPannerNode }>();
-  private mgs = new Map<string, { src: AudioBufferSourceNode; g: GainNode; p: StereoPannerNode; pos: Vec2; last: number }>();
+  private mgs = new Map<string, { src: AudioBufferSourceNode; g: GainNode; p: StereoPannerNode; pos: Vec2; last: number; vehicle: boolean }>();
   /** Master volume, one of VOLUMES (remembered per browser). */
   volume = 1;
 
@@ -196,7 +196,7 @@ export class Sound {
         old.src.stop(now + 0.25);
         this.driving.delete(e.id);
       }
-      const n = this.play('drive', v.pos, { near: true });
+      const n = this.play('drive', v.pos, { near: true, keep: true });
       if (n) {
         this.driving.set(e.id, n);
         n.src.addEventListener('ended', () => this.driving.get(e.id) === n && this.driving.delete(e.id));
@@ -277,6 +277,11 @@ export class Sound {
     return { gain, pan: Math.max(-0.9, Math.min(0.9, (sp.x / innerWidth) * 2 - 1)) };
   }
 
+  /** Round 19 #230: a vehicle's gun gets quieter zoomed out: full from zoom 3, about half at the starting 1.6, a third at 1 and below. */
+  private mgZoom(): number {
+    return Math.max(0.35, Math.min(1, 0.35 + (0.65 * (this.game.renderer.rig.zoom - 1)) / 2));
+  }
+
   /** Round 17: vehicles are only heard zoomed in and close (owner): 0…1 by zoom and distance from the view's middle. */
   private closeUp(pos: Vec2): number {
     const rig = this.game.renderer.rig;
@@ -315,6 +320,11 @@ export class Sound {
       v.p.pan.setTargetAtTime(this.place(s.pos).pan, now, 0.1);
       v.src.playbackRate.setTargetAtTime(s.moving ? 1.12 : 1, now, 0.4); // revs a little higher on the move
     }
+    // round 19 #224: a drive-off follows the same zoom-and-distance rule as the idle while it plays
+    for (const [id, n] of this.driving) {
+      const s = this.game.world.squads.find((x) => x.id === id);
+      if (s) n.g.gain.setTargetAtTime(this.game.paused ? 0 : LIMITS.drive.volume * this.closeUp(s.pos), now, 0.1);
+    }
     for (const [id, v] of this.idles)
       if (!live.has(id)) {
         v.g.gain.setTargetAtTime(0, now, 0.1);
@@ -344,7 +354,8 @@ export class Sound {
       const p = ctx.createStereoPanner();
       src.connect(g).connect(p).connect(this.master);
       src.start(0, Math.random() * buf.duration);
-      m = { src, g, p, pos: { ...pos }, last: 0 };
+      const v = shooter != null && this.game.world.squads.some((s) => s.id === shooter && s.def.category === 'vehicle');
+      m = { src, g, p, pos: { ...pos }, last: 0, vehicle: v };
       this.mgs.set(key, m);
     }
     m.last = ctx.currentTime;
@@ -356,7 +367,7 @@ export class Sound {
     for (const [key, m] of this.mgs) {
       const at = this.place(m.pos);
       const on = !this.game.paused && now - m.last < MG_HOLD;
-      m.g.gain.setTargetAtTime(on ? MG_VOLUME * at.gain : 0, now, on ? 0.02 : 0.08);
+      m.g.gain.setTargetAtTime(on ? MG_VOLUME * at.gain * (m.vehicle ? this.mgZoom() : 1) : 0, now, on ? 0.02 : 0.08);
       m.p.pan.setTargetAtTime(at.pan, now, 0.1);
       if (now - m.last > 3) {
         m.src.stop(now + 0.3);
@@ -447,7 +458,7 @@ export class Sound {
   }
 
   /** Play a clip from a bank at a world position (null = everywhere, e.g. a distant scream). */
-  private play(bank: Bank, pos: Vec2 | null, opt: { rate?: number; gain?: number; offset?: number; near?: boolean } = {}): { src: AudioBufferSourceNode; g: GainNode } | null {
+  private play(bank: Bank, pos: Vec2 | null, opt: { rate?: number; gain?: number; offset?: number; near?: boolean; keep?: boolean } = {}): { src: AudioBufferSourceNode; g: GainNode } | null {
     const ctx = this.ctx;
     const bufs = this.buffers[bank];
     if (!ctx || !this.master || !bufs?.length || this.volume === 0) return null;
@@ -461,7 +472,7 @@ export class Sound {
     if (pos) {
       const at = this.place(pos);
       gain *= opt.near ? this.closeUp(pos) : at.gain;
-      if (gain < 0.01) return null;
+      if (gain < 0.01 && !opt.keep) return null; // (`keep`: its volume is followed every frame: round 19 #224)
       pan = at.pan;
     }
     const src = ctx.createBufferSource();

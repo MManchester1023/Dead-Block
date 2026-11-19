@@ -11,7 +11,7 @@ export function squadStatus(s: Squad, w: World): { text: string; tone: StatusTon
   if (s.def.category === 'civilian') return s.moving ? { text: 'ON THE MOVE', tone: 'move' } : { text: 'WAITING', tone: 'idle' };
   if (s.climb) return { text: s.climb.up ? 'CLIMBING UP' : 'CLIMBING DOWN', tone: 'move' };
   if (s.garrisonedIn != null) return { text: 'IN TOWER', tone: 'fight' };
-  if (w.time - s.healing < 0.5) return { text: 'TREATING', tone: 'work' };
+  if (w.time - s.healing < 0.5) return { text: s.def.category === 'vehicle' ? 'REPAIRING' : 'TREATING', tone: 'work' }; // round 19 #228
   const o = s.currentOrder?.type;
   switch (o) {
     case 'move':

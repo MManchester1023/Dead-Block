@@ -92,10 +92,11 @@ const ok = (cond, what) => console.log(`${cond ? 'ok  ' : 'FAIL'} ${what}`);
     z.hp = z.maxHp = 1e6;
     let n = 0;
     w.events.on('shot', (e) => e.shooter === hv.id && n++);
-    await new Promise((r) => setTimeout(r, 3000));
+    // (round 19 #231: the turret comes round first; the headless game runs slower than real time)
+    await new Promise((r) => setTimeout(r, 5000));
     return n;
   });
-  ok(shots > 3, `its mounted MG fires (${shots} shots in 3 s)`);
+  ok(shots > 3, `its mounted MG fires (${shots} shots in 5 s, after its turret comes round)`);
   ok(errs.length === 0, `no page errors${errs.length ? ': ' + errs.join(' / ') : ''}`);
   await b.close();
 })();

@@ -9,7 +9,7 @@
  * The simulation tests and balance probes never load a tuning: they always run on the defaults.
  */
 import { BALANCE, DIFFICULTY, HORDE } from './balance';
-import { ZOMBIES } from './units';
+import { STRUCTURES, UNITS, ZOMBIES } from './units';
 import type { MapData } from '../sim/map';
 
 export type KnobValue = number | number[];
@@ -75,6 +75,12 @@ export function knobs(map: MapData): Knob[] {
     );
   }
 
+  // round 19 #222: weapons (damage a hit), for units and defences that shoot
+  for (const u of Object.values(UNITS))
+    if (u.weapon.damage > 0) k.push({ path: `unit.${u.id}.weapon.damage`, group: 'Weapons (damage a hit)', label: `${u.name} (${u.weapon.name})` });
+  for (const st of Object.values(STRUCTURES))
+    if (st.weapon && st.weapon.damage > 0) k.push({ path: `structure.${st.id}.weapon.damage`, group: 'Weapons (damage a hit)', label: `${st.name} (${st.weapon.name})` });
+
   // difficulty tiers: hive broods (the spawn pools), spawning, waves, roaming packs
   DIFFICULTY.forEach((t, i) => {
     const g = `Tier ${i}: ${t.name}`;
@@ -132,6 +138,14 @@ function locate(path: string, map: MapData): { obj: Record<string, unknown>; key
   else if (root === 'BALANCE') (obj = BALANCE), (rest = bits.slice(1));
   else if (root === 'tier') (obj = DIFFICULTY[Number(a)]), (rest = bits.slice(2));
   else if (root === 'zombie') (obj = ZOMBIES[a]), (rest = bits.slice(2));
+  else if (root === 'unit' || root === 'structure') {
+    // round 19 #222: a weapon's damage; units that share a weapon (e.g. two squads with the service rifle)
+    // get their own copy first, so setting one doesn't change the other
+    const d = (root === 'unit' ? UNITS[a] : STRUCTURES[a]) as { weapon?: object } | undefined;
+    if (d?.weapon && bits[2] === 'weapon') d.weapon = { ...d.weapon };
+    obj = d;
+    rest = bits.slice(2);
+  }
   else if (root === 'region') {
     const d = map.districts.find((x) => x.id === a);
     obj = d;

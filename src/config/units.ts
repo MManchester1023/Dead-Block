@@ -33,10 +33,15 @@ export interface VehicleHandling {
   body: number;
   /** Knocks over lamp posts and trees and flattens cars instead of going round (armored; not built yet). */
   crushes: boolean;
+  /** Round 19: its outline (metres) — what it runs over is what's under this. */
+  length: number;
+  width: number;
+  /** Round 19 #231: radians a second its turret turns (it only fires once it's on target). */
+  turretSpeed: number;
 }
 export const VEHICLE_CLASSES: Record<VehicleClass, VehicleHandling> = {
-  light: { turnRadius: 6, accel: 7, brake: 12, reverseSpeed: 3, body: 1.3, crushes: false },
-  armored: { turnRadius: 7.5, accel: 4, brake: 8, reverseSpeed: 2.5, body: 1.8, crushes: true },
+  light: { turnRadius: 6, accel: 7, brake: 12, reverseSpeed: 3, body: 1.3, crushes: false, length: 4.2, width: 2.2, turretSpeed: 3 },
+  armored: { turnRadius: 7.5, accel: 4, brake: 8, reverseSpeed: 2.5, body: 1.8, crushes: true, length: 6.5, width: 3, turretSpeed: 1.5 },
 };
 /** A vehicle's handling: its class, with its own overrides. */
 export function vehicleHandling(def: UnitDef): VehicleHandling {
@@ -111,7 +116,7 @@ export const UNITS: Record<string, UnitDef> = {
   mortar: { id: 'mortar', name: 'Mortar Team', category: 'infantry', members: 3, memberHp: 38, speed: 4.8, weapon: { name: '81mm mortar', range: 52, damage: 40, cooldown: 4, accuracy: 0.6, type: 'explosive', loudness: 6 }, cost: { money: 150, supplies: 40 }, upkeep: 6, command: 3, buildTime: 20, producedAt: 'armory', requires: 'artillery', unlock: 'Harbor power / Armory Lv2' },
   // STATUS #51 (owner): the Humvee, made at the Vehicle Bay: the MG emplacement's gun on a turret that turns all
   // the way round, and room for one squad of up to 5 (an Elite rifle squad). Was the "Gun Jeep" placeholder.
-  humvee: { id: 'humvee', name: 'Humvee', category: 'vehicle', members: 1, memberHp: 420, speed: 12, weapon: { name: 'Mounted HMG', range: 35, damage: 12, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 }, cost: { money: 160, supplies: 40 }, upkeep: 6, command: 3, buildTime: 20, producedAt: 'vehicleBay', unlock: 'Build a Vehicle Bay', seats: 5, vehicleClass: 'light', tags: ['transport'] },
+  humvee: { id: 'humvee', name: 'Humvee', category: 'vehicle', members: 1, memberHp: 420, speed: 12, weapon: { name: 'Mounted HMG', range: 35, damage: 20, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 }, cost: { money: 160, supplies: 40 }, upkeep: 6, command: 3, buildTime: 20, producedAt: 'vehicleBay', unlock: 'Build a Vehicle Bay', seats: 5, vehicleClass: 'light', tags: ['transport'] },
   supplyTruck: { id: 'supplyTruck', name: 'Supply Truck', category: 'vehicle', vehicleClass: 'light', members: 1, memberHp: 260, speed: 11, weapon: { name: 'None', range: 0, damage: 0, cooldown: 99, accuracy: 0, type: 'bullet', loudness: 0 }, cost: { money: 120, supplies: 30 }, upkeep: 4, command: 2, buildTime: 18, producedAt: 'armorStation', requires: 'outpostResupply', unlock: 'Industrial Park power', tags: ['resupply'] },
   lav: { id: 'lav', name: 'LAV', category: 'vehicle', vehicleClass: 'armored', members: 1, memberHp: 480, speed: 10, weapon: { name: '25mm autocannon', range: 26, damage: 22, cooldown: 0.5, accuracy: 0.7, type: 'explosive', loudness: 5 }, cost: { money: 260, supplies: 60 }, upkeep: 8, command: 4, buildTime: 28, producedAt: 'armorStation', requires: 'vehicles', unlock: 'Stadium power / Armor Station Lv2' },
   tank: { id: 'tank', name: 'Battle Tank', category: 'vehicle', vehicleClass: 'armored', members: 1, memberHp: 900, speed: 7.6, weapon: { name: '120mm main gun', range: 32, damage: 120, cooldown: 3.5, accuracy: 0.85, type: 'explosive', loudness: 9 }, cost: { money: 420, supplies: 90 }, upkeep: 12, command: 6, buildTime: 40, producedAt: 'armorStation', requires: 'vehicles', unlock: 'Stadium power / Armor Station Lv2', tags: ['crushesCars', 'damagesBuildings'] },
@@ -232,7 +237,7 @@ export const STRUCTURES: Record<string, StructureDef> = {
   sandbags: { id: 'sandbags', name: 'Sandbag Wall', hp: 260, cost: { money: 15, supplies: 10 }, buildTime: 6, size: { w: 3, h: 1 }, blocksMovement: true, cover: 0.55, climbable: true, hotkey: 'Q' },
   wire: { id: 'wire', name: 'Barbed Wire', hp: 120, cost: { money: 10, supplies: 5 }, buildTime: 4, size: { w: 3, h: 1 }, blocksMovement: false, slow: 0.35, hotkey: 'W' },
   // round 12 #145: 8 → 12 damage a round
-  mgNest: { id: 'mgNest', name: 'MG Emplacement', hp: 380, cost: { money: 140, supplies: 45 }, buildTime: 12, size: { w: 2, h: 2 }, blocksMovement: true, cover: 0.5, coverSlots: 2, hotkey: 'E', arc: 120, weapon: { name: 'Mounted HMG', range: 35, damage: 12, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 } },
+  mgNest: { id: 'mgNest', name: 'MG Emplacement', hp: 380, cost: { money: 140, supplies: 45 }, buildTime: 12, size: { w: 2, h: 2 }, blocksMovement: true, cover: 0.5, coverSlots: 2, hotkey: 'E', arc: 120, weapon: { name: 'Mounted HMG', range: 35, damage: 20, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 } },
   tallWall: { id: 'tallWall', name: 'Tall Concrete Wall (40 ft)', hp: 4000, cost: { money: 400, supplies: 120 }, buildTime: 60, size: { w: 4, h: 1 }, blocksMovement: true, climbable: false, requires: 'tallWalls' },
   loudspeaker: { id: 'loudspeaker', name: 'Loudspeaker', hp: 80, cost: { money: 40, supplies: 10 }, buildTime: 8, size: { w: 1, h: 1 }, blocksMovement: false, lure: 6, requires: 'tallWalls' },
 };

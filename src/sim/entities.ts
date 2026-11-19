@@ -60,6 +60,15 @@ export class Squad implements Targetable {
   drivenAt = -1;
   driveAnchor: { x: number; y: number } | null = null;
   driveSince = 0;
+  /** Round 19 #231: a vehicle's turret, relative to its hull (radians; 0 = straight ahead). */
+  turretAngle = 0;
+  /** Round 19 #226: spots it ran into lately (nav cells), planned around until `until`; bumps in a row. */
+  avoid: { c: number; until: number }[] = [];
+  bumps = 0;
+  /** …and the spot it's backing away from. */
+  backFrom: { x: number; y: number } | null = null;
+  /** Round 19 #227: backing straight up to a spot close behind it. */
+  backingUp = false;
   /** Round 18 #214: shuffling round to a parking direction (K-turn strokes). */
   aligning = false;
   alignDir = 1;

@@ -21,6 +21,7 @@ assets are free-licence downloads, credited in `CREDITS.md`.
 
 ## Working with Mat
 
+- **Keep progress messages to a minimum** (round 19): work quietly, then one summary message when done.
 - Straightforward, honest answers; light-hearted is welcome. Say when something is a guess (most balance
   numbers are until a playtest) and when you didn't check something.
 - **No screenshots at all** (Mat asked twice; round 15 #191): don't take them, not even private ones to check

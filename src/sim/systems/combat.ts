@@ -1,7 +1,7 @@
 import { dist, type Vec2 } from '../../core/math';
 import { BALANCE, HORDE } from '../../config/balance';
 import { isEnabled } from '../../config/features';
-import { ABILITIES, type WeaponDef } from '../../config/units';
+import { ABILITIES, type WeaponDef, vehicleHandling } from '../../config/units';
 import { Hive, Squad, Zombie, Structure } from '../entities';
 import { pickTarget } from '../targeting';
 import { areHostile, type Faction, type Targetable } from '../types';
@@ -60,6 +60,18 @@ function fire(w: World, from: Vec2, t: Targetable, weapon: WeaponDef, dmgMult: n
   return wasAlive && !t.alive;
 }
 
+/** Radians off target a turret can be and still fire. */
+const TURRET_ON = 0.1;
+
+/** Round 19 #231: turn a vehicle's turret (relative to its hull) toward a target or the front; true when on target. */
+export function aimTurret(s: Squad, t: { pos: { x: number; y: number } } | null | undefined, dt: number): boolean {
+  const rel = t ? Math.atan2(t.pos.y - s.pos.y, t.pos.x - s.pos.x) - s.facing : 0;
+  const diff = Math.atan2(Math.sin(rel - s.turretAngle), Math.cos(rel - s.turretAngle));
+  const step = vehicleHandling(s.def).turretSpeed * dt;
+  s.turretAngle = Math.atan2(Math.sin(s.turretAngle + Math.max(-step, Math.min(step, diff))), Math.cos(s.turretAngle + Math.max(-step, Math.min(step, diff))));
+  return !!t && Math.abs(diff) <= TURRET_ON + step;
+}
+
 export function updateCombat(w: World, dt: number): void {
   for (const s of w.squads) {
     if (!s.alive || s.stunned > 0 || s.climb) continue; // hands on the ladder
@@ -77,6 +89,9 @@ export function updateCombat(w: World, dt: number): void {
       forced && forced.alive && dist(s.pos, forced.pos) - forced.radius <= weapon.range && canHurt(weapon, forced) && (!!g || w.grid.lineClear(s.pos, forced.pos));
     if (forcedOk) s.targetId = forced.id;
     const t = forcedOk ? forced : acquire(w, s, s.faction, weapon, undefined, !!g);
+    // round 19 #231: a vehicle's turret turns toward its target (back to the front with none), and the gun
+    // only fires once it's pointing there
+    if (s.def.category === 'vehicle' && !aimTurret(s, t, dt)) continue;
     if (!t) continue;
     if (!s.moving && s.def.category !== 'vehicle') s.facing = Math.atan2(t.pos.y - s.pos.y, t.pos.x - s.pos.x); // (a vehicle's gun turns, not its body)
     // round 12 #140: engineers at work (building, repairing, planting a charge, installing) don't shoot;

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { applyTuning, getKnob, knobs } from '../src/config/tuning';
 import { currentMapData } from '../src/sim/map';
 import { World } from '../src/sim/World';
+import { STRUCTURES, UNITS } from '../src/config/units';
 
 const map = currentMapData();
 const all = knobs(map);
@@ -49,5 +50,27 @@ describe('difficulty tuning (round 15 #181, v4.68)', () => {
     expect(bad).toHaveLength(4);
     expect(getKnob('HORDE.count', map)).toBe(saved.get('HORDE.count'));
     expect(getKnob('tier.0.normalPool', map)).toEqual(saved.get('tier.0.normalPool'));
+  });
+
+  it("has weapon damage for units and defences; units sharing a weapon don't change together (round 19 #222)", () => {
+    const paths = all.map((k) => k.path);
+    expect(paths).toContain('unit.humvee.weapon.damage');
+    expect(paths).toContain('structure.mgNest.weapon.damage');
+    expect(getKnob('unit.humvee.weapon.damage', map)).toBe(20);
+    // two units with the very same weapon object, if any (e.g. the service rifle)
+    const ids = Object.keys(UNITS);
+    const pair = ids.flatMap((a) => ids.filter((b) => b > a && UNITS[a].weapon === UNITS[b].weapon).map((b) => [a, b]))[0];
+    expect(applyTuning({ 'unit.humvee.weapon.damage': 33, 'structure.mgNest.weapon.damage': 31 }, map)).toEqual([]);
+    expect(UNITS.humvee.weapon.damage).toBe(33);
+    expect(STRUCTURES.mgNest.weapon!.damage).toBe(31);
+    const w = new World({ seed: 7, fixedHives: true });
+    expect(w.spawnSquad('humvee', w.grid.nearestFree({ x: 150, y: 100 })).def.weapon.damage).toBe(33);
+    if (pair) {
+      const [a, b] = pair;
+      const before = UNITS[b].weapon.damage;
+      expect(applyTuning({ [`unit.${a}.weapon.damage`]: before + 5 }, map)).toEqual([]);
+      expect(UNITS[a].weapon.damage).toBe(before + 5);
+      expect(UNITS[b].weapon.damage).toBe(before);
+    }
   });
 });

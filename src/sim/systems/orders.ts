@@ -115,7 +115,8 @@ export function updateOrders(w: World, dt: number): void {
       switch (o.type) {
         case 'move':
         case 'cover':
-          if (s.def.category === 'vehicle' ? driveToward(w, s, o.pos, dt, ARRIVE, o) : moveToward(w, s, o.pos, dt, ARRIVE)) {
+          // round 19 #229: a vehicle with another move queued drives on through this one
+          if (s.def.category === 'vehicle' ? driveToward(w, s, o.pos, dt, passing(s) ? 4 : ARRIVE, o, passing(s)) : moveToward(w, s, o.pos, dt, ARRIVE)) {
             s.orders.shift();
             s.path = [];
             if (o.face !== undefined && s.def.category !== 'vehicle') {
@@ -135,7 +136,7 @@ export function updateOrders(w: World, dt: number): void {
           const route = o.route ?? [o.pos];
           const leg = (o.leg ?? 0) % route.length;
           o.pos = route[leg];
-          if (moveToward(w, s, route[leg], dt, ARRIVE)) {
+          if (s.def.category === 'vehicle' ? driveToward(w, s, route[leg], dt, 4, undefined, true) : moveToward(w, s, route[leg], dt, ARRIVE)) {
             o.leg = (leg + 1) % route.length;
             s.path = [];
           }
@@ -242,6 +243,11 @@ export function moveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: n
 }
 
 const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+/** Round 19 #229: the order after this one is another move (a queued waypoint): drive on through. */
+const passing = (s: Squad) => {
+  const next = s.orders[1];
+  return !!next && (next.type === 'move' || next.type === 'attackMove');
+};
 /** Round 18 #214: parking facing a set way: shuffle strokes this long (metres), and close enough (radians). */
 const ALIGN_STROKE = 2.5;
 const ALIGN_OK = 0.2;
@@ -249,38 +255,58 @@ const ALIGN_OK = 0.2;
 const VEHICLE_SETTLE = 5;
 /** Round 18 #213: m/s above which a vehicle runs zombies over (a walk is ~1.4). */
 const VEHICLE_CRUSH_SPEED = 2.5;
+/** Round 19 #227: a spot this close (metres) and behind it is reached by backing up. */
+const BACK_UP_RANGE = 12;
+/** Round 19 #226: how long it plans round something it ran into, and the longest it backs away from it. */
+const AVOID_SEC = 20;
+const BACK_OUT_MAX_SEC = 3.5;
 
 /**
  * Round 17 #203: vehicles drive like cars. They follow their route by steering toward a point a few metres
  * ahead; they turn only while moving (around their class's turning circle), slow down for sharp turns and to
- * stop at the destination, and back up for a moment when a turn is too tight or they hit something.
- * Routes avoid lamp posts (#208), and a post that gets too close is driven round, not through.
+ * stop at the destination, and back up when a turn is too tight or they hit something.
+ * Round 19: routes avoid lamp posts and trees (#225); what it bumps into is remembered and planned round
+ * (#226); a spot close behind it is reached by backing straight up (#227); `through`: a waypoint on the way,
+ * driven through without stopping (#229).
  */
-function driveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: number, order?: Order): boolean {
+function driveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: number, order?: Order, through = false): boolean {
   const H = vehicleHandling(s.def);
-  if (w.time - s.drivenAt > dt * 1.5) s.orbitTurn = 0; // a fresh drive
+  if (w.time - s.drivenAt > dt * 1.5) {
+    // a fresh drive
+    s.orbitTurn = 0;
+    s.bumps = 0;
+    s.backingUp = false;
+    s.driveAnchor = null;
+  }
   s.drivenAt = w.time;
   const left = dist(s.pos, dest);
   if (s.aligning) return alignTo(w, s, order?.face ?? s.facing, H, dt);
   if (left <= arrive) {
+    if (through) return true; // round 19 #229: on to the next waypoint at speed
     // stop where we are
     s.vel += Math.max(-H.brake * dt, Math.min(H.brake * dt, -s.vel));
     if (Math.abs(s.vel) < 0.4) {
       s.vel = 0;
       s.moving = false;
+      s.backingUp = false;
       return parked(w, s, order, H, dt);
     }
     stepVehicle(w, s, H, dt);
     return false;
   }
-  if (s.pathFor && dist(s.pathFor, dest) > 3) s.path = [];
+  if (s.pathFor && dist(s.pathFor, dest) > 3) {
+    s.path = [];
+    s.driveAnchor = null; // somewhere new: the stuck clock starts again (a re-plan round something doesn't)
+  }
   if (!s.path.length || s.pathVersion !== w.navVersion) {
-    s.path = findPath(w.grid, s.pos, dest, 6000, w.vehicleHazard()) ?? [];
+    s.path = findPath(w.grid, s.pos, dest, 6000, vehicleRouteCosts(w, s)) ?? [];
     s.pathVersion = w.navVersion;
     s.pathFor = { ...dest };
-    s.driveAnchor = { x: s.pos.x, y: s.pos.y };
-    s.driveSince = w.time;
     if (!s.path.length) return true; // unreachable: give up gracefully
+    // round 19 #227: close behind it, with a clear line: back straight up to it rather than turn round
+    // (not once it has bumped into something on this drive)
+    const behind = Math.abs(wrapAngle(Math.atan2(dest.y - s.pos.y, dest.x - s.pos.x) - s.facing)) > 2.3;
+    s.backingUp = s.bumps === 0 && order?.face === undefined && behind && left < BACK_UP_RANGE && w.grid.lineClear(s.pos, dest);
   }
   // boxed in (hasn't actually got 2 m anywhere in 4 s; a U-turn moving away still counts as moving): close enough
   if (s.driveAnchor && Math.hypot(s.pos.x - s.driveAnchor.x, s.pos.y - s.driveAnchor.y) > 2) {
@@ -292,39 +318,49 @@ function driveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: number,
   } else if (w.time - s.driveSince > 4) {
     s.vel = 0;
     s.moving = false;
+    s.backingUp = false;
     return true;
   }
-  while (s.path.length > 1 && dist(s.pos, s.path[0]) < 3) s.path.shift();
+  if (s.backingUp) return backUp(w, s, dest, dt, arrive, H, through);
+  // round 19 #226: no cutting corners: a route point is skipped, or aimed at, only if it can drive straight
+  // there (its width, past parked cars, posts and trees)
+  while (s.path.length > 1 && dist(s.pos, s.path[0]) < 3 && driveClear(w, s.pos, s.path[1], H.body)) s.path.shift();
   const LOOK = H.turnRadius;
-  let aim = s.path[s.path.length - 1];
-  for (const p of s.path)
-    if (dist(s.pos, p) >= LOOK) {
-      aim = p;
-      break;
-    }
+  let aim = s.path[0];
+  for (let i = 1; i < s.path.length && dist(s.pos, aim) < LOOK; i++) {
+    if (!driveClear(w, s.pos, s.path[i], H.body)) break;
+    aim = s.path[i];
+  }
   if (dist(s.pos, aim) < 0.5) aim = dest;
   const err = wrapAngle(Math.atan2(aim.y - s.pos.y, aim.x - s.pos.x) - s.facing);
   // round 18 #215: don't orbit a spot it can't make: close and off to the side or behind, or it has already
-  // gone a full circle near it: settle here
+  // gone a full circle near it: settle here (a waypoint on the way just counts as passed)
   const toDest = wrapAngle(Math.atan2(dest.y - s.pos.y, dest.x - s.pos.x) - s.facing);
   if ((left < VEHICLE_SETTLE && Math.abs(toDest) > Math.PI / 2) || (left < H.turnRadius * 2.5 && s.orbitTurn > Math.PI * 2)) {
+    s.orbitTurn = 0;
+    if (through) return true;
     s.vel = 0;
     s.moving = false;
-    s.orbitTurn = 0;
     return parked(w, s, order, H, dt);
   }
-  // too tight to make going forward (or stuck on something): back up for a moment, steering the nose round
+  // too tight to make going forward (or stuck on something): back up, steering the nose round
   if (s.reverseFor > 0) {
     s.reverseFor -= dt;
-    if (s.reverseFor <= 0) s.path = []; // backed out: plan again from here
+    // round 19 #226: backing away from something it hit: far enough to swing round it on its turning circle
+    if (s.backFrom && dist(s.pos, s.backFrom) >= H.turnRadius + H.length / 2) s.reverseFor = 0;
+    if (s.reverseFor <= 0) {
+      s.path = []; // backed out: plan again from here (round what it hit)
+      s.backFrom = null;
+    }
   } else if (Math.abs(err) > 2.1 && dist(s.pos, aim) < H.turnRadius * 2.2) {
     s.reverseFor = 1.1;
     s.reverseSteer = Math.sign(err) || 1;
   }
   const reversing = s.reverseFor > 0;
   const turnSlow = 1 - 0.6 * Math.min(1, Math.abs(err) / (Math.PI / 2));
+  const cruise = s.def.speed * w.grid.slowAt(s.pos) * turnSlow;
   const stopping = Math.sqrt(2 * H.brake * 0.6 * Math.max(0, left - arrive));
-  const target = reversing ? -H.reverseSpeed : Math.min(s.def.speed * w.grid.slowAt(s.pos) * turnSlow, stopping + 1);
+  const target = reversing ? -H.reverseSpeed : through ? cruise : Math.min(cruise, stopping + 1);
   s.vel += Math.max(-H.brake * dt, Math.min(H.accel * dt, target - s.vel));
   const before = { x: s.pos.x, y: s.pos.y };
   const blocked = stepVehicle(w, s, H, dt);
@@ -336,10 +372,77 @@ function driveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: number,
   // doesn't hit the same thing
   const want = reversing && Math.abs(err) < 0.6 ? s.reverseSteer * Math.PI : err;
   s.facing = wrapAngle(s.facing + Math.max(-turn, Math.min(turn, want)));
-  if (blocked && !reversing && s.vel > 0.5) {
-    s.reverseFor = 1.6;
-    s.reverseSteer = Math.abs(err) > 0.25 ? Math.sign(err) : (s.reverseSteer || 1);
+  if (blocked && !reversing && s.vel > 0.5 && left < H.length + 2) {
+    // bumped into something right by the spot (a lamp post on it, a wall): that's as close as it gets
     s.vel = 0;
+    s.moving = false;
+    if (through) return true;
+    return parked(w, s, order, H, dt);
+  }
+  if (blocked && !reversing && s.vel > 0.5) {
+    // round 19 #226: remember what it hit (planned round for a while), back out properly, and if it keeps
+    // happening try swinging the other way
+    const ahead = { x: s.pos.x + Math.cos(s.facing) * (H.length / 2 + 1), y: s.pos.y + Math.sin(s.facing) * (H.length / 2 + 1) };
+    s.avoid = s.avoid.filter((a) => a.until > w.time);
+    s.avoid.push({ c: w.grid.c(ahead.y) * w.grid.width + w.grid.c(ahead.x), until: w.time + AVOID_SEC });
+    s.bumps++;
+    s.backFrom = ahead;
+    s.reverseFor = BACK_OUT_MAX_SEC;
+    s.reverseSteer = s.bumps >= 2 ? -(s.reverseSteer || 1) : Math.abs(err) > 0.25 ? Math.sign(err) : s.reverseSteer || 1;
+    s.vel = 0;
+  }
+  return false;
+}
+
+/** Round 19 #226: can a vehicle this wide (`r` each side) drive straight from a to b? Buildings, parked cars, posts, trees. */
+function driveClear(w: World, a: Vec2, b: Vec2, r: number): boolean {
+  const d = dist(a, b);
+  const n = Math.max(1, Math.ceil(d / 0.75));
+  for (let i = 1; i <= n; i++) {
+    const x = a.x + ((b.x - a.x) * i) / n, y = a.y + ((b.y - a.y) * i) / n;
+    for (const [ox, oy] of [[-r, -r], [r, -r], [-r, r], [r, r]]) if (w.grid.isBlockedXY(x + ox, y + oy)) return false;
+    for (const o of w.vehicleObstaclesNear({ x, y })) if (Math.hypot(x - o.x, y - o.y) < r + o.r) return false;
+  }
+  return true;
+}
+
+/** Round 19 #226: the vehicles' route costs, plus the spots this one has run into lately. */
+function vehicleRouteCosts(w: World, s: Squad): Uint8Array {
+  const base = w.vehicleHazard();
+  s.avoid = s.avoid.filter((a) => a.until > w.time);
+  if (!s.avoid.length) return base;
+  const cells = Uint8Array.from(base);
+  for (const a of s.avoid) cells[a.c] = 1;
+  return cells;
+}
+
+/** Round 19 #227: back straight up to a spot close behind, the tail swinging toward it on the turning circle. */
+function backUp(w: World, s: Squad, dest: Vec2, dt: number, arrive: number, H: ReturnType<typeof vehicleHandling>, through: boolean): boolean {
+  const left = dist(s.pos, dest);
+  const tailErr = wrapAngle(Math.atan2(dest.y - s.pos.y, dest.x - s.pos.x) - (s.facing + Math.PI));
+  if (Math.abs(tailErr) > 1.3) {
+    // it's not behind any more: drive round instead
+    s.backingUp = false;
+    s.path = [];
+    return false;
+  }
+  const target = -Math.min(H.reverseSpeed * 1.4, through ? H.reverseSpeed * 1.4 : Math.sqrt(2 * H.brake * 0.6 * Math.max(0, left - arrive)) + 0.5);
+  s.vel += Math.max(-H.brake * dt, Math.min(H.accel * dt, target - s.vel));
+  const before = { x: s.pos.x, y: s.pos.y };
+  const blocked = stepVehicle(w, s, H, dt);
+  const moved = Math.hypot(s.pos.x - before.x, s.pos.y - before.y);
+  // reversing: turning the nose one way swings the tail the other, so the tail heads for the spot
+  s.facing = wrapAngle(s.facing + Math.sign(tailErr) * Math.min(Math.abs(tailErr), moved / H.turnRadius));
+  if (blocked) {
+    // something behind (a parked car): close enough already, or drive round instead
+    s.vel = 0;
+    s.backingUp = false;
+    if (left < H.length + 2) {
+      s.moving = false;
+      return through || parked(w, s, undefined, H, dt);
+    }
+    s.bumps++;
+    s.path = [];
   }
   return false;
 }
@@ -380,14 +483,18 @@ function alignTo(w: World, s: Squad, face: number, H: ReturnType<typeof vehicleH
   return false;
 }
 
-/** Move a vehicle along its heading at its speed; slide around lamp posts. True if it ran into something. */
+/** Move a vehicle along its heading at its speed; slide round lamp posts and trees. True if it ran into something. */
 function stepVehicle(w: World, s: Squad, H: ReturnType<typeof vehicleHandling>, dt: number): boolean {
-  // round 18 #213: moving faster than a walk, it runs down the dead in its path (a little slower for each)
+  // round 18 #213: moving faster than a walk, it runs down the dead under it (a little slower for each);
+  // round 19 #223: only what's actually under its outline (length × width, turned with it)
   if (Math.abs(s.vel) > VEHICLE_CRUSH_SPEED) {
-    const dir = Math.sign(s.vel);
-    const nose = { x: s.pos.x + Math.cos(s.facing) * 1.4 * dir, y: s.pos.y + Math.sin(s.facing) * 1.4 * dir };
-    for (const z of w.zombieHash.query(nose, H.body + 1)) {
-      if (!z.alive || dist(z.pos, nose) > H.body + z.radius) continue;
+    const c = Math.cos(s.facing), sn = Math.sin(s.facing);
+    const halfL = H.length / 2, halfW = H.width / 2;
+    for (const z of w.zombieHash.query(s.pos, halfL + 1)) {
+      if (!z.alive) continue;
+      const dx = z.pos.x - s.pos.x, dy = z.pos.y - s.pos.y;
+      const along = dx * c + dy * sn, side = -dx * sn + dy * c;
+      if (Math.abs(along) > halfL + z.radius * 0.5 || Math.abs(side) > halfW + z.radius * 0.5) continue;
       w.damage(z, z.hp + 1, 'crush', s.pos, s);
       if (!z.alive) {
         s.kills++;
@@ -398,16 +505,22 @@ function stepVehicle(w: World, s: Squad, H: ReturnType<typeof vehicleHandling>, 
     }
   }
   const step = s.vel * dt;
-  const blocked = moveWithCollision(w.grid, s.pos, Math.cos(s.facing) * step, Math.sin(s.facing) * step, H.body);
+  const x0 = s.pos.x, y0 = s.pos.y;
+  // round 19 #226: only actually being stopped counts (sliding along a wall or a car's corner doesn't)
+  const blocked = moveWithCollision(w.grid, s.pos, Math.cos(s.facing) * step, Math.sin(s.facing) * step, H.body) && Math.hypot(s.pos.x - x0, s.pos.y - y0) < Math.abs(step) * 0.5;
+  let hit = false;
   if (!H.crushes)
-    for (const p of w.lampPosts()) {
-      const dx = s.pos.x - p.x, dy = s.pos.y - p.y;
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) continue;
-      const d = Math.hypot(dx, dy), min = H.body + 0.3;
-      if (d < min && d > 0.001) moveWithCollision(w.grid, s.pos, (dx / d) * (min - d), (dy / d) * (min - d), H.body);
+    for (const o of w.vehicleObstaclesNear(s.pos)) {
+      const dx = s.pos.x - o.x, dy = s.pos.y - o.y;
+      const d = Math.hypot(dx, dy), min = H.body + o.r;
+      if (d < min && d > 0.001) {
+        moveWithCollision(w.grid, s.pos, (dx / d) * (min - d), (dy / d) * (min - d), H.body);
+        // head-on into it (not just brushing past): that's a bump too
+        if ((dx * Math.cos(s.facing) + dy * Math.sin(s.facing)) * Math.sign(s.vel) < -d * 0.7) hit = true;
+      }
     }
   s.moving = Math.abs(s.vel) > 0.3;
-  return blocked;
+  return blocked || hit;
 }
 
 /**
@@ -434,6 +547,7 @@ function repairVehicle(w: World, s: Squad, v: Squad, dt: number): void {
   }
   w.supplies -= cost;
   v.pool += hp;
+  v.healing = w.time; // (it reads "REPAIRING")
   w.makeNoise(s.pos, 0.6 * dt * 10);
   if (v.pool >= v.poolMax) {
     v.pool = v.poolMax;

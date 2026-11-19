@@ -134,12 +134,36 @@ export class World {
   lampPosts(): Vec2[] {
     return (this.posts ??= this.decor().filter((d) => d.kind === 'streetlight').map((d) => ({ x: d.x, y: d.z })));
   }
+  private obstacles: { list: { x: number; y: number; r: number }[]; byCell: Map<number, { x: number; y: number; r: number }[]> } | null = null;
+  /** Round 19 #225: what vehicles steer round: lamp posts and trees (shrubs they drive through). */
+  vehicleObstacles(): { x: number; y: number; r: number }[] {
+    if (!this.obstacles) {
+      const list = this.decor()
+        .filter((d) => d.kind === 'streetlight' || d.kind === 'tree' || d.kind === 'palm')
+        .map((d) => ({ x: d.x, y: d.z, r: d.kind === 'streetlight' ? 0.3 : 0.6 }));
+      const byCell = new Map<number, { x: number; y: number; r: number }[]>();
+      for (const o of list) {
+        const c = this.grid.c(o.y) * this.grid.width + this.grid.c(o.x);
+        (byCell.get(c) ?? byCell.set(c, []).get(c)!).push(o);
+      }
+      this.obstacles = { list, byCell };
+    }
+    return this.obstacles.list;
+  }
+  /** The vehicle obstacles in the 3×3 cells around a point. */
+  vehicleObstaclesNear(p: Vec2): { x: number; y: number; r: number }[] {
+    this.vehicleObstacles();
+    const out: { x: number; y: number; r: number }[] = [];
+    const cx = this.grid.c(p.x), cy = this.grid.c(p.y);
+    for (let y = cy - 1; y <= cy + 1; y++) for (let x = cx - 1; x <= cx + 1; x++) for (const o of this.obstacles!.byCell.get(y * this.grid.width + x) ?? []) out.push(o);
+    return out;
+  }
   private vHazard: { version: number; nav: number; cells: Uint8Array } | null = null;
-  /** Route costs for vehicles: the toxic clouds everyone avoids, plus every cell with a lamp post. */
+  /** Route costs for vehicles: the toxic clouds everyone avoids, plus every cell with a lamp post or a tree. */
   vehicleHazard(): Uint8Array {
     if (this.vHazard && this.vHazard.version === this.hazardVersion) return this.vHazard.cells;
     const cells = Uint8Array.from(this.hazard);
-    for (const p of this.lampPosts()) cells[this.grid.c(p.y) * this.grid.width + this.grid.c(p.x)] = 1;
+    for (const p of this.vehicleObstacles()) cells[this.grid.c(p.y) * this.grid.width + this.grid.c(p.x)] = 1;
     this.vHazard = { version: this.hazardVersion, nav: this.navVersion, cells };
     return cells;
   }
