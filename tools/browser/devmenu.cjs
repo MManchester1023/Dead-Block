@@ -92,7 +92,7 @@ const ok = (cond, what) => console.log(`${cond ? 'ok  ' : 'FAIL'} ${what}`);
   ok(mortars === 2, `Shift+click keeps placing (${mortars} Mortar Teams, a stand-in for now)`);
   await p.mouse.click(screen.x, screen.y, { button: 'right' });
   const money2 = await p.evaluate(() => window.game.world.money);
-  ok(money2 > money1 - 50, `units are free ($${money1} → $${money2}: no $160 Humvee or $150 mortars taken; kill bounties and upkeep move it a little)`);
+  ok(money2 > money1 - 50, `units are free ($${money1} → $${money2}: no $180 Humvee or $150 mortars taken; kill bounties and upkeep move it a little)`);
 
   // buildings: finished, free, locked or not, with nobody selected; the ghost and R work as in a normal build
   await p.evaluate(() => {
@@ -140,7 +140,9 @@ const ok = (cond, what) => console.log(`${cond ? 'ok  ' : 'FAIL'} ${what}`);
   // the extras
   const m0 = await p.evaluate(() => window.game.world.money);
   await p.click('[data-act="devcash"]');
-  ok((await p.evaluate(() => window.game.world.money)) - m0 === 1000, '+$1000');
+  // (the units dropped above shoot: kill bounties can land in the same moment)
+  const gain = (await p.evaluate(() => window.game.world.money)) - m0;
+  ok(gain >= 1000 && gain < 1040, `+$1000 (${gain})`);
   await p.click('[data-act="devclear"]');
   ok((await p.evaluate(() => window.game.world.zombies.filter((x) => x.alive).length)) === 0, 'Clear all zombies');
   await p.mouse.move(700, 450);

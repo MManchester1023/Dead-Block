@@ -56,7 +56,7 @@ describe('difficulty tuning (round 15 #181, v4.68)', () => {
     const paths = all.map((k) => k.path);
     expect(paths).toContain('unit.humvee.weapon.damage');
     expect(paths).toContain('structure.mgNest.weapon.damage');
-    expect(getKnob('unit.humvee.weapon.damage', map)).toBe(20);
+    expect(getKnob('unit.humvee.weapon.damage', map)).toBe(15);
     // two units with the very same weapon object, if any (e.g. the service rifle)
     const ids = Object.keys(UNITS);
     const pair = ids.flatMap((a) => ids.filter((b) => b > a && UNITS[a].weapon === UNITS[b].weapon).map((b) => [a, b]))[0];

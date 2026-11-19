@@ -19,7 +19,8 @@ const run = (w: World, sec: number) => {
 describe('the Humvee (STATUS #51, v4.77)', () => {
   it('is made at the Vehicle Bay and carries the MG emplacement\'s gun', () => {
     expect(UNITS.humvee.producedAt).toBe('vehicleBay');
-    expect(UNITS.humvee.weapon).toEqual(STRUCTURES.mgNest.weapon);
+    // the same gun and damage; the Humvee's reaches farther (round 20 #243)
+    expect({ ...UNITS.humvee.weapon, range: 0 }).toEqual({ ...STRUCTURES.mgNest.weapon!, range: 0 });
     expect(UNITS.humvee.seats).toBe(5);
     const w = quiet();
     expect(queueProduction(w, 'humvee')).toMatch(/vehicleBay/);

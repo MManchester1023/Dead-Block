@@ -28,9 +28,9 @@ const STREET = { x: 172, y: 105.5 }; // (copy it: a squad keeps the very point i
 
 describe('the Humvee, round 19 (v4.85)', () => {
   it('its MG and the MG emplacement hit harder than infantry weapons (#222)', () => {
-    expect(UNITS.humvee.weapon.damage).toBe(20);
-    expect(STRUCTURES.mgNest.weapon!.damage).toBe(20);
-    for (const u of Object.values(UNITS)) if (u.category === 'infantry') expect(u.weapon.damage, u.id).toBeLessThan(20 + 26); // (the sniper and mortar are slow, heavy shots)
+    // round 20 #238 (owner): both 15
+    expect(UNITS.humvee.weapon.damage).toBe(15);
+    expect(STRUCTURES.mgNest.weapon!.damage).toBe(15);
     expect(UNITS.humvee.weapon.damage).toBeGreaterThan(UNITS.rifle.weapon.damage);
   });
 

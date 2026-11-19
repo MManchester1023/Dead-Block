@@ -116,7 +116,8 @@ export const UNITS: Record<string, UnitDef> = {
   mortar: { id: 'mortar', name: 'Mortar Team', category: 'infantry', members: 3, memberHp: 38, speed: 4.8, weapon: { name: '81mm mortar', range: 52, damage: 40, cooldown: 4, accuracy: 0.6, type: 'explosive', loudness: 6 }, cost: { money: 150, supplies: 40 }, upkeep: 6, command: 3, buildTime: 20, producedAt: 'armory', requires: 'artillery', unlock: 'Harbor power / Armory Lv2' },
   // STATUS #51 (owner): the Humvee, made at the Vehicle Bay: the MG emplacement's gun on a turret that turns all
   // the way round, and room for one squad of up to 5 (an Elite rifle squad). Was the "Gun Jeep" placeholder.
-  humvee: { id: 'humvee', name: 'Humvee', category: 'vehicle', members: 1, memberHp: 420, speed: 12, weapon: { name: 'Mounted HMG', range: 35, damage: 20, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 }, cost: { money: 160, supplies: 40 }, upkeep: 6, command: 3, buildTime: 20, producedAt: 'vehicleBay', unlock: 'Build a Vehicle Bay', seats: 5, vehicleClass: 'light', tags: ['transport'] },
+  // round 20 (owner): $180; its MG 15 a hit (the MG emplacement too) and out to 45 m (#233, #238, #243)
+  humvee: { id: 'humvee', name: 'Humvee', category: 'vehicle', members: 1, memberHp: 420, speed: 12, weapon: { name: 'Mounted HMG', range: 45, damage: 15, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 }, cost: { money: 180, supplies: 40 }, upkeep: 6, command: 3, buildTime: 20, producedAt: 'vehicleBay', unlock: 'Build a Vehicle Bay', seats: 5, vehicleClass: 'light', tags: ['transport'] },
   supplyTruck: { id: 'supplyTruck', name: 'Supply Truck', category: 'vehicle', vehicleClass: 'light', members: 1, memberHp: 260, speed: 11, weapon: { name: 'None', range: 0, damage: 0, cooldown: 99, accuracy: 0, type: 'bullet', loudness: 0 }, cost: { money: 120, supplies: 30 }, upkeep: 4, command: 2, buildTime: 18, producedAt: 'armorStation', requires: 'outpostResupply', unlock: 'Industrial Park power', tags: ['resupply'] },
   lav: { id: 'lav', name: 'LAV', category: 'vehicle', vehicleClass: 'armored', members: 1, memberHp: 480, speed: 10, weapon: { name: '25mm autocannon', range: 26, damage: 22, cooldown: 0.5, accuracy: 0.7, type: 'explosive', loudness: 5 }, cost: { money: 260, supplies: 60 }, upkeep: 8, command: 4, buildTime: 28, producedAt: 'armorStation', requires: 'vehicles', unlock: 'Stadium power / Armor Station Lv2' },
   tank: { id: 'tank', name: 'Battle Tank', category: 'vehicle', vehicleClass: 'armored', members: 1, memberHp: 900, speed: 7.6, weapon: { name: '120mm main gun', range: 32, damage: 120, cooldown: 3.5, accuracy: 0.85, type: 'explosive', loudness: 9 }, cost: { money: 420, supplies: 90 }, upkeep: 12, command: 6, buildTime: 40, producedAt: 'armorStation', requires: 'vehicles', unlock: 'Stadium power / Armor Station Lv2', tags: ['crushesCars', 'damagesBuildings'] },
@@ -224,10 +225,11 @@ export const STRUCTURES: Record<string, StructureDef> = {
   // v4.13: introduced by tutorial region 2 (#54, #74)
   // STATUS #50 (owner): unlocked when region 3's power comes on (the way the Med Bay was); engineers build it.
   // Vehicles come with the Humvee (STATUS #51).
-  // round 18 (owner): vehicles come out of the garage door (the model's door is on the north side, 2.3 m east of
-  // centre), and vehicles parked by it are repaired like squads resting at the Med Bay
-  vehicleBay: { id: 'vehicleBay', name: 'Vehicle Bay', hp: 1600, cost: { money: 220, supplies: 60 }, buildTime: 30, size: { w: 5, h: 4 }, blocksMovement: true, hotkey: 'Y', unlock: 'vehicleBay', baseOnly: true,
-    exit: { x: 2.3, y: -6, face: -Math.PI / 2 },
+  // round 18 (owner): vehicles come out of a garage door (on the north side), and vehicles parked by it are repaired like squads resting at the Med Bay
+  vehicleBay: { id: 'vehicleBay', name: 'Vehicle Bay', hp: 1600, cost: { money: 150, supplies: 60 }, buildTime: 30, size: { w: 5, h: 4 }, blocksMovement: true, hotkey: 'Y', unlock: 'vehicleBay', baseOnly: true,
+    // round 20 #232 (owner): out of the far-right door (as seen from the default camera; the model's doors are at
+    // x −4.2, 0 and +4.2 m)
+    exit: { x: 4.2, y: -6, face: -Math.PI / 2 },
     vehicleRepair: { radius: 9, perSec: 0.03, suppliesPerHp: 0.08, restAfterHitSec: 5 } },
   guardTower: { id: 'guardTower', name: 'Guard Tower', hp: 900, cost: { money: 120, supplies: 40 }, buildTime: 18, size: { w: 2, h: 2 }, blocksMovement: true, hotkey: 'V', garrison: { rangeMult: 1.4, cover: 0.5, height: 5, climbSec: 2, jumpSec: 2.5 }, unlock: 'guardTower' },
   // STATUS #11 gave every outpost a small all-round garrison; round 11 #129 made it a paid upgrade
@@ -237,7 +239,7 @@ export const STRUCTURES: Record<string, StructureDef> = {
   sandbags: { id: 'sandbags', name: 'Sandbag Wall', hp: 260, cost: { money: 15, supplies: 10 }, buildTime: 6, size: { w: 3, h: 1 }, blocksMovement: true, cover: 0.55, climbable: true, hotkey: 'Q' },
   wire: { id: 'wire', name: 'Barbed Wire', hp: 120, cost: { money: 10, supplies: 5 }, buildTime: 4, size: { w: 3, h: 1 }, blocksMovement: false, slow: 0.35, hotkey: 'W' },
   // round 12 #145: 8 → 12 damage a round
-  mgNest: { id: 'mgNest', name: 'MG Emplacement', hp: 380, cost: { money: 140, supplies: 45 }, buildTime: 12, size: { w: 2, h: 2 }, blocksMovement: true, cover: 0.5, coverSlots: 2, hotkey: 'E', arc: 120, weapon: { name: 'Mounted HMG', range: 35, damage: 20, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 } },
+  mgNest: { id: 'mgNest', name: 'MG Emplacement', hp: 380, cost: { money: 140, supplies: 45 }, buildTime: 12, size: { w: 2, h: 2 }, blocksMovement: true, cover: 0.5, coverSlots: 2, hotkey: 'E', arc: 120, weapon: { name: 'Mounted HMG', range: 35, damage: 15, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 } },
   tallWall: { id: 'tallWall', name: 'Tall Concrete Wall (40 ft)', hp: 4000, cost: { money: 400, supplies: 120 }, buildTime: 60, size: { w: 4, h: 1 }, blocksMovement: true, climbable: false, requires: 'tallWalls' },
   loudspeaker: { id: 'loudspeaker', name: 'Loudspeaker', hp: 80, cost: { money: 40, supplies: 10 }, buildTime: 8, size: { w: 1, h: 1 }, blocksMovement: false, lure: 6, requires: 'tallWalls' },
 };

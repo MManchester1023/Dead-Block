@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { World } from '../src/sim/World';
 import { findPath } from '../src/sim/pathfinding';
+import { STRUCTURES, UNITS, structureExit } from '../src/config/units';
 
 function quiet(): World {
   const w = new World({ seed: 3, fixedHives: true });
@@ -80,5 +81,33 @@ describe('Humvee pathing, round 20 (v4.89)', () => {
       expect(w.time - t0).toBeGreaterThan(15);
       expect(radio).toMatch(/another route/);
     }
+  });
+
+  it('round 20 numbers: Vehicle Bay $150, Humvee $180, MGs 15 a hit, Humvee out to 45 m, out of the far-right door (#232–#243)', () => {
+    expect(STRUCTURES.vehicleBay.cost).toEqual({ money: 150, supplies: 60 });
+    expect(UNITS.humvee.cost).toEqual({ money: 180, supplies: 40 });
+    expect(UNITS.humvee.weapon.damage).toBe(15);
+    expect(STRUCTURES.mgNest.weapon!.damage).toBe(15);
+    expect(UNITS.humvee.weapon.range).toBe(45);
+    expect(STRUCTURES.mgNest.weapon!.range).toBe(35);
+    expect(UNITS.humvee.weapon).not.toBe(STRUCTURES.mgNest.weapon);
+    // the right-hand door's middle (the model's doors are at x -4.2, 0, +4.2 from the centre)
+    const ex = structureExit(STRUCTURES.vehicleBay, { x: 10, y: 10 }, false, 3)!;
+    expect(ex.x - (10 + 2.5) * 3).toBeCloseTo(4.2, 5);
+  });
+
+  it('the Humvee picks targets out to 45 m', () => {
+    const w = quiet();
+    const hv = w.spawnSquad('humvee', w.grid.nearestFree({ ...STREET }));
+    hv.facing = Math.PI;
+    w.issueOrder([hv], { type: 'hold', pos: { ...hv.pos } });
+    const z = w.spawnZombie('walker', { x: hv.pos.x - 42, y: hv.pos.y })!;
+    z.def = { ...z.def, speed: 0, sight: 0, hearing: 0 };
+    z.hp = z.maxHp = 1e6;
+    expect(w.grid.lineClear(hv.pos, z.pos)).toBe(true);
+    let shots = 0;
+    w.events.on('shot', (e) => e.shooter === hv.id && shots++);
+    for (let i = 0; i < 60; i++) w.step(1 / 30);
+    expect(shots).toBeGreaterThan(2);
   });
 });
