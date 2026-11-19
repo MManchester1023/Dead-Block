@@ -193,6 +193,13 @@ export interface StructureDef {
   needsPower?: boolean;
   /** Med Bay (v4.17): squads resting within `radius` m heal `perSec` of their max health per second, paying supplies. */
   heal?: { radius: number; perSec: number; suppliesPerHp: number; restAfterHitSec: number };
+  /** Round 18: vehicles parked next to it get repaired over time, for supplies (the Vehicle Bay; like the Med Bay's `heal`). */
+  vehicleRepair?: { radius: number; perSec: number; suppliesPerHp: number; restAfterHitSec: number };
+  /**
+   * Round 18: where what it makes comes out: metres from its centre (x east, y south) and the way out
+   * (radians), for the unrotated footprint; turned with it when it's placed rotated (see `structureExit`).
+   */
+  exit?: { x: number; y: number; face: number };
   /** A one-time upgrade bought from the structure's panel (round 11 #129: the outpost garrison). Adds `weapon`. */
   upgrade?: { name: string; desc: string; cost: { money: number; supplies: number }; weapon: WeaponDef; workSec: number };
 }
@@ -212,7 +219,11 @@ export const STRUCTURES: Record<string, StructureDef> = {
   // v4.13: introduced by tutorial region 2 (#54, #74)
   // STATUS #50 (owner): unlocked when region 3's power comes on (the way the Med Bay was); engineers build it.
   // Vehicles come with the Humvee (STATUS #51).
-  vehicleBay: { id: 'vehicleBay', name: 'Vehicle Bay', hp: 1600, cost: { money: 220, supplies: 60 }, buildTime: 30, size: { w: 5, h: 4 }, blocksMovement: true, hotkey: 'Y', unlock: 'vehicleBay', baseOnly: true },
+  // round 18 (owner): vehicles come out of the garage door (the model's door is on the north side, 2.3 m east of
+  // centre), and vehicles parked by it are repaired like squads resting at the Med Bay
+  vehicleBay: { id: 'vehicleBay', name: 'Vehicle Bay', hp: 1600, cost: { money: 220, supplies: 60 }, buildTime: 30, size: { w: 5, h: 4 }, blocksMovement: true, hotkey: 'Y', unlock: 'vehicleBay', baseOnly: true,
+    exit: { x: 2.3, y: -6, face: -Math.PI / 2 },
+    vehicleRepair: { radius: 9, perSec: 0.03, suppliesPerHp: 0.08, restAfterHitSec: 5 } },
   guardTower: { id: 'guardTower', name: 'Guard Tower', hp: 900, cost: { money: 120, supplies: 40 }, buildTime: 18, size: { w: 2, h: 2 }, blocksMovement: true, hotkey: 'V', garrison: { rangeMult: 1.4, cover: 0.5, height: 5, climbSec: 2, jumpSec: 2.5 }, unlock: 'guardTower' },
   // STATUS #11 gave every outpost a small all-round garrison; round 11 #129 made it a paid upgrade
   outpost: { id: 'outpost', name: 'Outpost', hp: 600, cost: { money: 100, supplies: 30 }, buildTime: 30, size: { w: 3, h: 3 }, blocksMovement: true, requiresSecured: true, hotkey: 'O',
@@ -233,3 +244,17 @@ export const ABILITIES = {
   demoCharge: { name: 'Demo Charge', plantTime: 2, // round 14 #171: was 3
      fuse: 5, damage: 520, radius: 7, type: 'explosive' as DamageType, cost: { money: 25, supplies: 10 }, loudness: 30 },
 };
+
+/**
+ * Round 18: where a structure's output comes out, in world metres, and which way it faces, for a footprint at
+ * `tile` (nav cells), turned like the 3D model when `rotated` (the model turns +90°: x, y → y, −x).
+ */
+export function structureExit(def: StructureDef, tile: { x: number; y: number }, rotated: boolean, cell: number): { x: number; y: number; face: number } | null {
+  if (!def.exit) return null;
+  const w = rotated ? def.size.h : def.size.w;
+  const h = rotated ? def.size.w : def.size.h;
+  const cx = (tile.x + w / 2) * cell, cy = (tile.y + h / 2) * cell;
+  const ox = rotated ? def.exit.y : def.exit.x;
+  const oy = rotated ? -def.exit.x : def.exit.y;
+  return { x: cx + ox, y: cy + oy, face: rotated ? def.exit.face - Math.PI / 2 : def.exit.face };
+}

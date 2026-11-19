@@ -63,7 +63,8 @@ assets are free-licence downloads, credited in `CREDITS.md`.
 - **Textures** are baked into vertex colours at ≤512 px: shrink bigger ones with
   `tools/assets/resize-texture.cjs` (not ffmpeg: its colours differ), trim GLBs with `tools/assets/trim_glb.py`.
 - **Sounds**: originals in `assets-src/audio/`; shipped as trimmed mono mp3 (44.1 kHz, 96 kbit) in
-  `public/audio/` via ffmpeg, wired in `src/audio/Sound.ts`. Vehicle sounds play only zoomed in and close
+  `public/audio/` via ffmpeg, wired in `src/audio/Sound.ts`. **Loops** are seamless cross-faded WAVs (MP3 padding gaps a loop),
+  made by `tools/assets/make-loops.py`. Vehicle sounds play only zoomed in and close
   (`closeUp()` in Sound.ts, owner's rule). Building models (and vehicles) go through `tools/assets/export-prop.cjs`.
 
 ## Checking work

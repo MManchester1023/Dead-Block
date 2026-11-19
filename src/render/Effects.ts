@@ -15,12 +15,12 @@ interface Fx {
  */
 export class Effects {
   private fx: Fx[] = [];
-  private tracers: { a: Vec2; b: Vec2; life: number; heavy: boolean }[] = [];
+  private tracers: { a: Vec2; b: Vec2; life: number; heavy: boolean; h: number }[] = [];
   private tracerGeo = new THREE.BufferGeometry();
   private tracerPos = new Float32Array(1024 * 6);
   private activeSprays = 0;
   /** Round 11 #127: muzzle flashes, two pooled point clouds (rifles/carbines, and big guns). Real time. */
-  private flashes: { p: Vec2; life: number; big: boolean; shown: number }[] = [];
+  private flashes: { p: Vec2; life: number; big: boolean; shown: number; h: number }[] = [];
   private flashSets = [false, true].map((big) => {
     const pos = new Float32Array(512 * 3);
     const geo = new THREE.BufferGeometry();
@@ -40,18 +40,20 @@ export class Effects {
   }
 
   /** A muzzle flash a little way out of the barrel, toward the target (round 11 #127). */
-  muzzleFlash(from: Vec2, to: Vec2, big: boolean): void {
+  /** `h`: the muzzle's height (a soldier's rifle ~1.25 m; round 18 #210: a Humvee's turret gun higher, and already at the muzzle). */
+  muzzleFlash(from: Vec2, to: Vec2, big: boolean, h = 1.25, atMuzzle = false): void {
     if (this.flashes.length >= 1000) return;
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const l = Math.hypot(dx, dy) || 1;
     // round 15 #188: bigger, a little longer, and always drawn for at least two frames (a 0.05 s flash timed in
     // real time could fall between frames entirely when the frame rate dips)
-    this.flashes.push({ p: { x: from.x + (dx / l) * 0.75, y: from.y + (dy / l) * 0.75 }, life: big ? 0.1 : 0.08, big, shown: 0 });
+    const out = atMuzzle ? 0.2 : 0.75;
+    this.flashes.push({ p: { x: from.x + (dx / l) * out, y: from.y + (dy / l) * out }, life: big ? 0.1 : 0.08, big, shown: 0, h });
   }
 
-  tracer(from: Vec2, to: Vec2, heavy: boolean): void {
-    if (this.tracers.length < 1000) this.tracers.push({ a: from, b: to, life: heavy ? 0.12 : 0.06, heavy });
+  tracer(from: Vec2, to: Vec2, heavy: boolean, h = 1.3): void {
+    if (this.tracers.length < 1000) this.tracers.push({ a: from, b: to, life: heavy ? 0.12 : 0.06, heavy, h });
   }
 
   private add(obj: THREE.Object3D, life: number, update: Fx['update']): void {
@@ -215,7 +217,7 @@ export class Effects {
       t.life -= realDt;
       if (t.life <= 0 || n >= 1024) continue;
       const o = n * 6;
-      this.tracerPos.set([t.a.x, 1.3, t.a.y, t.b.x, 1.1, t.b.y], o);
+      this.tracerPos.set([t.a.x, t.h, t.a.y, t.b.x, 1.1, t.b.y], o);
       n++;
     }
     this.tracers = this.tracers.filter((t) => t.life > 0);
@@ -227,7 +229,7 @@ export class Effects {
       for (const fl of this.flashes) {
         if (fl.big !== set.big || (fl.life <= 0 && fl.shown >= 2) || k >= 512) continue;
         set.pos[k * 3] = fl.p.x;
-        set.pos[k * 3 + 1] = 1.25;
+        set.pos[k * 3 + 1] = fl.h;
         set.pos[k * 3 + 2] = fl.p.y;
         k++;
       }

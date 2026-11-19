@@ -47,6 +47,7 @@ export function issueOrder(w: World, squads: Squad[], order: Order, queue = fals
     if (!queue) {
       s.autoCrouch = false;
       s.seekCover = false;
+      s.aligning = false; // round 18 #214: a new order ends any parking shuffle
     }
   }
   // formations for multi-squad moves (doc §4; round 14 #177 adds shapes and a dragged facing): fighters in
@@ -400,6 +401,16 @@ export function orderResume(w: World, engineers: Squad[], site: Structure, queue
 }
 
 /** Engineers patch up damaged structures, paying supplies as they go (v4.4). */
+/** Round 18 #220: engineers patch up a damaged vehicle (supplies, like structure repairs). */
+export function orderRepairVehicle(w: World, engineers: Squad[], v: Squad, queue = false): string | null {
+  const eng = engineers.filter((e) => e.def.canBuild?.length);
+  if (!eng.length) return 'Only engineers can repair';
+  if (v.def.category !== 'vehicle') return 'Engineers repair vehicles and buildings';
+  if (v.pool >= v.poolMax) return `${v.name} isn't damaged`;
+  issueOrder(w, eng, { type: 'repair', pos: { ...v.pos }, targetId: v.id }, queue);
+  return null;
+}
+
 export function orderRepair(w: World, engineers: Squad[], st: Structure, queue = false): string | null {
   const eng = engineers.filter((e) => e.def.canBuild?.length);
   if (!eng.length) return 'Only engineers can repair';

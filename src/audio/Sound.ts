@@ -68,7 +68,7 @@ const LIMITS: Record<Bank, { voices: number; gap: number; volume: number }> = {
   flyby: { voices: 2, gap: 1, volume: 0.45 },
   chute: { voices: 2, gap: 0.3, volume: 0.6 },
   power: { voices: 1, gap: 1, volume: 0.8 },
-  drive: { voices: 3, gap: 0.15, volume: 0.75 },
+  drive: { voices: 6, gap: 0, volume: 0.75 },
   thud: { voices: 2, gap: 0.2, volume: 0.7 },
 };
 
@@ -83,6 +83,8 @@ const BUILD_VOLUME = 0.5;
 const MG_LOOP = 'mg_loop';
 /** Round 17: vehicles' engines (owner's recordings). Heard only zoomed in and close (VEHICLE_ZOOM, VEHICLE_NEAR). */
 const IDLE_LOOP = 'humvee_idle';
+/** Loops shipped as WAV so they repeat without a gap (round 18). */
+const WAV_LOOPS = new Set([MG_LOOP, IDLE_LOOP]);
 const IDLE_VOLUME = 0.45;
 /** Camera zoom: silent at or below the first, full from the second (the game starts at 1.6, max 6). */
 const VEHICLE_ZOOM = [2, 3];
@@ -139,6 +141,8 @@ export class Sound {
   /** One looping work sound per crew at a job (squad id → its nodes). */
   private work = new Map<number, { src: AudioBufferSourceNode; g: GainNode; p: StereoPannerNode }>();
   /** Firing MG emplacements: their loop, where they are, and when they last fired (v4.55). */
+  /** Round 18 #211: each vehicle's drive-off sound now playing (one at a time). */
+  private driving = new Map<number, { src: AudioBufferSourceNode; g: GainNode }>();
   private idles = new Map<number, { src: AudioBufferSourceNode; g: GainNode; p: StereoPannerNode }>();
   private mgs = new Map<string, { src: AudioBufferSourceNode; g: GainNode; p: StereoPannerNode; pos: Vec2; last: number }>();
   /** Master volume, one of VOLUMES (remembered per browser). */
@@ -183,7 +187,20 @@ export class Sound {
     // round 17 #207: a vehicle sent somewhere drives off (once per order, fading out after a couple of seconds)
     ev.on('vehicleOrdered', (e) => {
       const v = game.world.squads.find((s) => s.id === e.id);
-      if (v) this.play('drive', v.pos, { near: true });
+      if (!v) return;
+      // round 18 #211: one at a time per vehicle: a new order fades the last one out and starts again
+      const old = this.driving.get(e.id);
+      if (old && this.ctx) {
+        const now = this.ctx.currentTime;
+        old.g.gain.setTargetAtTime(0, now, 0.05);
+        old.src.stop(now + 0.25);
+        this.driving.delete(e.id);
+      }
+      const n = this.play('drive', v.pos, { near: true });
+      if (n) {
+        this.driving.set(e.id, n);
+        n.src.addEventListener('ended', () => this.driving.get(e.id) === n && this.driving.delete(e.id));
+      }
     });
     ev.on('memberKilled', (e) => this.play('human', e.pos, { rate: 0.92 + Math.random() * 0.16 }));
     ev.on('radio', (e) => {
@@ -226,7 +243,8 @@ export class Sound {
           /* a missing clip just stays silent */
         });
     }
-    const load = async (n: string) => this.ctx!.decodeAudioData(await (await fetch(`audio/${n}.mp3`)).arrayBuffer());
+    // round 18 #212/#216: the loops are seamless WAVs (MP3 pads the start and end, leaving a gap each repeat)
+    const load = async (n: string) => this.ctx!.decodeAudioData(await (await fetch(`audio/${n}${WAV_LOOPS.has(n) ? '.wav' : '.mp3'}`)).arrayBuffer());
     for (const n of [BUILD_LOOP, MG_LOOP, IDLE_LOOP])
       load(n)
         .then((b) => (this.loops[n] = b))
@@ -429,21 +447,21 @@ export class Sound {
   }
 
   /** Play a clip from a bank at a world position (null = everywhere, e.g. a distant scream). */
-  private play(bank: Bank, pos: Vec2 | null, opt: { rate?: number; gain?: number; offset?: number; near?: boolean } = {}): void {
+  private play(bank: Bank, pos: Vec2 | null, opt: { rate?: number; gain?: number; offset?: number; near?: boolean } = {}): { src: AudioBufferSourceNode; g: GainNode } | null {
     const ctx = this.ctx;
     const bufs = this.buffers[bank];
-    if (!ctx || !this.master || !bufs?.length || this.volume === 0) return;
-    if (this.game.paused && bank !== 'scream' && bank !== 'click') return;
+    if (!ctx || !this.master || !bufs?.length || this.volume === 0) return null;
+    if (this.game.paused && bank !== 'scream' && bank !== 'click') return null;
     const L = LIMITS[bank];
     const now = ctx.currentTime;
-    if (this.playing[bank] >= L.voices || now - this.lastStart[bank] < L.gap) return;
+    if (this.playing[bank] >= L.voices || now - this.lastStart[bank] < L.gap) return null;
 
     let gain = L.volume * (opt.gain ?? 1);
     let pan = 0;
     if (pos) {
       const at = this.place(pos);
       gain *= opt.near ? this.closeUp(pos) : at.gain;
-      if (gain < 0.01) return;
+      if (gain < 0.01) return null;
       pan = at.pan;
     }
     const src = ctx.createBufferSource();
@@ -458,5 +476,6 @@ export class Sound {
     this.lastStart[bank] = now;
     src.onended = () => this.playing[bank]--;
     src.start(0, opt.offset ?? 0);
+    return { src, g };
   }
 }

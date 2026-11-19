@@ -60,6 +60,12 @@ export class Squad implements Targetable {
   drivenAt = -1;
   driveAnchor: { x: number; y: number } | null = null;
   driveSince = 0;
+  /** Round 18 #214: shuffling round to a parking direction (K-turn strokes). */
+  aligning = false;
+  alignDir = 1;
+  alignTravel = 0;
+  /** Round 18 #215: radians turned while close to the destination (a full circle = it's orbiting). */
+  orbitTurn = 0;
   /** STATUS #51: riding in this vehicle (squad id): hidden, safe, not shooting. */
   inVehicle: number | null = null;
   /** STATUS #51: a vehicle's passenger squad (id). */

@@ -326,3 +326,9 @@ h3.collapsible:hover { color: #fff; }
 .dev-panel .opts { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
 .dev-panel .cmd { padding: 3px 8px; font-size: 11px; }
 .dev-panel .hint { margin: 6px 0 0; color: #c8a8a0; }
+
+/* Round 18 #217: experience to the next level, under the health bar */
+.xprow { display: flex; justify-content: center; margin-top: 1px; }
+.xpbar { display: block; width: 46px; height: 3px; background: #222; border: 1px solid #000; }
+.xpbar i { display: block; height: 100%; background: #7fb6e8; }
+.xpbar.max i { background: #e8c25a; }

@@ -96,6 +96,7 @@ const CONTROLS: [string, [string, string][]][] = [
     [K('G'), 'Crouch / stand (half cover anywhere, slower on the move)'],
     [K('K'), 'Medics: heal a squad (or right-click a hurt squad)'],
     [K('U'), 'Humvee: unload its squad (right-click a Humvee with infantry to board)'],
+    [K('N'), 'Engineers: repair (then click a vehicle or a building); right-clicking a vehicle boards it'],
     [K('`'), 'Dev menu: spawn zombies and hives for testing'],
     [`${K('Ctrl')}+${K('S')}`, 'Stop'],
     [`${K('Ctrl')}+${K('1')}–${K('9')} / ${K('1')}–${K('9')}`, 'Save / recall a group (press twice to centre)'],
@@ -297,6 +298,7 @@ export class Hud {
         break;
       case 'heal': g.startHeal(); break;
       case 'unload': g.unload(); break;
+      case 'repairPick': g.startRepair(); break;
       // STATUS #59: dev menu
       case 'devz': g.dev.zombie = arg; this.renderDev(); break;
       case 'devn': g.dev.count = Number(arg); this.renderDev(); break;
@@ -654,6 +656,8 @@ export class Hud {
     const vehOnly = sq.every((s) => s.def.category === 'vehicle');
     if (vehOnly) cmds = cmds.replace(/<button class="cmd[^"]*" data-act="crouch">.*?<\/button>/, '');
     if (sq.some((s) => s.def.seats && s.cargo != null)) cmds = btn('unload', 'Unload', 'U') + cmds;
+    // round 18 #220: engineers' repair key
+    if (g.selectedEngineers.length && g.selectedEngineers.length === sq.length) cmds = btn('repairPick', 'Repair', 'N', undefined, mode.kind === 'repair') + cmds;
     // STATUS #20: medics' Heal, with its cooldown
     const medics = g.selectedMedics;
     if (medics.length) {
@@ -673,6 +677,7 @@ export class Hud {
       : mode.kind === 'attackMove' ? 'Attack-move: click a destination'
       : mode.kind === 'charge' ? 'Click a hive to plant a demo charge'
       : mode.kind === 'heal' ? 'Heal: click a hurt squad · right-click to cancel'
+      : mode.kind === 'repair' ? 'Repair: click a damaged vehicle or building · right-click to cancel'
       : mode.kind === 'dev' ? `Dev: click the map to drop ${mode.what === 'hive' ? 'a hive' : 'zombies'} · Shift+click to keep placing · right-click to stop`
       : mode.kind === 'deconstruct' ? 'Click something your engineers built to take it down (unstarted: full refund, built: half)'
       : civOnly ? 'Right-click to walk them · get them to the Command Post to evacuate them'

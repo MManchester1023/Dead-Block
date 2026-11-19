@@ -93,9 +93,9 @@ v4.39 (uploaded by the owner; authors to fill in where blank):
 | `muddy-explosion-gfx-sounds-wet-mud-explosion-4-4-0m06s.mp3` (GFX Sounds) | Hive destroyed (`hive_death`) |
 | `freesound_community-commercial-jet-flies-overhead-53746.mp3` (Pixabay, freesound_community) | Supply plane fly-by, 26 s cut around the loudest pass (`plane_flyby`) Replaced in v4.75 by the C-130 below; kept as a source. |
 | `transportation-prop-plane-c-130-flyby-close-distance-short-01.wav` (owner's upload; source to fill in) | Supply plane fly-by since v4.75 (round 16 #200): a C-130 propeller plane, the whole 23 s pass, +2.3 dB with a limiter (`plane_flyby`) |
-| `50calsound.mp3` (owner's upload; source to fill in) | MG emplacement and Humvee gun since v4.80: the steady 1.7 s of the burst, +16 dB with a limiter, looped (`mg_loop`) |
+| `50calsound.mp3` (owner's upload; source to fill in) | MG emplacement and Humvee gun since v4.80: the steady part of the burst, +16 dB with a limiter; since v4.83 a seamless cross-faded WAV loop (`mg_loop.wav`) |
 | `poweronsound.mp3` (owner's upload; source to fill in) | Power station starting up since v4.80 (`power_on`) |
-| `humvee startup.mp3` (owner's upload; source to fill in) | A Humvee's engine idling, looped (`humvee_idle`, v4.80) |
+| `humvee startup.mp3` (owner's upload; source to fill in) | A Humvee's engine idling (`humvee_idle`, v4.80; a seamless cross-faded WAV loop since v4.83) |
 | `humveedriving.mp3` (owner's upload; source to fill in) | A Humvee driving off when given a move, the first 4 s fading out (`humvee_drive`, v4.80) |
 | `transportation-car-touareg-bj-2004-vw10-diesel-bi-turbo-rev-engine-front-01.wav` (owner's upload) | Not used yet (a diesel revving) |
 | `foley-cloth-parachute-open-slide-impact-03.wav` | Supply crate's chute opening (`parachute`) |

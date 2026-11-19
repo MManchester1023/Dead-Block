@@ -1,5 +1,5 @@
 import { BALANCE } from '../../config/balance';
-import { UNITS } from '../../config/units';
+import { UNITS, structureExit } from '../../config/units';
 import type { World } from '../World';
 
 /**
@@ -50,8 +50,11 @@ export function updateEconomy(w: World, dt: number): void {
     job.remaining -= dt;
     if (job.remaining <= 0) {
       b.queue.shift();
-      const door = w.grid.nearestFree({ x: b.pos.x + b.radius + 3, y: b.pos.y });
+      // round 18: a building with an exit (the Vehicle Bay's garage door) sends its output out of it, facing out
+      const ex = structureExit(b.def, b.tile, b.size.w !== b.def.size.w, w.grid.cell);
+      const door = w.grid.nearestFree(ex ?? { x: b.pos.x + b.radius + 3, y: b.pos.y });
       const sq = w.spawnSquad(job.defId, door);
+      if (ex) sq.facing = ex.face;
       const rally = w.grid.nearestFree({ x: w.map.rally.x + w.rng.range(-6, 6), y: w.map.rally.y + w.rng.range(-8, 8) });
       w.issueOrder([sq], { type: 'move', pos: rally });
       w.events.emit('unitProduced', { id: sq.id, defId: job.defId, name: `${sq.name} (${UNITS[job.defId].name})` });
@@ -63,7 +66,27 @@ export function updateEconomy(w: World, dt: number): void {
  * Med Bay (v4.17): squads resting next to a powered Med Bay heal over time, paying supplies, and
  * soldiers rejoin as the squad's health climbs back past each member's share. A wiped squad is gone.
  */
+/** Round 18: vehicles parked by a Vehicle Bay are repaired over time, paying supplies (like the Med Bay). */
+function updateVehicleRepair(w: World, dt: number): void {
+  for (const bay of w.structures) {
+    const R = bay.def.vehicleRepair;
+    if (!R || !bay.alive || !bay.built) continue;
+    for (const v of w.squads) {
+      if (!v.alive || v.def.category !== 'vehicle' || v.moving || v.pool >= v.poolMax) continue;
+      if (Math.hypot(v.pos.x - bay.pos.x, v.pos.y - bay.pos.y) > R.radius + bay.radius) continue;
+      if (w.time - v.lastHit < R.restAfterHitSec) continue;
+      let hp = Math.min(v.poolMax - v.pool, v.poolMax * R.perSec * dt);
+      if (w.supplies < hp * R.suppliesPerHp) hp = Math.max(0, w.supplies / R.suppliesPerHp);
+      if (hp <= 0) continue;
+      w.supplies -= hp * R.suppliesPerHp;
+      v.pool += hp;
+      v.healing = w.time;
+    }
+  }
+}
+
 export function updateMedical(w: World, dt: number): void {
+  updateVehicleRepair(w, dt);
   for (const bay of w.structures) {
     const H = bay.def.heal;
     if (!H || !bay.alive || !bay.built) continue;

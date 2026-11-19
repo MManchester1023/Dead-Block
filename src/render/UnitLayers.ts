@@ -105,7 +105,12 @@ export class SquadLayer {
     const st = squadStatus(s, this.ctx.world);
     const cover = st.tone === 'idle' && st.text === 'IDLE' ? '' : `<span class="status ${st.tone}">${st.text}</span>`;
     const lvl = s.level ? `<span class="tag lvl">${s.levelName.toUpperCase()}</span>` : '';
-    const bars = sel || hover ? `<div class="pips">${pips}</div>` : '';
+    // round 18 #217: experience to the next level, a thin bar under the health (full and gold at the top level)
+    const L = BALANCE.combat.levels;
+    const cur = L[s.level], next = L[s.level + 1];
+    const xpK = next ? Math.max(0, Math.min(1, (s.xp - cur.xp) / (next.xp - cur.xp))) : 1;
+    const xp = `<span class="xpbar ${next ? '' : 'max'}" title="${next ? `${Math.floor(s.xp)} / ${next.xp} XP to ${next.name}` : 'Top level'}"><i style="width:${(xpK * 100).toFixed(0)}%"></i></span>`;
+    const bars = sel || hover ? `<div class="pips">${pips}</div><div class="xprow">${xp}</div>` : '';
     return `<div class="sname ${sel ? 'sel' : ''} ${hover ? 'hover' : ''}">${s.name}${lvl}</div>${cover ? `<div>${cover}</div>` : ''}${bars}`;
   }
 }

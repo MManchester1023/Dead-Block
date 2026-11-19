@@ -50,11 +50,11 @@ export class PlacementGhost {
     scene.add(this.arrow, this.range, this.aim);
   }
 
-  set(tile: { x: number; y: number } | null, size = { w: 1, h: 1 }, ok = true, range = 0, arc?: { aim: number; deg: number }): void {
+  set(tile: { x: number; y: number } | null, size = { w: 1, h: 1 }, ok = true, range = 0, arc?: { aim: number; deg: number }, exit?: { x: number; y: number; face: number } | null): void {
     this.box.visible = !!tile;
-    this.arrow.visible = !!tile && size.w !== size.h && !arc;
+    this.arrow.visible = !!tile && size.w !== size.h && !arc && !exit;
     this.range.visible = !!tile && range > 0;
-    this.aim.visible = !!tile && !!arc;
+    this.aim.visible = !!tile && (!!arc || !!exit);
     if (!tile) return;
     const cx = (tile.x + size.w / 2) * CELL;
     const cz = (tile.y + size.h / 2) * CELL;
@@ -86,6 +86,10 @@ export class PlacementGhost {
     if (arc) {
       this.aim.position.set(cx, 1.9, cz);
       this.aim.rotation.z = -arc.aim;
+    } else if (exit) {
+      // round 18: where vehicles come out (the Vehicle Bay's door), pointing the way they leave
+      this.aim.position.set(exit.x, 1.2, exit.y);
+      this.aim.rotation.z = -exit.face;
     }
   }
 }

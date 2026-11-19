@@ -371,6 +371,10 @@ export class World {
     return Commands.upgradeStructure(this, st);
   }
 
+  orderRepairVehicle(engineers: Squad[], vehicle: Squad, queue = false): string | null {
+    return Commands.orderRepairVehicle(this, engineers, vehicle, queue);
+  }
+
   orderBoard(squads: Squad[], vehicle: Squad, queue = false): string | null {
     return Commands.orderBoard(this, squads, vehicle, queue);
   }

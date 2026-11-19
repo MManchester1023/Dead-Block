@@ -1,10 +1,11 @@
-import { BALANCE } from '../../config/balance';
+import { BALANCE, HORDE } from '../../config/balance';
 import { dist, norm, sub, type Vec2 } from '../../core/math';
 import { ABILITIES, vehicleHandling } from '../../config/units';
 import { Hive, Squad, Structure } from '../entities';
 import { newId } from '../entities';
 import { findPath } from '../pathfinding';
 import type { World } from '../World';
+import type { Order } from '../types';
 import type { BuildingDef } from '../map';
 import { moveWithCollision } from './movement';
 import { gainXp } from './combat';
@@ -114,10 +115,10 @@ export function updateOrders(w: World, dt: number): void {
       switch (o.type) {
         case 'move':
         case 'cover':
-          if (moveToward(w, s, o.pos, dt, ARRIVE)) {
+          if (s.def.category === 'vehicle' ? driveToward(w, s, o.pos, dt, ARRIVE, o) : moveToward(w, s, o.pos, dt, ARRIVE)) {
             s.orders.shift();
             s.path = [];
-            if (o.face !== undefined) {
+            if (o.face !== undefined && s.def.category !== 'vehicle') {
               s.facing = o.face; // round 14 #177: the facing dragged out with right-click
               s.formFacing = o.face;
             }
@@ -241,6 +242,13 @@ export function moveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: n
 }
 
 const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+/** Round 18 #214: parking facing a set way: shuffle strokes this long (metres), and close enough (radians). */
+const ALIGN_STROKE = 2.5;
+const ALIGN_OK = 0.2;
+/** Round 18 #215: a spot this close that it would have to circle for counts as reached. */
+const VEHICLE_SETTLE = 5;
+/** Round 18 #213: m/s above which a vehicle runs zombies over (a walk is ~1.4). */
+const VEHICLE_CRUSH_SPEED = 2.5;
 
 /**
  * Round 17 #203: vehicles drive like cars. They follow their route by steering toward a point a few metres
@@ -248,17 +256,19 @@ const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
  * stop at the destination, and back up for a moment when a turn is too tight or they hit something.
  * Routes avoid lamp posts (#208), and a post that gets too close is driven round, not through.
  */
-function driveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: number): boolean {
+function driveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: number, order?: Order): boolean {
   const H = vehicleHandling(s.def);
+  if (w.time - s.drivenAt > dt * 1.5) s.orbitTurn = 0; // a fresh drive
   s.drivenAt = w.time;
   const left = dist(s.pos, dest);
+  if (s.aligning) return alignTo(w, s, order?.face ?? s.facing, H, dt);
   if (left <= arrive) {
     // stop where we are
     s.vel += Math.max(-H.brake * dt, Math.min(H.brake * dt, -s.vel));
     if (Math.abs(s.vel) < 0.4) {
       s.vel = 0;
       s.moving = false;
-      return true;
+      return parked(w, s, order, H, dt);
     }
     stepVehicle(w, s, H, dt);
     return false;
@@ -294,6 +304,15 @@ function driveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: number)
     }
   if (dist(s.pos, aim) < 0.5) aim = dest;
   const err = wrapAngle(Math.atan2(aim.y - s.pos.y, aim.x - s.pos.x) - s.facing);
+  // round 18 #215: don't orbit a spot it can't make: close and off to the side or behind, or it has already
+  // gone a full circle near it: settle here
+  const toDest = wrapAngle(Math.atan2(dest.y - s.pos.y, dest.x - s.pos.x) - s.facing);
+  if ((left < VEHICLE_SETTLE && Math.abs(toDest) > Math.PI / 2) || (left < H.turnRadius * 2.5 && s.orbitTurn > Math.PI * 2)) {
+    s.vel = 0;
+    s.moving = false;
+    s.orbitTurn = 0;
+    return parked(w, s, order, H, dt);
+  }
   // too tight to make going forward (or stuck on something): back up for a moment, steering the nose round
   if (s.reverseFor > 0) {
     s.reverseFor -= dt;
@@ -312,6 +331,7 @@ function driveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: number)
   // the nose swings toward the aim by as much as the distance actually covered allows on its turning
   // circle (either direction of travel): no turning on the spot, and no swinging round while scraping a wall
   const turn = Math.min(1.5 * dt, Math.hypot(s.pos.x - before.x, s.pos.y - before.y) / H.turnRadius);
+  if (left < H.turnRadius * 2.5) s.orbitTurn += Math.min(turn, Math.abs(err)); // how far it has turned close to the spot
   // backing out of a dead end with the target straight ahead: swing the nose to one side so the next try
   // doesn't hit the same thing
   const want = reversing && Math.abs(err) < 0.6 ? s.reverseSteer * Math.PI : err;
@@ -324,8 +344,59 @@ function driveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: number)
   return false;
 }
 
+/** Arrived: done, unless it was told which way to face (round 18 #214): then shuffle round to it first. */
+function parked(w: World, s: Squad, order: Order | undefined, H: ReturnType<typeof vehicleHandling>, dt: number): boolean {
+  if (order?.face === undefined || Math.abs(wrapAngle(order.face - s.facing)) < ALIGN_OK) return true;
+  s.aligning = true;
+  s.alignDir = 1;
+  s.alignTravel = 0;
+  return alignTo(w, s, order.face, H, dt);
+}
+
+/**
+ * Round 18 #214: turn to `face` without a turning-on-the-spot cheat: short strokes forward and back (a K-turn),
+ * the nose swinging toward the heading on each by the distance covered on its turning circle.
+ */
+function alignTo(w: World, s: Squad, face: number, H: ReturnType<typeof vehicleHandling>, dt: number): boolean {
+  const d = wrapAngle(face - s.facing);
+  if (Math.abs(d) < ALIGN_OK) {
+    s.aligning = false;
+    s.vel = 0;
+    s.moving = false;
+    return true;
+  }
+  const target = 2.5 * s.alignDir;
+  s.vel += Math.max(-H.brake * dt, Math.min(H.accel * dt, target - s.vel));
+  const before = { x: s.pos.x, y: s.pos.y };
+  const blocked = stepVehicle(w, s, H, dt);
+  const moved = Math.hypot(s.pos.x - before.x, s.pos.y - before.y);
+  s.facing = wrapAngle(s.facing + Math.sign(d) * Math.min(Math.abs(d), moved / H.turnRadius));
+  s.alignTravel += moved;
+  if (s.alignTravel > ALIGN_STROKE || blocked) {
+    s.alignDir = -s.alignDir;
+    s.alignTravel = 0;
+    s.vel = 0;
+  }
+  return false;
+}
+
 /** Move a vehicle along its heading at its speed; slide around lamp posts. True if it ran into something. */
 function stepVehicle(w: World, s: Squad, H: ReturnType<typeof vehicleHandling>, dt: number): boolean {
+  // round 18 #213: moving faster than a walk, it runs down the dead in its path (a little slower for each)
+  if (Math.abs(s.vel) > VEHICLE_CRUSH_SPEED) {
+    const dir = Math.sign(s.vel);
+    const nose = { x: s.pos.x + Math.cos(s.facing) * 1.4 * dir, y: s.pos.y + Math.sin(s.facing) * 1.4 * dir };
+    for (const z of w.zombieHash.query(nose, H.body + 1)) {
+      if (!z.alive || dist(z.pos, nose) > H.body + z.radius) continue;
+      w.damage(z, z.hp + 1, 'crush', s.pos, s);
+      if (!z.alive) {
+        s.kills++;
+        gainXp(w, s, BALANCE.combat.xpPerKill / HORDE.count);
+        w.events.emit('zombieRunOver', { vehicleId: s.id, pos: { ...z.pos } });
+      }
+      s.vel *= 0.9;
+    }
+  }
   const step = s.vel * dt;
   const blocked = moveWithCollision(w.grid, s.pos, Math.cos(s.facing) * step, Math.sin(s.facing) * step, H.body);
   if (!H.crushes)
@@ -337,6 +408,37 @@ function stepVehicle(w: World, s: Squad, H: ReturnType<typeof vehicleHandling>, 
     }
   s.moving = Math.abs(s.vel) > 0.3;
   return blocked;
+}
+
+/**
+ * Round 18 #220: engineers patch up a vehicle: walk to it, then restore it at about a full bar per its build
+ * time (at least 8 s), paying supplies like structure repairs (half its supply cost per full bar).
+ */
+function repairVehicle(w: World, s: Squad, v: Squad, dt: number): void {
+  if (!v.alive || v.pool >= v.poolMax) {
+    s.orders.shift();
+    return;
+  }
+  if (dist(s.pos, v.pos) > 4.5) {
+    moveToward(w, s, v.pos, dt, 3.5);
+    return;
+  }
+  s.path = [];
+  s.facing = Math.atan2(v.pos.y - s.pos.y, v.pos.x - s.pos.x);
+  const hp = Math.min(v.poolMax - v.pool, (v.poolMax / Math.max(8, v.def.buildTime)) * dt * (s.aliveCount / s.def.members));
+  const cost = Math.max(0.02 * dt, (hp / v.poolMax) * v.def.cost.supplies * 0.5);
+  if (w.supplies < cost) {
+    w.events.emit('radio', { speaker: s.name, text: 'Out of supplies for repairs, Command.', tone: 'warn' });
+    s.orders.shift();
+    return;
+  }
+  w.supplies -= cost;
+  v.pool += hp;
+  w.makeNoise(s.pos, 0.6 * dt * 10);
+  if (v.pool >= v.poolMax) {
+    v.pool = v.poolMax;
+    s.orders.shift();
+  }
 }
 
 /** STATUS #51: walk to the vehicle and climb in (if there's still room). */
@@ -523,6 +625,7 @@ function doAttack(w: World, s: Squad, dt: number): void {
 function doRepair(w: World, s: Squad, dt: number): void {
   const o = s.currentOrder!;
   const st = w.get(o.targetId ?? null);
+  if (st instanceof Squad) return repairVehicle(w, s, st, dt);
   if (!(st instanceof Structure) || !st.alive || st.hp >= st.def.hp) {
     s.orders.shift();
     return;

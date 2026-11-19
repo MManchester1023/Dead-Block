@@ -1,5 +1,5 @@
 import type { Vec2 } from '../core/math';
-import { STRUCTURES } from '../config/units';
+import { STRUCTURES, structureExit } from '../config/units';
 import type { Game } from '../Game';
 
 /** Mouse + keyboard → Game commands. Controls follow doc §4. */
@@ -89,6 +89,12 @@ export class Input {
       g.setMode({ kind: 'normal' });
       return;
     }
+    if (g.mode.kind === 'repair') {
+      // round 18 #220: N, then click a vehicle (or a building) for the engineers to repair
+      g.repairAt(p, this.squadAt(e.clientX, e.clientY), e.shiftKey);
+      g.setMode({ kind: 'normal' });
+      return;
+    }
     if (g.mode.kind === 'dev') {
       // STATUS #59: drop zombies / a hive (Shift keeps placing)
       g.devPlace(p);
@@ -123,7 +129,10 @@ export class Input {
     if (this.rightDrag) {
       const d = this.rightDrag;
       if (!d.dragging && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 18 && this.game.selectedSquads.length) d.dragging = true;
-      if (d.dragging) this.game.renderer.formationPreview = this.game.formationPreview(d.p, this.ground(e));
+      if (d.dragging) {
+        this.game.renderer.formationPreview = this.game.formationPreview(d.p, this.ground(e));
+        this.game.renderer.vehicleGhosts = this.game.vehicleGhosts(d.p, this.ground(e)); // round 18 #214
+      }
     }
     if (this.mouse.inside) {
       this.game.renderer.hovered = this.pick(e.clientX, e.clientY);
@@ -169,7 +178,7 @@ export class Input {
     const id = this.squadAt(e.clientX, e.clientY);
     if (id == null || g.selected.has(id)) return false;
     const t = g.world.squads.find((s) => s.id === id && s.alive);
-    if (!t || t.def.category === 'civilian') return false;
+    if (!t || t.def.category === 'civilian' || t.def.category === 'vehicle') return false; // round 18 #218: right-click boards it
     if (t.pool >= t.poolMax && t.aliveCount >= t.members.length) return false;
     return g.healSquad(id, e.shiftKey) || true;
   }
@@ -181,7 +190,7 @@ export class Input {
     let best: number | null = null;
     let bestD = 28;
     for (const s of this.game.world.squads) {
-      if (!s.alive) continue;
+      if (!s.alive || s.inVehicle != null) continue; // round 18 #219: a rider sits on its vehicle: click the vehicle
       const p = r.worldToScreen(s.pos);
       const d = Math.hypot(p.x - x, p.y - y);
       if (d < bestD) {
@@ -212,7 +221,7 @@ export class Input {
     const tile = g.buildTile(p, g.mode.defId, g.mode.rotated);
     const ok = !g.world.canPlace(g.mode.defId, tile, g.mode.rotated);
     const def = STRUCTURES[g.mode.defId];
-    g.renderer.setGhost(tile, g.world.footprint(g.mode.defId, g.mode.rotated), ok, def.weapon?.range ?? 0, def.arc ? { aim: g.mode.aim, deg: def.arc } : undefined);
+    g.renderer.setGhost(tile, g.world.footprint(g.mode.defId, g.mode.rotated), ok, def.weapon?.range ?? 0, def.arc ? { aim: g.mode.aim, deg: def.arc } : undefined, structureExit(def, tile, g.mode.rotated, g.world.grid.cell));
   }
 
   private up(e: MouseEvent): void {
@@ -224,6 +233,7 @@ export class Input {
       const d = this.rightDrag;
       this.rightDrag = null;
       this.game.renderer.formationPreview = [];
+      this.game.renderer.vehicleGhosts = [];
       if (d.dragging) this.game.formationMoveAt(d.p, this.ground(e), e.shiftKey);
       else if (!this.rightHeal(e)) this.game.commandAt(d.p, e.shiftKey);
       return;
@@ -309,6 +319,10 @@ export class Input {
       case '`':
         // STATUS #59: the dev menu
         g.toggleDev?.();
+        break;
+      case 'n':
+        // round 18 #220: engineers repair (then click a vehicle or a building)
+        g.startRepair();
         break;
       case 'u':
         // STATUS #51: unload the selected Humvee

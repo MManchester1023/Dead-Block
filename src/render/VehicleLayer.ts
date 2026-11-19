@@ -14,6 +14,9 @@ import { models } from './ModelLibrary';
 const TURRETS: Record<string, { key: string; pivot: [number, number] }> = {
   humvee: { key: 'humveeTurret', pivot: [0.03, 0] },
 };
+/** Round 18 #210: the Humvee gun's muzzle, from the turret's pivot (metres out along the barrel, height). */
+const MUZZLE_OUT = 1.1;
+const MUZZLE_HEIGHT = 1.62;
 /** Radians per second a turret turns. */
 const TURRET_SPEED = 3;
 
@@ -22,6 +25,60 @@ export class VehicleLayer {
   private turrets = new Map<number, { obj: THREE.Object3D; angle: number }>();
 
   constructor(private ctx: RenderCtx) {}
+
+  /** Round 18 #214: see-through vehicles with an arrow at the front, where a right-drag would park them. */
+  private ghosts: THREE.Group[] = [];
+  private updateGhosts(list: { x: number; y: number; face: number; defId: string }[]): void {
+    while (this.ghosts.length < list.length) {
+      const g = new THREE.Group();
+      const body = this.make(list[this.ghosts.length].defId);
+      body.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh) return;
+        m.material = (m.material as THREE.Material).clone();
+        (m.material as THREE.Material).transparent = true;
+        (m.material as THREE.Material).opacity = 0.4;
+        (m.material as THREE.Material).depthWrite = false;
+        m.castShadow = false;
+      });
+      body.userData.shared = false;
+      g.add(body);
+      const shape = new THREE.Shape();
+      shape.moveTo(0, -0.35);
+      for (const [x, y] of [[2.2, -0.35], [2.2, -0.9], [3.6, 0], [2.2, 0.9], [2.2, 0.35], [0, 0.35]] as [number, number][]) shape.lineTo(x, y);
+      shape.closePath();
+      const arrow = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthTest: false, side: THREE.DoubleSide }));
+      arrow.rotation.x = -Math.PI / 2;
+      arrow.position.y = 2.2;
+      arrow.renderOrder = 10;
+      arrow.name = 'arrow';
+      g.add(arrow);
+      this.ctx.scene.add(g);
+      this.ghosts.push(g);
+    }
+    this.ghosts.forEach((g, i) => {
+      const s = list[i];
+      g.visible = !!s;
+      if (!s) return;
+      g.position.set(s.x, 0, s.y);
+      // the body's front is at -X (half turn); the arrow points along +X in its own frame
+      g.children[0].rotation.y = -s.face + Math.PI;
+      g.getObjectByName('arrow')!.rotation.z = -s.face;
+    });
+  }
+
+  /**
+   * Round 18 #210: where a vehicle's gun fires from: its turret's muzzle (world x/y and height), or null for
+   * vehicles without one.
+   */
+  muzzle(id: number): { x: number; y: number; h: number } | null {
+    const t = this.turrets.get(id);
+    if (!t) return null;
+    t.obj.updateWorldMatrix(true, false);
+    // the barrel points along the turret's local -X (the model's front), about 1.1 m out from the pivot
+    const p = new THREE.Vector3(-MUZZLE_OUT, MUZZLE_HEIGHT, 0).applyMatrix4(t.obj.matrixWorld);
+    return { x: p.x, y: p.z, h: p.y };
+  }
 
   private make(defId: string): THREE.Object3D {
     const m = models.instance(defId);
@@ -40,7 +97,8 @@ export class VehicleLayer {
     return g;
   }
 
-  update(f: FrameState): void {
+  update(f: FrameState, ghosts: { x: number; y: number; face: number; defId: string }[] = []): void {
+    this.updateGhosts(ghosts);
     const { scene, world: w } = this.ctx;
     const seen = new Set<number>();
     for (const s of w.squads) {

@@ -25,7 +25,9 @@ export type Mode =
   /** STATUS #20: medics pick a squad to treat. */
   | { kind: 'heal' }
   /** STATUS #59: the dev menu: clicks drop zombies or a hive. */
-  | { kind: 'dev'; what: 'zombies' | 'hive' };
+  | { kind: 'dev'; what: 'zombies' | 'hive' }
+  /** Round 18 #220: engineers repair whatever is clicked next. */
+  | { kind: 'repair' };
 
 /**
  * Owns the fixed-step loop, pause/speed (doc §2), the current selection and the
@@ -195,7 +197,7 @@ export class Game {
     ids = ids.filter((id) => this.world.squads.find((s) => s.id === id)?.inVehicle == null);
     if (ids.length || !add) this.selectedStructure = null;
     for (const id of ids) this.selected.add(id);
-    if (this.mode.kind !== 'normal' && !this.selectedEngineers.length && this.mode.kind !== 'attackMove' && this.mode.kind !== 'patrol' && this.mode.kind !== 'rally' && this.mode.kind !== 'support' && !(this.mode.kind === 'heal' && this.selectedMedics.length) && this.mode.kind !== 'dev') this.mode = { kind: 'normal' };
+    if (this.mode.kind !== 'normal' && !this.selectedEngineers.length && this.mode.kind !== 'attackMove' && this.mode.kind !== 'patrol' && this.mode.kind !== 'rally' && this.mode.kind !== 'support' && !(this.mode.kind === 'heal' && this.selectedMedics.length) && this.mode.kind !== 'dev' && !(this.mode.kind === 'repair' && this.selectedEngineers.length)) this.mode = { kind: 'normal' };
     this.changed();
   }
 
@@ -426,6 +428,8 @@ export class Game {
   private dragFormation(a: Vec2, b: Vec2): Formation {
     const len = Math.hypot(b.x - a.x, b.y - a.y);
     const along = Math.atan2(b.y - a.y, b.x - a.x);
+    // round 18 #214: vehicles on their own park facing the way you drag (the arrow on their ghost)
+    if (this.selectedSquads.every((s) => s.def.category === 'vehicle')) return { shape: this.formation, facing: along };
     const wide = this.formation === 'line' || this.formation === 'spread';
     if (!wide) return { shape: this.formation, facing: along };
     // line / spread: the drag is the front, and the group faces across it, away from where it's coming from
@@ -448,6 +452,45 @@ export class Game {
     const dir = { x: Math.cos(f.facing!), y: Math.sin(f.facing!) };
     const perp = { x: -dir.y, y: dir.x };
     return slots.map((s) => ({ x: centre.x + perp.x * s.right - dir.x * s.back, y: centre.y + perp.y * s.right - dir.y * s.back }));
+  }
+
+  /** Round 18 #214: ghosts of the selected vehicles where a right-drag would park them, and which way they'd face. */
+  vehicleGhosts(a: Vec2, b: Vec2): { x: number; y: number; face: number; defId: string }[] {
+    const sq = this.selectedSquads.filter((s) => s.def.category !== 'civilian');
+    const veh = sq.filter((s) => s.def.category === 'vehicle');
+    if (!veh.length) return [];
+    const spots = this.formationPreview(a, b);
+    const face = this.dragFormation(a, b).facing!;
+    // fighters take the front slots in order (as issueOrder does); vehicles are fighters
+    const fighters = sq.filter((s) => !s.def.canBuild?.length);
+    return veh.map((v) => ({ ...(spots[fighters.indexOf(v)] ?? spots[0]), face, defId: v.def.id }));
+  }
+
+  /** Round 18 #220: N: engineers repair the next thing clicked. */
+  startRepair(): void {
+    if (!this.selectedEngineers.length) {
+      this.toast('Select an Engineer Team to repair');
+      return;
+    }
+    this.setMode({ kind: 'repair' });
+    this.toast('Repair: click a damaged vehicle or building');
+  }
+
+  /** Round 18 #220: the selected engineers repair the vehicle (or building) at a click. */
+  repairAt(p: Vec2, squadId: number | null, queue: boolean): void {
+    const eng = this.selectedEngineers;
+    if (!eng.length) return;
+    const w = this.world;
+    const v = squadId != null ? w.squads.find((s) => s.id === squadId && s.alive) : undefined;
+    let err: string | null;
+    if (v) err = w.orderRepairVehicle(eng, v, queue);
+    else {
+      const st = w.structureAt(p, (s) => s.def.cost.money + s.def.cost.supplies > 0 || !!s.def.restore || !!s.def.derelict);
+      err = st ? (st.built ? w.orderRepair(eng, st, queue) : w.orderResume(eng, st, queue)) : 'Click a damaged vehicle or building';
+    }
+    if (err) this.toast(err);
+    else this.renderer.marker(v?.pos ?? p, 0xd0c070);
+    this.changed();
   }
 
   /** Round 14 #177: right-drag from `a` to `b`: move into the chosen formation there, facing as dragged. */

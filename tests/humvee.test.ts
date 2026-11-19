@@ -156,4 +156,84 @@ describe('the Humvee (STATUS #51, v4.77)', () => {
     }
     expect(closest).toBeGreaterThan(1.3); // its body (1.3 m) never overlaps a post
   });
+
+  it('runs zombies over while driving, not while parked (round 18 #213)', () => {
+    const w = quiet();
+    const hv = w.spawnSquad('humvee', w.grid.nearestFree({ x: 150, y: 100 }));
+    hv.facing = 0;
+    hv.def = { ...hv.def, weapon: { ...hv.def.weapon, damage: 0 } }; // the gun stays out of it
+    // parked next to one: nothing happens
+    const z0 = w.spawnZombie('walker', { x: hv.pos.x + 1.5, y: hv.pos.y })!;
+    z0.def = { ...z0.def, speed: 0, sight: 0, hearing: 0, damage: 0 };
+    run(w, 1);
+    expect(z0.alive).toBe(true);
+    z0.alive = false;
+    // a line of them in its path while it drives
+    const zs = [0, 1, 2].map((i) => {
+      const z = w.spawnZombie('walker', { x: hv.pos.x + 12 + i * 3, y: hv.pos.y })!;
+      z.def = { ...z.def, speed: 0, sight: 0, hearing: 0, damage: 0 };
+      return z;
+    });
+    w.issueOrder([hv], { type: 'move', pos: w.grid.nearestFree({ x: hv.pos.x + 30, y: hv.pos.y }) });
+    run(w, 6);
+    expect(zs.filter((z) => !z.alive).length).toBeGreaterThanOrEqual(2);
+    expect(hv.kills).toBeGreaterThanOrEqual(2);
+  });
+
+  it("settles for a spot right beside it instead of circling it (round 18 #215)", () => {
+    const w = quiet();
+    const hv = w.spawnSquad('humvee', w.grid.nearestFree({ x: 150, y: 100 }));
+    hv.facing = 0;
+    w.issueOrder([hv], { type: 'move', pos: { x: hv.pos.x, y: hv.pos.y + 3 } });
+    run(w, 3);
+    expect(hv.currentOrder).toBeUndefined();
+  });
+
+  it('parks facing the way it was dragged (round 18 #214)', () => {
+    const w = quiet();
+    const hv = w.spawnSquad('humvee', w.grid.nearestFree({ x: 150, y: 100 }));
+    hv.facing = 0;
+    const dest = w.grid.nearestFree({ x: hv.pos.x + 25, y: hv.pos.y });
+    w.issueOrder([hv], { type: 'move', pos: dest }, false, { shape: 'line', facing: Math.PI / 2 }); // park facing south
+    for (let i = 0; i < 30 * 30 && hv.currentOrder; i++) w.step(1 / 30);
+    expect(hv.currentOrder).toBeUndefined();
+    const off = Math.abs(Math.atan2(Math.sin(hv.facing - Math.PI / 2), Math.cos(hv.facing - Math.PI / 2)));
+    expect(off).toBeLessThan(0.45); // within ~25°
+  });
+
+  it('engineers repair it for supplies (round 18 #220)', () => {
+    const w = quiet();
+    const eng = w.squads.find((s) => s.def.id === 'engineer')!;
+    const hv = w.spawnSquad('humvee', w.grid.nearestFree({ x: eng.pos.x + 6, y: eng.pos.y }));
+    hv.pool = hv.poolMax * 0.4;
+    const s0 = w.supplies;
+    expect(w.orderRepairVehicle([eng], hv)).toBeNull();
+    run(w, 30);
+    expect(hv.pool).toBeCloseTo(hv.poolMax, 0);
+    expect(w.supplies).toBeLessThan(s0);
+  });
+
+  it('the Vehicle Bay repairs a parked vehicle, and builds them out of its door facing out (round 18)', () => {
+    const w = quiet();
+    const b = w.map.baseCells;
+    let bay: ReturnType<typeof w.addStructure> | null = null;
+    for (let y = b.y; y < b.y + b.h && !bay; y++) for (let x = b.x; x < b.x + b.w && !bay; x++) if (!w.canPlace('vehicleBay', { x, y }) || w.canPlace('vehicleBay', { x, y }) === 'Not unlocked yet') {
+      if (w.canPlace('vehicleBay', { x, y }) === 'Not unlocked yet') w.unlocked.add('vehicleBay');
+      if (!w.canPlace('vehicleBay', { x, y })) bay = w.addStructure('vehicleBay', { x, y }, true);
+    }
+    expect(bay).not.toBeNull();
+    // out of the door (north side), facing north
+    expect(queueProduction(w, 'humvee')).toBeNull();
+    run(w, UNITS.humvee.buildTime + 0.2);
+    const hv = w.squads.find((s) => s.def.id === 'humvee')!;
+    expect(hv.pos.y).toBeLessThan(bay!.pos.y - 4);
+    // parked next to the bay, it gets repaired
+    w.issueOrder([hv], { type: 'hold', pos: { ...hv.pos } });
+    hv.pos.x = bay!.pos.x;
+    hv.pos.y = bay!.pos.y - bay!.radius - 3;
+    hv.pool = hv.poolMax * 0.5;
+    const before = hv.pool;
+    run(w, 10);
+    expect(hv.pool).toBeGreaterThan(before);
+  });
 });

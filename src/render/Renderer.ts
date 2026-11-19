@@ -51,6 +51,8 @@ export class Renderer {
   hoveredSquads: number[] = [];
   /** Where a right-drag formation would put the selected squads (round 14 #177). */
   formationPreview: { x: number; y: number }[] = [];
+  /** Round 18 #214: ghosts of vehicles being right-dragged into place (where, which way they'll face). */
+  vehicleGhosts: { x: number; y: number; face: number; defId: string }[] = [];
   /** Selected base building, so its bar shows too. */
   selectedStructure: number | null = null;
 
@@ -141,8 +143,11 @@ export class Renderer {
   private hookEvents(): void {
     const ev = this.world.events;
     ev.on('shot', (e) => {
-      this.fx.tracer(e.from, e.to, !!e.heavy);
-      this.fx.muzzleFlash(e.from, e.to, !!e.heavy || e.weapon === 'Mounted HMG');
+      // round 18 #210: a vehicle's shots come out of its turret's muzzle, not the middle of the vehicle
+      const m = e.shooter != null ? this.vehicles.muzzle(e.shooter) : null;
+      const from = m ?? e.from;
+      this.fx.tracer(from, e.to, !!e.heavy, m?.h);
+      this.fx.muzzleFlash(from, e.to, !!e.heavy || e.weapon === 'Mounted HMG', m?.h, !!m);
     });
     ev.on('explosion', (e) => this.fx.explosion(e.pos, e.radius, e.type === 'toxic' ? 0x8fbf3a : 0xffa040, e.type !== 'toxic'));
     // a tutorial region opens: the fence comes down in a cloud of dust
@@ -194,8 +199,8 @@ export class Renderer {
   }
 
   /** Build preview under the cursor (null hides it). */
-  setGhost(tile: { x: number; y: number } | null, size = { w: 1, h: 1 }, ok = true, range = 0, arc?: { aim: number; deg: number }): void {
-    this.ghost.set(tile, size, ok, range, arc);
+  setGhost(tile: { x: number; y: number } | null, size = { w: 1, h: 1 }, ok = true, range = 0, arc?: { aim: number; deg: number }, exit?: { x: number; y: number; face: number } | null): void {
+    this.ghost.set(tile, size, ok, range, arc, exit);
   }
 
   /** Squad whose name label is under this screen point (clicking a name selects it; #39). */
@@ -227,7 +232,7 @@ export class Renderer {
     if (!this.crowds) this.updateBoxZombies();
     this.structures.update(f);
     this.hives.update(f);
-    this.vehicles.update(f);
+    this.vehicles.update(f, this.vehicleGhosts);
     this.drops.update();
     this.popups.update(realDt);
     this.routes.update(f, this.formationPreview);
