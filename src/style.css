@@ -239,3 +239,18 @@ h3.collapsible:hover { color: #fff; }
 .formations { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; width: 100%; margin-top: 4px; }
 .formations small { color: #999; margin-right: 4px; }
 .formations .cmd { padding: 2px 7px; }
+
+/* STATUS #47: performance readout (Settings) */
+.perf-readout {
+  position: fixed;
+  top: 64px;
+  right: 8px;
+  z-index: 50;
+  pointer-events: none;
+  background: rgba(10, 12, 14, 0.78);
+  color: #d8e4c8;
+  font: 11px/1.45 ui-monospace, monospace;
+  padding: 5px 8px;
+  border-radius: 4px;
+}
+.perf-readout b { color: #fff; }

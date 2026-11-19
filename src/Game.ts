@@ -496,13 +496,24 @@ export class Game {
 
   // ---- loop ----
 
+  /**
+   * STATUS #47: where each frame's time goes (ms, smoothed), and the slowest frame lately. Shown by the HUD's
+   * performance readout (Settings). `sim` = simulation steps, `scene` = updating the 3D scene, `draw` = handing
+   * it to the GPU (the GPU's own time isn't measurable from here), `hud` = HUD, input and sound.
+   */
+  readonly perf = { fps: 0, frame: 0, sim: 0, scene: 0, draw: 0, hud: 0, steps: 0, worst: 0, worstAt: 0, worstWhat: '' };
+
   start(frame: () => void): void {
+    const ease = (a: number, b: number) => a + (b - a) * 0.1;
     const tick = () => {
       const now = performance.now();
+      const P = this.perf;
       const realDt = Math.min(0.1, (now - this.last) / 1000);
       this.last = now;
       const step = 1 / BALANCE.tickRate;
       let simDt = 0;
+      const t0 = performance.now();
+      let steps = 0;
       if (!this.paused && !this.world.over) {
         this.acc += realDt * this.speed;
         let n = 0;
@@ -513,10 +524,31 @@ export class Game {
           n++;
         }
         if (n >= 16) this.acc = 0;
+        steps = n;
       }
+      const t1 = performance.now();
       this.renderer.selectedStructure = this.selectedStructure;
       this.renderer.render(realDt, simDt, this.selected);
+      const t2 = performance.now();
       frame();
+      const t3 = performance.now();
+      const draw = this.renderer.drawMs;
+      const parts = { sim: t1 - t0, scene: t2 - t1 - draw, draw, hud: t3 - t2 };
+      P.sim = ease(P.sim, parts.sim);
+      P.scene = ease(P.scene, parts.scene);
+      P.draw = ease(P.draw, parts.draw);
+      P.hud = ease(P.hud, parts.hud);
+      P.steps = steps;
+      P.frame = ease(P.frame, realDt * 1000);
+      P.fps = P.frame > 0 ? 1000 / P.frame : 0;
+      // the slowest frame in the last 2 s, and which part made it slow
+      const gap = realDt * 1000;
+      if (gap >= P.worst || now - P.worstAt > 2000) {
+        P.worst = gap;
+        P.worstAt = now;
+        const top = (Object.entries(parts) as [string, number][]).sort((a, b) => b[1] - a[1])[0];
+        P.worstWhat = `${top[0]} ${top[1].toFixed(0)} ms`;
+      }
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);

@@ -16,6 +16,13 @@ import { Popups } from './Popups';
 import { RouteLayer } from './RouteLayer';
 import { HiveLayer, SquadLayer, StructureLayer } from './UnitLayers';
 
+export type Quality = 'high' | 'medium' | 'low';
+/** STATUS #47: what each graphics quality setting draws. */
+export const QUALITY: Record<Quality, { label: string; pixelCap: number; shadowMap: number; zombieShadows: number }> = {
+  high: { label: 'High', pixelCap: 2, shadowMap: 4096, zombieShadows: 300 },
+  medium: { label: 'Medium', pixelCap: 1.25, shadowMap: 2048, zombieShadows: 100 },
+  low: { label: 'Low', pixelCap: 1, shadowMap: 1024, zombieShadows: 0 },
+};
 const SHADOW_HALF = 200; // metres either side of the camera target that get sun shadows
 
 /**
@@ -69,7 +76,7 @@ export class Renderer {
   constructor(container: HTMLElement, overlay: HTMLElement, private world: World, cast: Record<string, Flipbook> | null = null) {
     // full-resolution, anti-aliased isometric 3D (v4.3: the pixel-art filter was dropped)
     this.gl = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.gl.setPixelRatio(Math.min(2, window.devicePixelRatio));
+    this.gl.setPixelRatio(Math.min(this.pixelCap, window.devicePixelRatio));
     this.gl.setSize(window.innerWidth, window.innerHeight);
     this.gl.shadowMap.enabled = true;
     this.gl.shadowMap.type = THREE.PCFShadowMap;
@@ -202,7 +209,7 @@ export class Renderer {
     this.rig.apply(realDt);
     {
       // keep the sun's shadow box centred on what the camera looks at (snapped to texels to avoid shimmer)
-      const step = (SHADOW_HALF * 2) / 4096;
+      const step = (SHADOW_HALF * 2) / this.sun.shadow.mapSize.x;
       const tx = Math.round(this.rig.target.x / step) * step;
       const tz = Math.round(this.rig.target.z / step) * step;
       this.sun.position.set(tx - 66, 210, tz + 114);
@@ -223,7 +230,39 @@ export class Renderer {
     this.city.updateDistricts();
     this.fx.update(this.time, realDt, simDt);
     if (isEnabled('dayNight')) this.applyTimeOfDay(w.dayTimer / BALANCE.economy.dayLengthSec);
+    const d0 = performance.now();
     this.gl.render(this.scene, this.rig.camera);
+    this.drawMs = performance.now() - d0;
+  }
+
+  /** STATUS #47: the highest pixel ratio drawn (2 on High; lower settings draw fewer pixels on high-DPI screens). */
+  private pixelCap = 2;
+  quality: Quality = 'high';
+
+  /**
+   * STATUS #47: graphics quality (Settings). High is the look so far; Medium and Low draw fewer pixels on
+   * high-DPI screens, use a smaller sun shadow map, and let fewer (or no) zombies cast shadows.
+   */
+  setQuality(q: Quality): void {
+    const Q = QUALITY[q];
+    this.quality = q;
+    this.pixelCap = Q.pixelCap;
+    this.gl.setPixelRatio(Math.min(this.pixelCap, window.devicePixelRatio));
+    this.gl.setSize(window.innerWidth, window.innerHeight);
+    if (this.sun.shadow.mapSize.x !== Q.shadowMap) {
+      this.sun.shadow.mapSize.set(Q.shadowMap, Q.shadowMap);
+      this.sun.shadow.map?.dispose();
+      this.sun.shadow.map = null; // three makes a new one at the new size
+    }
+    this.crowds?.setZombieShadows(Q.zombieShadows);
+  }
+
+  /** STATUS #47: milliseconds the last gl.render call took on the CPU (the frame's draw submission). */
+  drawMs = 0;
+
+  /** STATUS #47: what the last frame drew. */
+  get drawInfo(): { calls: number; triangles: number } {
+    return { calls: this.gl.info.render.calls, triangles: this.gl.info.render.triangles };
   }
 
   /** Placeholder zombies (only when the character models aren't loaded). */
@@ -272,7 +311,7 @@ export class Renderer {
   }
 
   resize(): void {
-    this.gl.setPixelRatio(Math.min(2, window.devicePixelRatio));
+    this.gl.setPixelRatio(Math.min(this.pixelCap, window.devicePixelRatio));
     this.gl.setSize(window.innerWidth, window.innerHeight);
     this.rig.resize(window.innerWidth, window.innerHeight);
   }

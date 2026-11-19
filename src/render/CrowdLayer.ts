@@ -67,6 +67,11 @@ export class CrowdLayer {
     this.crowds.zombieM.shadowLimit = this.crowds.zombieF.shadowLimit = 300;
   }
 
+  /** STATUS #47: at most this many zombies cast shadows (beyond it, none do). */
+  setZombieShadows(n: number): void {
+    this.crowds.zombieM.shadowLimit = this.crowds.zombieF.shadowLimit = n;
+  }
+
   /** A zombie died: it plays its death and lies there a while. */
   zombieDied(e: { id: number; defId: string; pos: { x: number; y: number }; facing: number }): void {
     const look = zombieLook(e.id, e.defId);

@@ -1,4 +1,5 @@
 import { BALANCE } from '../config/balance';
+import { QUALITY, type Quality } from '../render/Renderer';
 import { SAVE_VERSION, SLOTS, deleteSlot, latestSlot, requestLoad, slotMeta, writeSlot, type SlotId } from '../sim/save';
 import { ABILITIES, STRUCTURES, UNITS } from '../config/units';
 import { isEnabled } from '../config/features';
@@ -131,6 +132,10 @@ export class Hud {
   private last = 0;
   private toastTimer = 0;
   private uiScale = 1;
+  /** STATUS #47: the performance readout (Settings). */
+  private showPerf = false;
+  private perfEl: HTMLElement | null = null;
+  private perfLast = 0;
   private buildBar!: HTMLElement;
   private collapsed = new Set<string>();
 
@@ -162,6 +167,9 @@ export class Hud {
     this.root = root;
     // v4.9 (round 4 #38): UI scale setting, remembered per browser
     this.uiScale = Number(pref.get('uiScale')) || 1;
+    this.showPerf = pref.get('perf') === '1';
+    const quality = pref.get('quality') as Quality | null;
+    if (quality && quality in QUALITY) this.game.renderer.setQuality(quality);
     this.applyScale();
     for (const k of ['objectives', 'districts']) if (pref.get(`collapsed.${k}`) === '1') this.collapsed.add(k);
     // v4.9 (#62): the radio log is hidden until voice audio lands. Every line is still generated
@@ -268,6 +276,19 @@ export class Hud {
       case 'attackMove': g.setMode({ kind: 'attackMove' }); break;
       case 'hold': g.hold(); break;
       case 'crouch': g.crouch(); break;
+      case 'quality': {
+        const order: Quality[] = ['high', 'medium', 'low'];
+        const next = order[(order.indexOf(g.renderer.quality) + 1) % order.length];
+        g.renderer.setQuality(next);
+        pref.set('quality', next);
+        if (g.menuOpen) this.showMenu('settings');
+        break;
+      }
+      case 'perf':
+        this.showPerf = !this.showPerf;
+        pref.set('perf', this.showPerf ? '1' : '');
+        if (g.menuOpen) this.showMenu('settings');
+        break;
       case 'heal': g.startHeal(); break;
       case 'patrol': g.setMode({ kind: 'patrol', started: false }); break;
       case 'formation': g.setFormation(arg as FormationShape); break;
@@ -372,6 +393,7 @@ export class Hud {
       this.toastTimer -= dt;
       if (this.toastTimer <= 0) this.toastEl.classList.remove('show');
     }
+    this.updatePerf();
     this.last += dt;
     if (!this.dirty && this.last < 0.125) return;
     this.last = 0;
@@ -381,6 +403,32 @@ export class Hud {
     this.renderObjectives();
     this.renderSelection();
     this.renderBuildBar();
+  }
+
+  /** STATUS #47: frames per second and where the time goes, 4× a second. */
+  private updatePerf(): void {
+    if (!this.showPerf) {
+      if (this.perfEl) this.perfEl.style.display = 'none';
+      return;
+    }
+    const now = performance.now();
+    if (this.perfEl && now - this.perfLast < 250) return;
+    this.perfLast = now;
+    if (!this.perfEl) {
+      this.perfEl = document.createElement('div');
+      this.perfEl.className = 'perf-readout';
+      document.body.appendChild(this.perfEl);
+    }
+    this.perfEl.style.display = '';
+    const P = this.game.perf;
+    const d = this.game.renderer.drawInfo;
+    const zombies = this.game.world.zombies.reduce((n, z) => n + (z.alive ? 1 : 0), 0);
+    const ms = (v: number) => v.toFixed(1);
+    this.perfEl.innerHTML = `<b>${Math.round(P.fps)} FPS</b> · ${ms(P.frame)} ms/frame<br>
+      sim ${ms(P.sim)} · scene ${ms(P.scene)} · draw ${ms(P.draw)} · hud ${ms(P.hud)}<br>
+      waiting on GPU / browser ~${ms(Math.max(0, P.frame - P.sim - P.scene - P.draw - P.hud))}<br>
+      slowest (2 s): ${P.worst.toFixed(0)} ms (${P.worstWhat})<br>
+      ${d.calls} draw calls · ${(d.triangles / 1000).toFixed(0)}k triangles · ${zombies} zombies`;
   }
 
   private renderTop(): void {
@@ -708,7 +756,9 @@ export class Hud {
       body = `<table class="settings">
         <tr><td>Sound volume</td><td><button data-act="volume">${vol}</button></td></tr>
         <tr><td>Interface size</td><td><button data-act="uiscale">${Math.round(this.uiScale * 100)}%</button></td></tr>
-      </table><p class="hint">Both are remembered in this browser.</p>`;
+        <tr><td>Graphics quality</td><td><button data-act="quality">${QUALITY[this.game.renderer.quality].label}</button></td></tr>
+        <tr><td>Performance readout</td><td><button data-act="perf">${this.showPerf ? 'On' : 'Off'}</button></td></tr>
+      </table><p class="hint">All remembered in this browser. Graphics quality: Medium and Low draw fewer pixels on sharp screens, use smaller shadows and fewer zombie shadows. The readout (top right) shows frames per second and where each frame's time goes.</p>`;
     } else {
       body = `<p>Restart the campaign from the beginning? Anything since your last save is lost.</p>
         <button class="big" data-act="restart">YES, RESTART</button> <button class="big ghost" data-act="menu-page:main">CANCEL</button>`;
