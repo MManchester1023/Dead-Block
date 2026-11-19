@@ -117,7 +117,7 @@ v4.39 (uploaded by the owner; authors to fill in where blank):
 
 ## Medic model and pistol (v4.62, uploaded by the owner; authors and licences to fill in)
 
-- **Medic** (`assets-src/models/medic.zip`: `test.fbx` with a base-colour texture): not in the game yet. It has its own 22-bone rig, so it's exported skeleton-free for Mixamo's auto-rigger (`assets-src/models/mixamo/to-rig/medic_for_mixamo.zip`); until then medics use the engineer model tinted red.
+- **Medic** (`assets-src/models/medic.zip`: `test.fbx` with a base-colour texture): **changed:** exported skeleton-free (`assets-src/models/mixamo/to-rig/medic_for_mixamo.zip`) and re-rigged on Mixamo by the owner (`assets-src/models/mixamo/medic_rigged.fbx`); in the game since v4.64 (`public/models/characters/medic/medic.fbx`).
 - **Pistol** (`assets-src/models/pistol.zip`): **changed:** the slide, frame, trigger and magazine merged, the colour texture (shrunk to 512 px) baked into vertex colours, turned into the rifle frame and scaled to 20 cm (`tools/assets/export-gun.cjs`). Game copy `public/models/weapons/pistol.glb`.
 
 ## Trees and shrubs (v4.58)

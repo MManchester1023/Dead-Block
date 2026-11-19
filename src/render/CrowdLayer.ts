@@ -15,8 +15,7 @@ export function zombieLook(id: number, defId: string): { key: string; sx: number
 }
 
 /** The crowd a squad's soldiers are drawn from. */
-// STATUS #20 / v4.62: medics have their own crowd (pistol clips, healing animation) on the engineer body, tinted
-// red to tell them apart until their own model is rigged.
+// STATUS #20 / v4.62: medics have their own crowd (pistol clips, healing animation); v4.64: their own model.
 const squadCrowd = (defId: string) => (defId === 'engineer' ? 'engineer' : defId === 'medic' ? 'medic' : defId === 'civilians' ? 'civilian' : 'soldier');
 /**
  * v4.62: height above the ground while jumping off a tower of `height` m, `e` s into Mixamo's "Jumping Down".
@@ -34,7 +33,6 @@ export function jumpLift(e: number, height: number): number {
 
 /** v4.62: every other civilian is the female model. */
 const memberCrowd = (defId: string, i: number | undefined, base: string) => (defId === 'civilians' && (i ?? 0) % 2 === 1 ? 'civilianF' : base);
-const squadTint = (defId: string) => (defId === 'medic' ? 0xffa89c : undefined);
 
 /**
  * Animated soldiers, engineers, civilians, zombies and corpses, drawn as flipbook crowds
@@ -79,7 +77,7 @@ export class CrowdLayer {
   /** A soldier (or civilian) died. */
   memberDied(e: { unitId: string; pos: { x: number; y: number }; facing: number; low?: boolean; member?: number }): void {
     // v4.55: shot while crouched or in cover: the crouched death
-    this.corpses.push({ key: memberCrowd(e.unitId, e.member, squadCrowd(e.unitId)), x: e.pos.x, z: e.pos.y, facing: e.facing, t0: this.clock, sx: 1, sy: 1, tint: squadTint(e.unitId), clip: e.low ? 'deathCrouch' : undefined });
+    this.corpses.push({ key: memberCrowd(e.unitId, e.member, squadCrowd(e.unitId)), x: e.pos.x, z: e.pos.y, facing: e.facing, t0: this.clock, sx: 1, sy: 1, clip: e.low ? 'deathCrouch' : undefined });
   }
 
   update(simDt: number): void {
@@ -205,8 +203,8 @@ export class CrowdLayer {
         if (clip === 'climbDown' && jumpAt >= 0) {
           // one after another, 0.12 s apart; clip time and fall in step so they land when the clip does
           const e = Math.max(0, jumpAt - i * 0.12);
-          crowd.add(clip, e, m.pos.x, m.pos.y, m.facing, 1, squadTint(s.def.id), -jumpLift(e, jumpHeight));
-        } else crowd.add(clip, this.animTime(key, clip, rate, simDt), m.pos.x, m.pos.y, m.facing, 1, squadTint(s.def.id), -lift);
+          crowd.add(clip, e, m.pos.x, m.pos.y, m.facing, 1, undefined, -jumpLift(e, jumpHeight));
+        } else crowd.add(clip, this.animTime(key, clip, rate, simDt), m.pos.x, m.pos.y, m.facing, 1, undefined, -lift);
       });
     }
 

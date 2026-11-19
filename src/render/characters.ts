@@ -710,17 +710,16 @@ export const CHARACTER_SPECS: CharacterSpec[] = [
     simplifyIndexed: true,
   },
   {
-    // v4.62 (STATUS #20): the Medic Team. Stand-in body: the engineer (until the owner's medic model is
-    // re-rigged on Mixamo), with the owner's pistol and Mixamo pistol clips, and "medic healing" while treating
+    // v4.62 (STATUS #20): the Medic Team, with the owner's pistol and Mixamo pistol clips, and "medic healing"
+    // while treating; v4.64: the owner's medic model, re-rigged on Mixamo (texture embedded)
     key: 'medic',
-    url: 'models/characters/engineer/engineer.fbx',
-    texture: 'models/characters/engineer/engineer.png',
+    url: 'models/characters/medic/medic.fbx',
     clips: ['idle', 'walk', 'shoot', 'death', 'work', 'crouch', 'cover', 'standUp', 'crouchWalk', 'deathCrouch', 'climbUp', 'climbDown'],
     clipFiles: {
       ...SOLDIER_CLIPS,
       idle: 'models/characters/medic/idle.clip.json',
       walk: 'models/characters/medic/run.clip.json',
-      shoot: 'models/characters/medic/idle.clip.json', // no pistol-firing clip yet: the pistol idle has it raised
+      shoot: 'models/characters/medic/shoot.clip.json', // v4.64: a steady pistol aim (owner's upload; no recoil in it)
       work: 'models/characters/medic/heal.clip.json',
       crouch: 'models/characters/medic/kneel.clip.json',
       cover: 'models/characters/medic/kneel.clip.json',
