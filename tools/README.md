@@ -28,6 +28,7 @@ Slow runs that print results instead of passing or failing. Not part of `npm tes
 | `crouch.cjs` | Crouch and cover in the real game: three squads sent to one car, G crouches and the button flips to Stand, muzzle flashes are made when they shoot, a hive's hover shows its next-stage timer |
 | `sound.cjs` | Sound wiring in the real game: every clip decodes, both ambience beds start, a working engineer crew gets its construction loop and loses it when done, HUD buttons click, soldier deaths play, Command's radio lines play chatter, the supply plane's fly-by and parachute, the hive's blast, and that barbed wire uses the model (checks the audio graph; it can't listen) |
 | `round13.cjs` | Round 13 in the real game: squad labels hidden until hovered, MG nests turned to their aim |
+| `balance.cjs` | Difficulty tuning (`dev-balance.html`, v4.68): groups and region estimates shown, edits highlighted, Save stores them, Download gives balance.json, the game starts with the tuned values and says so, Reset clears |
 | `mapeditor.cjs` | Map editor (`dev-map.html`): no problems in the starter map, Save with no edits gives exactly the repo file, dragging moves a building, Play starts the game on the edit |
 | `chunks.cjs` | City streaming on a 1.8 km test map (100 chunks): only chunks near the camera are built, memory stays within budget while crossing the map, the ops map uses low detail |
 | `castcheck.cjs` | Pre-baked cast: matches a live bake pose for pose, loads much faster; prints load times and memory |

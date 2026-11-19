@@ -336,6 +336,11 @@ export function buildMap(data: MapData): CityMap {
 
 let mapOverride: MapData | null = null;
 /** Play a different map (the map editor's "Play" button, via main.ts); null goes back to the file. */
+/** The map data a new game will be built from (the starter map, or the map editor's edit). */
+export function currentMapData(): MapData {
+  return mapOverride ?? (starterData as unknown as MapData);
+}
+
 export function useMapData(d: MapData | null): void {
   mapOverride = d;
 }

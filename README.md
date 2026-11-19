@@ -21,5 +21,12 @@ Then open http://localhost:5173. Tests: `npm test`.
 - **[CREDITS.md](CREDITS.md)**: model authors and licences.
 - `src/`: `sim/` is the game rules (no graphics), `render/` the 3D view, `ui/` the HUD, `config/` every tunable number.
 - `assets-src/models/`: uploaded models waiting to be used (not shipped).
-- **Rifle fitter**: with `npm run dev` running, open http://localhost:5173/dev-rifle.html to line the rifle up in the soldiers' hands (sliders, any animation), then save `m4.json` into `public/models/weapons/`.
 - [README_old.md](README_old.md): the previous, detailed README (architecture notes).
+
+## Tools
+
+With `npm run dev` running (the game at http://localhost:5173):
+
+- **Difficulty tuning**: http://localhost:5173/dev-balance.html: every difficulty setting (whole horde, hives, horde waves, noise, each zombie type, each difficulty tier's hive pools and spawning, each region's hive starting stage and ambient zombies…) next to its default. **Save** uses your changes in your next game in that browser; **Download balance.json** and upload it to `public/` to keep them for good.
+- **Map editor**: http://localhost:5173/dev-map.html: the city as data: move, resize, add and delete buildings, cars, roads, lots, districts, hive sites and power stations, with checks for problems and undo. **Play** tries your edit in the game straight away; **Save** downloads `starter.json` (upload it to `src/data/maps/` to keep it).
+- **Weapon fitter**: http://localhost:5173/dev-rifle.html: pick a unit and a gun, line the gun up in the hands (sliders, any animation), then **Download** its `.json` (one per gun) and upload it to `public/models/weapons/`.

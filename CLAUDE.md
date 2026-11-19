@@ -16,7 +16,8 @@ assets are free-licence downloads, credited in `CREDITS.md`.
   campaign, commands, damage, buildings; `systems/` = what runs each tick); it never touches the DOM.
   `src/render/` is the 3D view (Renderer coordinates layers: City, Crowd, Unit, SupplyDrops, Effects,
   PlacementGhost; `characters.ts` bakes animations into flipbook poses). `src/ui/Hud.ts`, `src/audio/`, `src/data/maps/` (the city as data, edited in `dev-map.html`),
-  `src/config/` (balance.ts, units.ts, features.ts: tune numbers there). `dev-*.html` are developer pages.
+  `src/config/` (balance.ts, units.ts, features.ts: tune numbers there; tuning.ts: the knobs Mat tunes himself in
+  `dev-balance.html`, saved as `public/balance.json`, so check that file before changing a default). `dev-*.html` are developer pages.
 
 ## Working with Mat
 

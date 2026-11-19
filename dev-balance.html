@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Difficulty tuning</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; background: #1b1d1f; color: #e4e0d6; font: 14px/1.45 system-ui, sans-serif; }
+      header { position: sticky; top: 0; z-index: 2; background: #23262a; border-bottom: 1px solid #3a3e44; padding: 12px 20px; }
+      h1 { margin: 0 0 4px; font-size: 18px; }
+      header p { margin: 0 0 8px; color: #b8b2a4; max-width: 900px; }
+      .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+      button, .file { background: #3a4048; color: #f0ece2; border: 1px solid #555c66; border-radius: 4px; padding: 6px 12px; font: inherit; cursor: pointer; }
+      button.main { background: #4f6b3a; border-color: #6d8f52; }
+      button:hover, .file:hover { filter: brightness(1.15); }
+      .file input { display: none; }
+      #status { color: #d8c27a; margin-left: 6px; }
+      main { padding: 10px 20px 60px; max-width: 1100px; }
+      details { background: #222528; border: 1px solid #33373c; border-radius: 6px; margin: 8px 0; }
+      summary { cursor: pointer; padding: 8px 12px; font-weight: 600; }
+      summary small { font-weight: 400; color: #d8c27a; margin-left: 8px; }
+      summary .est { color: #9fc4e8; }
+      .row { display: grid; grid-template-columns: minmax(220px, 1fr) auto auto; gap: 4px 12px; align-items: center; padding: 6px 12px; border-top: 1px solid #2c3034; }
+      .row.changed { background: #2f2b1d; }
+      .row label { display: block; }
+      .row .hint { display: block; color: #8f897c; font-size: 12px; }
+      .inputs { display: flex; flex-wrap: wrap; gap: 6px; }
+      .inputs span { display: flex; flex-direction: column; font-size: 11px; color: #8f897c; }
+      input[type=number] { width: 78px; background: #15171a; color: #f0ece2; border: 1px solid #4a5058; border-radius: 3px; padding: 3px 5px; font: inherit; }
+      .row.changed input { border-color: #d8c27a; }
+      .def { color: #8f897c; font-size: 12px; white-space: nowrap; }
+      .reset { padding: 2px 8px; visibility: hidden; }
+      .row.changed .reset { visibility: visible; }
+      @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Difficulty tuning</h1>
+      <p>
+        Change any number, then <b>Save</b>: your next game in this browser uses it (reload the game tab). Changed
+        settings are highlighted; ↺ puts one back. To keep settings for good, <b>Download balance.json</b> and upload
+        it to the game's <code>public/</code> folder on GitHub; the game then starts from it everywhere.
+      </p>
+      <div class="bar">
+        <button class="main" data-a="save">Save (use in my next game)</button>
+        <button data-a="download">Download balance.json</button>
+        <label class="file">Load a balance.json<input type="file" accept=".json,application/json" data-a="load" /></label>
+        <button data-a="resetall">Reset everything to defaults</button>
+        <button data-a="play">Open the game</button>
+        <span id="status"></span>
+      </div>
+    </header>
+    <main id="groups"></main>
+    <script type="module" src="/src/dev/balanceTool.ts"></script>
+  </body>
+</html>
