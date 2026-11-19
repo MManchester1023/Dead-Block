@@ -13,6 +13,7 @@ A persistent, open-world-ish military RTS-lite set in a zombie-choked city. Buil
 |---|---|
 | v3 | November 2026 design review: map sequence, engineer construction rules, Elite armory access, hive progression. Revision addendum (§17–20): tutorial, open-world transition, region takeover. |
 | **v4** | Addendum merged into the main body. Added: rooftops, tall walls, building destruction and rubble, vehicle crushing, AC-130, colored smoke, target priority, human faction (placeholder), day/night with flares, Little Bird, knockback, sheet-metal armor, artillery vehicles, Last Stand defeat, outpost resupply, artillery strike patterns, loudspeaker, Hawk rappelling, Elite cosmetics. New §21 priority roadmap. Table formatting fixed. |
+| **v4.98** | Round 22 #270 logged: a button (and the Home key) to jump the camera back to the main base (STATUS #87). No code changes. |
 | **v4.97** | Round 22 logged (§22, #257–269): no command points, see-through gas-station roofs, crouch icon, charges not interrupted, search bar, hurt sounds, medics from the Med Bay, right-click to aim abilities, engineers round gas, no "Sapper", hive weak spot, hives hurt by gunfire and losing levels, medic SMG and animations. No code changes. |
 | **v4.96** | Plans written (§21 "Technical and polish plans", STATUS #77–#85): docs split, repo size (assets-src is 470 MB of every download), splitting orders.ts and Hud.ts, faster pathfinding, a proper vehicle planner, end-of-region summary card, level-up sound, idle squad button, minimap. No code changes. |
 | **v4.95** | STATUS #70 (round 21 #249, #250, #253, #255, #256): region 2's hive at stage 1; noise cooldown 60 s; hive stages 15 / 10.5 / 12 min; "Heavy MG Nest"; horde waves only from noise (no timer). |
@@ -1362,7 +1363,7 @@ The first try at this round was on the old branch (`claude/magical-brown-7bsmza`
 | 255 | More time between hive upgrades | A hive takes 10 min (stage 1→2), 7 min (2→3) and 8 min (3→4). | Half as long again: 15, 10.5 and 12 min (on the tuning page too: Hives → Seconds to grow a stage). | Owner: 15, 10.5 and 12 min; ✔ v4.95 |
 | 256 | No more timed horde waves: noise is enough | Each hive sends a horde wave on a timer (first after 7–10 min, then every 3–7 min by stage and region) and also straight away when a district's noise meter fills. | Drop the timer: waves come only from noise. The timer settings leave the tuning page. | –; ✔ v4.95 |
 
-### Round 22 [v4.97] (notes on v4.96; logged, not started)
+### Round 22 [v4.97] (notes on v4.96; logged, not started; #270 added in v4.98)
 
 | # | Note | Current state (from the code) | Proposed fix | Needs from owner |
 |---|---|---|---|---|
@@ -1379,4 +1380,5 @@ The first try at this round was on the old branch (`claude/magical-brown-7bsmza`
 | 267 | Zombies should spawn round only ¾ of a hive, leaving a weak spot | They spawn at a random point all round it. | Each hive gets a gap (a quarter of the way round, its direction fixed per hive and visible on the model) where nothing spawns. | – |
 | 268 | Hives: hurt by gunfire with a lot of health (more each level); only attacked when ordered; explosives and fire still best; at 0 health it drops a level with that level's full health, until a level 1 hive at 0 is destroyed | Only explosives and fire hurt a hive (500 / 750 / 1,000 / 1,250 health by stage); stages only go up; squads shoot hives on their own only with those weapons. | Bullets hurt hives; health per level raised a lot; squads never target a hive unless told to (right-click it); explosives and fire do extra to hives; at 0 health it loses a level (its spawning and waves drop too) and refills to that level's health; a level 1 hive at 0 dies. On the tuning page. | Health per level (e.g. 3,000 / 4,500 / 6,000 / 8,000?) and how much extra explosives and fire do (×3?). Does a dropped level grow back over time? |
 | 269 | Medics: new animations and an SMG instead of the pistol | Medics use the pistol clips (few and they look bad) and a pistol model. | Medics use the soldiers' rifle animations with an SMG model in their hands (fitted in dev-rifle.html). | An SMG model (free-licence GLB), or OK to cut one from a model we have? |
+| 270 | A button to bring the camera back to the main base | There's none: B selects the Barracks (and opens its card) but doesn't move the camera; you scroll or use the ops map. | A BASE button (with the minimap and top-right controls) and the Home key: the camera jumps to the Command Post; pressing it again goes back to where you were. | – |
 
