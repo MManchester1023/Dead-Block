@@ -239,7 +239,8 @@ export const STRUCTURES: Record<string, StructureDef> = {
   sandbags: { id: 'sandbags', name: 'Sandbag Wall', hp: 260, cost: { money: 15, supplies: 10 }, buildTime: 6, size: { w: 3, h: 1 }, blocksMovement: true, cover: 0.55, climbable: true, hotkey: 'Q' },
   wire: { id: 'wire', name: 'Barbed Wire', hp: 120, cost: { money: 10, supplies: 5 }, buildTime: 4, size: { w: 3, h: 1 }, blocksMovement: false, slow: 0.35, hotkey: 'W' },
   // round 12 #145: 8 → 12 damage a round
-  mgNest: { id: 'mgNest', name: 'MG Emplacement', hp: 380, cost: { money: 140, supplies: 45 }, buildTime: 12, size: { w: 2, h: 2 }, blocksMovement: true, cover: 0.5, coverSlots: 2, hotkey: 'E', arc: 120, weapon: { name: 'Mounted HMG', range: 35, damage: 15, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 } },
+  // round 21 #253 (owner): "Heavy MG Nest" (was "MG Emplacement")
+  mgNest: { id: 'mgNest', name: 'Heavy MG Nest', hp: 380, cost: { money: 140, supplies: 45 }, buildTime: 12, size: { w: 2, h: 2 }, blocksMovement: true, cover: 0.5, coverSlots: 2, hotkey: 'E', arc: 120, weapon: { name: 'Mounted HMG', range: 35, damage: 15, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 } },
   tallWall: { id: 'tallWall', name: 'Tall Concrete Wall (40 ft)', hp: 4000, cost: { money: 400, supplies: 120 }, buildTime: 60, size: { w: 4, h: 1 }, blocksMovement: true, climbable: false, requires: 'tallWalls' },
   loudspeaker: { id: 'loudspeaker', name: 'Loudspeaker', hp: 80, cost: { money: 40, supplies: 10 }, buildTime: 8, size: { w: 1, h: 1 }, blocksMovement: false, lure: 6, requires: 'tallWalls' },
 };

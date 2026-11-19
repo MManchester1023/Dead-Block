@@ -111,7 +111,7 @@ export function seedDistrict(w: World, d: DistrictState): void {
   for (const [i, site] of hiveSites(w, d).entries()) {
     const hs = d.def.hiveStage ?? 1;
     const stage = Array.isArray(hs) ? (hs[i] ?? 1) : hs;
-    const hive = new Hive({ ...site }, d.def.id, BALANCE.hive.hpByStage[stage - 1], T.firstPulseDelaySec);
+    const hive = new Hive({ ...site }, d.def.id, BALANCE.hive.hpByStage[stage - 1]);
     hive.stage = stage;
     w.hives.push(hive);
     w.registerHive(hive);

@@ -169,7 +169,7 @@ const ok = (cond, what) => console.log(`${cond ? 'ok  ' : 'FAIL'} ${what}`);
     const x = d.find((e) => /Weapons/.test(e.querySelector('summary').textContent));
     return x ? x.textContent : '';
   });
-  ok(/Humvee/.test(weapons) && /MG Emplacement/.test(weapons), `the tuning page has a Weapons group with the Humvee and the MG emplacement (#222)`);
+  ok(/Humvee/.test(weapons) && /Heavy MG Nest/.test(weapons), `the tuning page has a Weapons group with the Humvee and the Heavy MG Nest (#222)`);
   ok(errs2.length === 0, `no tuning page errors${errs2.length ? ': ' + errs2.join(' / ') : ''}`);
   await b.close();
 })();

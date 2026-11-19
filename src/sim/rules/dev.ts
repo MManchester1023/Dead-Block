@@ -38,7 +38,7 @@ export function devSpawnHive(w: World, at: Vec2, stage: number): Hive {
   const st = Math.max(1, Math.min(4, Math.round(stage)));
   const pos = w.grid.nearestFree(at);
   const district = w.districtAt(pos)?.def.id ?? 'base';
-  const hive = new Hive({ ...pos }, district, BALANCE.hive.hpByStage[st - 1], w.tier(district).firstPulseDelaySec);
+  const hive = new Hive({ ...pos }, district, BALANCE.hive.hpByStage[st - 1]);
   hive.stage = st;
   w.hives.push(hive);
   w.registerHive(hive);

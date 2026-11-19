@@ -197,7 +197,7 @@ export const ROADSIDE_MOTEL_TUTORIAL: TutorialStep[] = [
   {
     id: 'fortify',
     title: 'Dig in',
-    text: 'Engineers build anywhere. Select <b>Sapper Charlie</b>, press <b>F</b> (or the Sandbag Wall button), click to place, <b>R</b> to rotate. Also: <b>G</b> barbed wire, <b>T</b> MG nest. Right-click your own structure with engineers to <b>resume</b> or <b>repair</b> it; <b>X</b> takes it down for a refund.',
+    text: 'Engineers build anywhere. Select <b>Sapper Charlie</b>, press <b>F</b> (or the Sandbag Wall button), click to place, <b>R</b> to rotate. Also: <b>G</b> barbed wire, <b>T</b> heavy MG nest. Right-click your own structure with engineers to <b>resume</b> or <b>repair</b> it; <b>X</b> takes it down for a refund.',
     objective: 'Build something with your engineers.',
     done: (g) => g.world.structures.some((s) => s.built && ['sandbags', 'wire', 'mgNest'].includes(s.def.id)),
     highlight: '.hud-selection',

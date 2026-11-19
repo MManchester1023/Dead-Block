@@ -57,18 +57,14 @@ export function updateHives(w: World, dt: number): void {
       }
     }
 
-    // horde pulses (doc §11) — on a timer, or immediately when the district's noise meter fills
+    // horde pulses (doc §11): round 21 #256 (owner): only when the district's noise meter fills (there used to be
+    // a timer as well)
     const d = w.districts.get(h.districtId);
-    h.pulseTimer -= dt;
-    const loud = isEnabled('noise') && !!d && d.noise >= BALANCE.noise.pulseThreshold;
-    if (h.pulseTimer <= 0 || loud) {
-      if (loud && d) {
-        w.events.emit('noiseAlert', { districtId: d.def.id });
-        d.noise = 0;
-        d.noiseLockUntil = w.time + BALANCE.noise.pulseCooldownSec;
-      }
-      h.pulseTimer = T.pulseIntervalSec[h.stage - 1];
-      pulse(w, h, loud ? 4 : 0);
+    if (isEnabled('noise') && d && d.noise >= BALANCE.noise.pulseThreshold) {
+      w.events.emit('noiseAlert', { districtId: d.def.id });
+      d.noise = 0;
+      d.noiseLockUntil = w.time + BALANCE.noise.pulseCooldownSec;
+      pulse(w, h, 4);
     }
   }
 }

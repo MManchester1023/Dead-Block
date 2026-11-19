@@ -108,7 +108,7 @@ export function updateDistricts(w: World, dt: number): void {
         d.infestation = 40;
         w.commandCap -= BALANCE.economy.commandPerSecuredDistrict;
         if (isEnabled('regionTakeover')) {
-          const hive = new Hive(pos, d.def.id, BALANCE.hive.hpByStage[0], w.tier(d.def.id).pulseIntervalSec[0]);
+          const hive = new Hive(pos, d.def.id, BALANCE.hive.hpByStage[0]);
           w.hives.push(hive);
           w.registerHive(hive);
         }

@@ -95,8 +95,6 @@ export function knobs(map: MapData): Knob[] {
       { path: `tier.${i}.runnerShare`, group: g, label: 'Share of Walkers & Runners that are Runners', len: 4, parts: STAGES },
       { path: `tier.${i}.mediumStart`, group: g, label: 'Specials’ share of the starting crowd' },
       { path: `tier.${i}.mediumStartMin`, group: g, label: '…and at least this many', int: true },
-      { path: `tier.${i}.firstPulseDelaySec`, group: g, label: 'First horde wave after (seconds)', int: true },
-      { path: `tier.${i}.pulseIntervalSec`, group: g, label: 'Seconds between horde waves', len: 4, parts: STAGES, int: true },
       { path: `tier.${i}.pulseSize`, group: g, label: 'Horde wave size (×)' },
     );
     if (t.roam)

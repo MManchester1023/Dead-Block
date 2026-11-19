@@ -237,12 +237,12 @@ export class Hive implements Targetable {
   stage = 1; // 1 Dormant … 4 Overrun (doc §9) — never regresses
   stageTimer = 0;
   spawnTimer = 0;
-  pulseTimer: number;
+  /** (Unused since round 21 #256: horde waves come from noise only. Kept so old saves load.) */
+  pulseTimer = 0;
   spawned = new Set<number>();
 
-  constructor(public pos: Vec2, public districtId: string, hp: number, firstPulse: number) {
+  constructor(public pos: Vec2, public districtId: string, hp: number) {
     this.hp = hp;
-    this.pulseTimer = firstPulse;
   }
 }
 

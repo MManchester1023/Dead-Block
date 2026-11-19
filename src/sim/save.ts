@@ -120,7 +120,7 @@ export function loadWorld(data: SaveData, seed = 1337): World {
   // entities, each created under its saved id (resetIds just before its constructor runs)
   for (const h of s.hives) {
     resetIds(h.id);
-    const hive = new Hive(h.pos, h.districtId, h.hp, h.pulseTimer);
+    const hive = new Hive(h.pos, h.districtId, h.hp);
     Object.assign(hive, { ...h, spawned: new Set(h.spawned) });
     w.hives.push(hive);
     w.registerHive(hive);

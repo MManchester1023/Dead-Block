@@ -38,7 +38,7 @@ export const BALANCE = {
     decayPerSec: 1.25,
     pulseThreshold: 100,
     /** Round 12 #149: after a noise pulse the meter stays empty this long (the fight against it used to set off the next). */
-    pulseCooldownSec: 45,
+    pulseCooldownSec: 60, // round 21 #250 (owner; was 45)
     /** Round 13 #156: the power station starting up is this loud (a demo charge is 30): the dead come to look. */
     powerOnLoudness: 12,
     // Gunshots carry well beyond sight (zombie sight ~14 m). v4.15 (#76): a rifle (2.2) is heard ~60 m
@@ -75,7 +75,7 @@ export const BALANCE = {
     alarmRadius: 20, // a squad this close to a hive sets it off…
     alarmCallRadius: 45, // …and every zombie this close to the hive comes for it
     hpByStage: [500, 750, 1000, 1250], // grows as it matures — kill it early
-    stageDurationSec: [600, 420, 480], // time to advance stage 1→2, 2→3, 3→4
+    stageDurationSec: [900, 630, 720], // time to advance stage 1→2, 2→3, 3→4 (round 21 #255, owner: half as long again)
     // spawn rates, caps and pulse timing live in DIFFICULTY (below), per district tier
     reinforceBelow: 0.25, // a hive whose brood is under this share of its cap spawns faster…
     reinforceRate: 0.6, // …at this multiple of its normal interval
@@ -187,8 +187,6 @@ export interface DifficultyTier {
   /** Medium share of the starting crowd, and the minimum number placed (so they're actually met). */
   mediumStart: number;
   mediumStartMin: number;
-  firstPulseDelaySec: number;
-  pulseIntervalSec: readonly number[];
   pulseSize: number; // multiplier on pulse size
   /** Roaming packs leaving this district (STATUS #11): seconds between packs, and pack size. None = stays put. */
   roam?: { everySec: readonly [number, number]; group: readonly [number, number] };
@@ -198,14 +196,14 @@ export const DIFFICULTY: readonly DifficultyTier[] = [
   // Tutorial: young hives are busier than before (#32) but stages 3–4 are far calmer (#57)
   { name: 'Tutorial', zombieHp: 0.7, density: 0.85, spawnIntervalSec: [13, 10, 10, 9], spawnGroup: [1, 2, 2, 2],
     normalPool: [14, 28, 42, 56], mediumPool: [2, 4, 5, 7], mediumChance: [0.15, 0.18, 0.2, 0.22], runnerShare: [0.08, 0.14, 0.2, 0.25],
-    mediumStart: 0.06, mediumStartMin: 3, firstPulseDelaySec: 600, pulseIntervalSec: [420, 330, 270, 240], pulseSize: 0.7 },
+    mediumStart: 0.06, mediumStartMin: 3, pulseSize: 0.7 },
   // Easy (tutorial region 2, v4.13 #74): a real step up: more and tougher dead, Runner-heavy
   { name: 'Easy', zombieHp: 0.85, density: 1.15, spawnIntervalSec: [13, 12, 9, 7], spawnGroup: [1, 1, 2, 3],
     normalPool: [14, 24, 60, 120], mediumPool: [3, 4, 8, 12], mediumChance: [0.15, 0.2, 0.22, 0.25], runnerShare: [0.15, 0.25, 0.3, 0.35],
-    mediumStart: 0.07, mediumStartMin: 4, firstPulseDelaySec: 420, pulseIntervalSec: [330, 260, 210, 180], pulseSize: 1,
+    mediumStart: 0.07, mediumStartMin: 4, pulseSize: 1,
     roam: { everySec: [300, 420], group: [3, 5] } },
   { name: 'Standard', zombieHp: 1, density: 1, spawnIntervalSec: [18, 11, 7, 4], spawnGroup: [1, 2, 3, 4],
     normalPool: [10, 34, 105, 270], mediumPool: [2, 6, 15, 30], mediumChance: [0.12, 0.18, 0.22, 0.25], runnerShare: [0.08, 0.15, 0.22, 0.3],
-    mediumStart: 0.06, mediumStartMin: 2, firstPulseDelaySec: 480, pulseIntervalSec: [300, 240, 200, 180], pulseSize: 1,
+    mediumStart: 0.06, mediumStartMin: 2, pulseSize: 1,
     roam: { everySec: [180, 270], group: [4, 8] } },
 ];

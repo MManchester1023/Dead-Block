@@ -41,7 +41,7 @@ const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60
 const BUILD_MENU: { kind: 'structure' | 'tool'; id: string; name: string; key: string; icon: string; tip: string; unlock?: string }[] = [
   { kind: 'structure', id: 'sandbags', name: 'Sandbags', key: 'F', icon: 'sandbags', tip: 'Cover for squads behind it (R rotates)' },
   { kind: 'structure', id: 'wire', name: 'Barbed Wire', key: 'Z', icon: 'wire', tip: 'Slows everything that crosses it, yours included' },
-  { kind: 'structure', id: 'mgNest', name: 'MG Nest', key: 'T', icon: 'mg', tip: '35 m, 120° field of fire aimed with R' },
+  { kind: 'structure', id: 'mgNest', name: 'Heavy MG Nest', key: 'T', icon: 'mg', tip: '35 m, 120° field of fire aimed with R' },
   { kind: 'structure', id: 'guardTower', name: 'Guard Tower', key: 'V', icon: 'tower', tip: 'One squad mans it: +40% range, sees over cover', unlock: 'opens with Gas Station Strip' },
   { kind: 'structure', id: 'vehicleBay', name: 'Vehicle Bay', key: 'Y', icon: 'garage', tip: 'In the base; builds vehicles (the Humvee is on its way)', unlock: 'restore the Rail Siding power station' },
   { kind: 'structure', id: 'outpost', name: 'Outpost', key: 'O', icon: 'outpost', tip: 'Secures a district once its hives are dead and infestation is 2% or less' },
@@ -102,7 +102,7 @@ const CONTROLS: [string, [string, string][]][] = [
     [`${K('Ctrl')}+${K('1')}–${K('9')} / ${K('1')}–${K('9')}`, 'Save / recall a group (press twice to centre)'],
   ]],
   ['Engineers', [
-    [K('F'), 'Sandbags'], [K('Z'), 'Barbed wire'], [K('T'), 'MG nest'], [K('V'), 'Guard tower (region 2)'],
+    [K('F'), 'Sandbags'], [K('Z'), 'Barbed wire'], [K('T'), 'Heavy MG nest'], [K('V'), 'Guard tower (region 2)'],
     [K('Y'), 'Vehicle Bay (after power)'], [K('O'), 'Outpost'], [K('C'), 'Demo charge (click a hive)'], [K('X'), 'Deconstruct'],
     [K('R'), 'Rotate while placing (MG: turn its field of fire)'],
     ['Right-click own structure', 'Resume building / repair (or restore the power station)'],
