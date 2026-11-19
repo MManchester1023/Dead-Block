@@ -6,7 +6,7 @@ assets are free-licence downloads, credited in `CREDITS.md`.
 ## Where things are
 
 - **`docs/Dead_Block_Command_Design_Doc_v4.md`** is the source of truth: version table at the top (one row
-  per change, newest first), §21 roadmap, **§22 playtest log** (rounds of numbered notes, #1–#255 so far (round 21)).
+  per change, newest first), §21 roadmap, **§22 playtest log** (rounds of numbered notes, #1–#256 so far (round 21)).
 - **`STATUS.md`** is the short, ranked to-do list plus what's done. **Item numbers are fixed** ("work on #13" always means
   item **#13**): never renumber; new items take the next free number and go where they rank. Keep "Next, in
   order" **ranked by importance with open items only**; finished items move to Done → Finished items.
