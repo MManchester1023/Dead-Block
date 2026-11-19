@@ -40,6 +40,8 @@ export function squadStatus(s: Squad, w: World): { text: string; tone: StatusTon
       return { text: s.moving ? 'TO THE OUTPOST' : 'INSTALLING', tone: 'work' };
     case 'heal':
       return { text: s.moving ? 'TO PATIENT' : 'HEALING', tone: 'work' };
+    case 'board':
+      return { text: 'TO THE HUMVEE', tone: 'move' };
     case 'disband':
       return { text: 'STANDING DOWN', tone: 'move' };
   }

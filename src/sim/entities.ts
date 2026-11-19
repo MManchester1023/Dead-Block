@@ -52,6 +52,10 @@ export class Squad implements Targetable {
   targetId: number | null = null;
   holding = false;
   inCover = 0; // current cover damage reduction
+  /** STATUS #51: riding in this vehicle (squad id): hidden, safe, not shooting. */
+  inVehicle: number | null = null;
+  /** STATUS #51: a vehicle's passenger squad (id). */
+  cargo: number | null = null;
   /** Medics (STATUS #20): sim time when Heal can be used again. */
   healReadyAt = 0;
   /** Round 11 #125: the player told it to crouch (G): half cover in the open, slower on the move. Stays until G again. */

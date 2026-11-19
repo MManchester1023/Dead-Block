@@ -148,7 +148,7 @@ export class Sound {
     ev.on('shot', (e) => {
       if (e.weapon === 'Carbine') this.play('carbine', e.from, { rate: 0.93 + Math.random() * 0.14 });
       else if (e.weapon === 'Pistol') this.play('pistol', e.from, { rate: 0.95 + Math.random() * 0.1, gain: 0.8 }); // STATUS #20 medics
-      else if (e.weapon === 'Mounted HMG') this.mgFiring(e.from); // v4.55: a continuous 50-cal burst, not single shots
+      else if (e.weapon === 'Mounted HMG') this.mgFiring(e.from, e.shooter); // v4.55: a continuous 50-cal burst, not single shots
       else this.play('rifle', e.from, e.heavy ? { rate: 0.82, gain: 1.35 } : { rate: 0.94 + Math.random() * 0.12 });
     });
     ev.on('zombieKilled', (e) => {
@@ -243,12 +243,17 @@ export class Sound {
   }
 
   /** An MG emplacement fired (a shot from it): start or keep its burst loop going. */
-  private mgFiring(pos: Vec2): void {
+  /** One loop per gun: keyed by the shooter (STATUS #51: a Humvee's gun moves), else by where it is. */
+  private mgFiring(pos: Vec2, shooter?: number): void {
     const ctx = this.ctx;
     const buf = this.loops[MG_LOOP];
     if (!ctx || !this.master || !buf || this.volume === 0) return;
-    const key = `${Math.round(pos.x)},${Math.round(pos.y)}`;
+    const key = shooter != null ? `id${shooter}` : `${Math.round(pos.x)},${Math.round(pos.y)}`;
     let m = this.mgs.get(key);
+    if (m) {
+      m.pos.x = pos.x;
+      m.pos.y = pos.y;
+    }
     if (!m) {
       const src = ctx.createBufferSource();
       src.buffer = buf;

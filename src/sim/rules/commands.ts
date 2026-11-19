@@ -2,7 +2,8 @@ import { norm, sub, type Vec2 } from '../../core/math';
 import { BALANCE } from '../../config/balance';
 import { isEnabled } from '../../config/features';
 import { STRUCTURES, UNITS } from '../../config/units';
-import type { Hive, Squad, Structure } from '../entities';
+import { Squad } from '../entities';
+import type { Hive, Structure } from '../entities';
 import type { BuildingDef } from '../map';
 import type { Formation, FormationShape, Order, Targetable } from '../types';
 import type { World } from '../World';
@@ -140,6 +141,7 @@ export function orderHeal(w: World, squads: Squad[], target: Squad, queue = fals
   const medics = squads.filter((s) => s.alive && s.def.abilities?.includes('heal') && s !== target);
   if (!medics.length) return 'Only medics can heal';
   if (!target.alive) return 'Nobody left to treat';
+  if (target.def.category === 'vehicle') return 'Medics treat people, not vehicles';
   if (target.pool >= target.poolMax && target.aliveCount >= target.members.length) return `${target.name} isn't hurt`;
   const ready = medics.filter((s) => w.time >= s.healReadyAt);
   if (!ready.length) return `Heal ready in ${Math.ceil(Math.min(...medics.map((s) => s.healReadyAt)) - w.time)} s`;
@@ -214,6 +216,7 @@ export function orderCharge(w: World, engineers: Squad[], hive: Hive, queue = fa
 
 /** Round 11 #125: toggle crouching for these squads (all crouch unless all already are). */
 export function toggleCrouch(squads: Squad[]): boolean {
+  squads = squads.filter((s) => s.def.category !== 'vehicle'); // STATUS #51
   const on = !squads.every((s) => s.crouched);
   for (const s of squads) {
     s.crouched = on;
@@ -265,7 +268,53 @@ export function upgradeStructure(w: World, st: Structure): string | null {
 }
 
 /** Search a building for supplies (v4.9 #46): ~5 s at the door, interrupted by getting hit. */
+/**
+ * STATUS #51: infantry climb into a vehicle with seats (one squad per vehicle, up to `seats` soldiers).
+ * The first squad that fits gets the order.
+ */
+export function orderBoard(w: World, squads: Squad[], vehicle: Squad, queue = false): string | null {
+  const seats = vehicle.def.seats ?? 0;
+  if (!seats || !vehicle.alive) return `${vehicle.def.name} can't carry anyone`;
+  if (vehicle.cargo != null && w.get(vehicle.cargo)?.alive) return `${vehicle.name} already has a squad aboard`;
+  const riders = squads.filter((s) => s.alive && s.def.category === 'infantry' && s.inVehicle == null);
+  if (!riders.length) return 'Only infantry squads can ride';
+  const fits = riders.find((s) => s.aliveCount <= seats);
+  if (!fits) return `Too many soldiers: ${seats} seats`;
+  issueOrder(w, [fits], { type: 'board', pos: { ...vehicle.pos }, targetId: vehicle.id }, queue);
+  return null;
+}
+
+/** STATUS #51: the passenger squad climbs out beside the vehicle. */
+export function unload(w: World, vehicle: Squad, bailOut = false): Squad | null {
+  const p = vehicle.cargo != null ? w.get(vehicle.cargo) : undefined;
+  vehicle.cargo = null;
+  if (!(p instanceof Squad) || !p.alive) return null;
+  p.inVehicle = null;
+  const side = w.grid.nearestFree({ x: vehicle.pos.x + Math.cos(vehicle.facing + Math.PI / 2) * 3, y: vehicle.pos.y + Math.sin(vehicle.facing + Math.PI / 2) * 3 });
+  p.pos.x = side.x;
+  p.pos.y = side.y;
+  p.members.forEach((m, i) => {
+    m.pos.x = side.x + ((i % 3) - 1) * 0.9;
+    m.pos.y = side.y + (Math.floor(i / 3) - 0.5) * 0.9;
+  });
+  p.orders = [];
+  p.path = [];
+  w.events.emit('squadUnloaded', { vehicleId: vehicle.id, squadId: p.id, bailOut });
+  w.events.emit('radio', { speaker: p.name, text: bailOut ? `${vehicle.name} is gone! We're out, we're on foot!` : 'Dismounted.', tone: bailOut ? 'bad' : 'info' });
+  return p;
+}
+
+/** STATUS #51: unload every selected vehicle that has someone aboard. */
+export function orderUnload(w: World, vehicles: Squad[]): string | null {
+  const full = vehicles.filter((v) => v.alive && v.cargo != null);
+  if (!full.length) return 'Nobody aboard';
+  for (const v of full) unload(w, v);
+  return null;
+}
+
 export function orderSearch(w: World, squads: Squad[], b: BuildingDef, queue = false): string | null {
+  squads = squads.filter((s) => s.def.category !== 'vehicle'); // STATUS #51: a Humvee can't search a house
+  if (!squads.length) return 'Vehicles can\'t search buildings';
   const st = w.buildingState.get(b.id);
   if (!st) return 'Nothing to search there';
   if (st.searched) return 'Already searched';
@@ -277,6 +326,8 @@ export function orderSearch(w: World, squads: Squad[], b: BuildingDef, queue = f
 /** Man a guard tower (v4.13). One squad per tower. */
 export function orderGarrison(w: World, squads: Squad[], tower: Structure, queue = false): string | null {
   if (!tower.def.garrison) return 'Only guard towers can be manned';
+  squads = squads.filter((s) => s.def.category !== 'vehicle');
+  if (!squads.length) return 'Vehicles can\'t man a tower';
   if (!tower.built) return 'Finish building it first';
   const occupant = w.squads.find((s) => s.alive && s.garrisonedIn === tower.id);
   if (occupant) return `${occupant.name} is already up there`;

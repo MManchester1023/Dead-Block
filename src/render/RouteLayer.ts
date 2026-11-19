@@ -59,7 +59,7 @@ export class RouteLayer {
       m++;
     };
     for (const s of w.squads) {
-      if (!s.alive || !f.selected.has(s.id)) continue;
+      if (!s.alive || !f.selected.has(s.id) || s.inVehicle != null) continue;
       let from: Vec2 = s.pos;
       let k = 0;
       for (const o of s.orders) {

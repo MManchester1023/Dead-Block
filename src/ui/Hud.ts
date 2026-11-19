@@ -94,6 +94,7 @@ const CONTROLS: [string, [string, string][]][] = [
     [K('H'), 'Hold position'],
     [K('G'), 'Crouch / stand (half cover anywhere, slower on the move)'],
     [K('K'), 'Medics: heal a squad (or right-click a hurt squad)'],
+    [K('U'), 'Humvee: unload its squad (right-click a Humvee with infantry to board)'],
     [`${K('Ctrl')}+${K('S')}`, 'Stop'],
     [`${K('Ctrl')}+${K('1')}–${K('9')} / ${K('1')}–${K('9')}`, 'Save / recall a group (press twice to centre)'],
   ]],
@@ -292,6 +293,7 @@ export class Hud {
         if (g.menuOpen) this.showMenu('settings');
         break;
       case 'heal': g.startHeal(); break;
+      case 'unload': g.unload(); break;
       case 'patrol': g.setMode({ kind: 'patrol', started: false }); break;
       case 'formation': g.setFormation(arg as FormationShape); break;
       case 'stop': g.stop(); break;
@@ -529,8 +531,8 @@ export class Hud {
     const g = this.game;
     const sq = g.selectedSquads;
     const st = g.selectedStructure != null ? g.world.structures.find((s) => s.id === g.selectedStructure && s.alive) : undefined;
-    if (!sq.length && st?.def.id === 'barracks') {
-      this.set(this.selection, this.barracksPanel());
+    if (!sq.length && (st?.def.id === 'barracks' || st?.def.id === 'vehicleBay')) {
+      this.set(this.selection, this.productionPanel(st));
       return;
     }
     if (!sq.length && st?.def.id === 'commandPost') {
@@ -564,7 +566,7 @@ export class Hud {
       return;
     }
     if (!sq.length) {
-      const all = g.world.squads.map((s) => `<button class="chip" data-act="focus:${s.id}">${esc(s.name)} <small>${s.aliveCount}/${s.members.length}</small></button>`).join('');
+      const all = g.world.squads.map((s) => `<button class="chip" data-act="focus:${s.inVehicle ?? s.id}">${esc(s.name)} <small>${s.inVehicle != null ? 'riding' : `${s.aliveCount}/${s.members.length}`}</small></button>`).join('');
       this.set(this.selection, `<h3>Forces</h3><div class="chips">${all || '<i>No squads left.</i>'}</div><p class="hint">Click or drag to select · click the <b>Barracks</b> (B) to recruit · click the <b>Command Post</b> for support · right-click a car for cover</p>`);
       return;
     }
@@ -585,7 +587,7 @@ export class Hud {
         return `<div class="card"><div class="row"><b>${esc(s.name)}</b><span class="status ${st.tone}">${st.text}</span></div><div class="row small"><span>${s.def.name}</span></div>
           <div class="pips">${pips}</div>
           <div class="row small"><span>${s.levelName} · ${xp}</span></div>
-          <div class="row small"><span>Kills ${s.kills}</span><span>Upkeep ${s.def.upkeep}/day</span></div></div>`;
+          <div class="row small"><span>Kills ${s.kills}</span><span>Upkeep ${s.def.upkeep}/day</span></div>${s.def.seats ? `<div class="row small"><span>${s.cargo != null ? `Aboard: <b>${esc(g.world.squads.find((x) => x.id === s.cargo)?.name ?? '?')}</b> (U to unload)` : `Empty · ${s.def.seats} seats: right-click it with infantry`}</span></div>` : ''}</div>`;
       })
       .join('');
     const eng = g.engineersOnly; // v4.9 #61: build tools only for an engineers-only selection
@@ -597,6 +599,10 @@ export class Hud {
     const mode = g.mode;
     const civOnly = sq.every((s) => s.def.category === 'civilian');
     let cmds = civOnly ? btn('hold', 'Hold', 'H') + btn('stop', 'Stop', 'Ctrl+S') : btn('attackMove', 'Attack-move', 'Ctrl+A', undefined, mode.kind === 'attackMove') + btn('patrol', 'Patrol', 'P', undefined, mode.kind === 'patrol') + btn('hold', 'Hold', 'H') + btn('crouch', sq.every((s) => s.crouched) ? 'Stand' : 'Crouch', 'G', undefined, sq.every((s) => s.crouched)) + btn('stop', 'Stop', 'Ctrl+S') + `<button class="cmd" data-act="disband" title="Walk back to the Barracks and stand down: frees command and upkeep, refunds ${BALANCE.economy.disbandRefund * 100}% of the cost">Disband</button>`;
+    // STATUS #51: vehicles: no crouching; Unload when someone's aboard
+    const vehOnly = sq.every((s) => s.def.category === 'vehicle');
+    if (vehOnly) cmds = cmds.replace(/<button class="cmd[^"]*" data-act="crouch">.*?<\/button>/, '');
+    if (sq.some((s) => s.def.seats && s.cargo != null)) cmds = btn('unload', 'Unload', 'U') + cmds;
     // STATUS #20: medics' Heal, with its cooldown
     const medics = g.selectedMedics;
     if (medics.length) {
@@ -674,15 +680,16 @@ export class Hud {
     this.set(this.buildBar, `<div class="bb-title">ENGINEERS · BUILD</div><div class="bb-row">${items}</div>`);
   }
 
-  private barracksPanel(): string {
+  /** The Barracks (infantry) or the Vehicle Bay (STATUS #51): what it makes, its queue, the rally point. */
+  private productionPanel(producer: { def: { id: string; name: string }; queue: { defId: string; remaining: number }[] }): string {
     const g = this.game;
     const w = g.world;
-    const barracks = w.structures.find((s) => s.def.id === 'barracks');
-    const queue = barracks?.queue ?? [];
+    const queue = producer.queue;
     const recruitable = Object.values(UNITS).filter((u) => u.category !== 'civilian');
+    const here = recruitable.filter((u) => u.producedAt === producer.def.id);
     // STATUS #20: campaign unlocks too (the Medic Team comes with the Med Bay)
     const open = (u: (typeof recruitable)[number]) => (!u.requires || isEnabled(u.requires as never)) && w.unitUnlocked(u.id);
-    const avail = recruitable.filter(open);
+    const avail = here.filter(open);
     const locked = recruitable.filter((u) => !open(u));
     const rows = avail
       .map((u) => {
@@ -701,10 +708,10 @@ export class Hud {
     const q = runs.map((r) => `<div class="qitem">${UNITS[r.defId].name}${r.n > 1 ? ` ×${r.n}` : ''}${r.first ? ` <small>${Math.ceil(r.remaining)}s</small>` : ''}</div>`).join('');
     const lockedHtml = locked.map((u) => `<div class="locked" title="${esc(u.unlock)}">🔒 ${u.name}<small>${esc(u.unlock)}</small></div>`).join('');
     const rallyOn = g.mode.kind === 'rally';
-    return `<h3>Barracks · Recruit</h3><div class="prod-list">${rows}</div>${q ? `<div class="queue">${q}</div>` : ''}
+    return `<h3>${producer.def.name} · ${producer.def.id === 'barracks' ? 'Recruit' : 'Build vehicles'}</h3><div class="prod-list">${rows || '<i>Nothing to make here yet.</i>'}</div>${q ? `<div class="queue">${q}</div>` : ''}
       <div class="cmds"><button class="cmd ${rallyOn ? 'on' : ''}" data-act="rally">⚑ Set rally point</button></div>
       <p class="hint">${rallyOn ? 'Click the map where new squads should gather · right-click to cancel' : `★ ${w.commandUsed}${w.hasCommandCap ? `/${w.commandCap}` : ''} command used. New squads walk to the rally flag.`}</p>
-      <details><summary>Roster roadmap (${locked.length} locked)</summary>${lockedHtml}</details>`;
+      ${producer.def.id === 'barracks' ? `<details><summary>Roster roadmap (${locked.length} locked)</summary>${lockedHtml}</details>` : ''}`;
   }
 
   private showIntro(): void {

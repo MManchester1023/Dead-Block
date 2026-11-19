@@ -146,7 +146,7 @@ export class Input {
     const r = this.game.renderer;
     const out: { id: number; d: number }[] = [];
     for (const s of this.game.world.squads) {
-      if (!s.alive) continue;
+      if (!s.alive || s.inVehicle != null) continue;
       const p = r.worldToScreen(s.pos);
       const d = Math.hypot(p.x - x, p.y - y);
       if (d < 28) out.push({ id: s.id, d });
@@ -299,6 +299,10 @@ export class Input {
         break;
       case 'h':
         g.hold();
+        break;
+      case 'u':
+        // STATUS #51: unload the selected Humvee
+        g.unload();
         break;
       case 'k':
         // STATUS #20: medics heal

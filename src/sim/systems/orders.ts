@@ -8,6 +8,7 @@ import type { World } from '../World';
 import type { BuildingDef } from '../map';
 import { moveWithCollision } from './movement';
 import { gainXp } from './combat';
+import { unload } from '../rules/commands';
 
 const ARRIVE = 1; // metres
 const BODY = 0.9; // squad-centre collision radius, metres
@@ -15,6 +16,20 @@ const BODY = 0.9; // squad-centre collision radius, metres
 export function updateOrders(w: World, dt: number): void {
   for (const s of w.squads) {
     if (!s.alive) continue;
+    // STATUS #51: riding in a vehicle: go where it goes; if it's destroyed, bail out
+    if (s.inVehicle != null) {
+      const v = w.get(s.inVehicle);
+      if (!(v instanceof Squad) || !v.alive) {
+        s.inVehicle = null;
+        if (v instanceof Squad) unload(w, v, true);
+        continue;
+      }
+      s.moving = false;
+      s.pos.x = v.pos.x;
+      s.pos.y = v.pos.y;
+      for (const m of s.members) (m.pos.x = v.pos.x), (m.pos.y = v.pos.y);
+      continue;
+    }
     applyKnock(w, s, dt);
     if (s.stunned > 0) {
       s.stunned -= dt;
@@ -171,6 +186,9 @@ export function updateOrders(w: World, dt: number): void {
         case 'heal':
           doHeal(w, s, dt);
           break;
+        case 'board':
+          doBoard(w, s, dt);
+          break;
         case 'disband':
           // v4.9 (#55): walk into the Barracks and stand down
           if (moveToward(w, s, o.pos, dt, 2.5)) w.standDown(s);
@@ -218,6 +236,37 @@ export function moveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: n
   // a destination right against a car or wall can be unreachable for a body this wide: close enough is arrived
   if (blocked && left <= arrive + BODY * 2) return true;
   return !s.path.length && left <= arrive + 1.8;
+}
+
+/** STATUS #51: walk to the vehicle and climb in (if there's still room). */
+function doBoard(w: World, s: Squad, dt: number): void {
+  const o = s.currentOrder!;
+  const v = w.get(o.targetId ?? null);
+  if (!(v instanceof Squad) || !v.alive) {
+    s.orders.shift();
+    return;
+  }
+  o.pos = { ...v.pos };
+  if (dist(s.pos, v.pos) > 4) {
+    moveToward(w, s, v.pos, dt, 3);
+    return;
+  }
+  s.orders.shift();
+  s.path = [];
+  const seats = v.def.seats ?? 0;
+  if ((v.cargo != null && w.get(v.cargo)?.alive) || s.aliveCount > seats) {
+    w.events.emit('radio', { speaker: s.name, text: `No room in ${v.name}.`, tone: 'warn' });
+    return;
+  }
+  v.cargo = s.id;
+  s.inVehicle = v.id;
+  s.crouched = false;
+  s.inCover = 0;
+  s.coverPropId = null;
+  s.holding = false;
+  s.targetId = null;
+  w.events.emit('squadBoarded', { vehicleId: v.id, squadId: s.id });
+  w.events.emit('radio', { speaker: s.name, text: `Mounted up in ${v.name}.`, tone: 'info' });
 }
 
 /** STATUS #20: a medic team walks to its patient, treats it for a moment, and restores part of its health. */
@@ -563,6 +612,7 @@ function updateCover(w: World, s: Squad): void {
   s.inCover = 0;
   s.coverPropId = null;
   s.openCover = false;
+  if (s.def.category === 'vehicle') return; // STATUS #51: a Humvee doesn't take a car's cover from the infantry
   if (!s.moving) {
     const spots: { id: number; cover: number; slots: number }[] = [];
     for (const p of w.map.props) {

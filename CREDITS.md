@@ -134,3 +134,7 @@ v4.39 (uploaded by the owner; authors to fill in where blank):
 ## Military buildings (v4.72): the Vehicle Bay
 
 "[Military Environment Buildings. Modular](https://sketchfab.com/3d-models/military-environment-buildings-modular-371eb5dc09a9448aa932b957100f86c8)" by [Salah3D](https://sketchfab.com/abbasyounis214), licensed under [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). **Changed:** the garage on its own, textures baked into vertex colours, fitted to the Vehicle Bay's 15 × 12 m footprint (504 triangles; `tools/assets/export-prop.cjs`). Original `assets-src/models/military_environment_buildings._modular.zip`, game copy `public/models/props/vehicle_bay.glb`. The pack's other buildings aren't used yet.
+
+## Humvee (v4.77)
+
+"[Low poly Humvee](https://sketchfab.com/3d-models/low-poly-humvee-1183335985d34497a5b4be723758c0ba)" by [SIpriv](https://sketchfab.com/S1Priv), licensed under [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/). **Changed:** merged, its 16 textures baked into vertex colours, simplified from 16,366 to ~6,200 triangles and scaled to 4.1 × 2.2 m (`tools/assets/export-prop.cjs`). Original `assets-src/models/low_poly_humvee.glb`, game copy `public/models/props/humvee.glb`.

@@ -69,7 +69,7 @@ export function updateMedical(w: World, dt: number): void {
     if (!H || !bay.alive || !bay.built) continue;
     if (bay.def.needsPower && !w.powerOnline) continue; // (STATUS #50: the Med Bay has its own generator now)
     for (const s of w.squadHash.query(bay.pos, H.radius + bay.radius + 4)) {
-      if (!s.alive || s.moving || s.pool >= s.poolMax) continue;
+      if (!s.alive || s.moving || s.pool >= s.poolMax || s.inVehicle != null || s.def.category === 'vehicle') continue;
       if (Math.hypot(s.pos.x - bay.pos.x, s.pos.y - bay.pos.y) > H.radius + bay.radius) continue;
       if (w.time - s.lastHit < H.restAfterHitSec) continue;
       let hp = Math.min(s.poolMax - s.pool, s.poolMax * H.perSec * dt);

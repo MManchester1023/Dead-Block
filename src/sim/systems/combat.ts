@@ -52,7 +52,7 @@ function fire(w: World, from: Vec2, t: Targetable, weapon: WeaponDef, dmgMult: n
   const acc = weapon.accuracy * (1 - 0.35 * Math.min(1, d / weapon.range)) * accMult;
   const hit = w.rng.chance(acc);
   const miss = hit ? { x: 0, y: 0 } : { x: w.rng.range(-1.6, 1.6), y: w.rng.range(-1.6, 1.6) };
-  w.events.emit('shot', { from: { ...from }, to: { x: t.pos.x + miss.x, y: t.pos.y + miss.y }, faction: 'player', heavy: weapon.damage >= 30, weapon: weapon.name });
+  w.events.emit('shot', { from: { ...from }, to: { x: t.pos.x + miss.x, y: t.pos.y + miss.y }, faction: 'player', heavy: weapon.damage >= 30, weapon: weapon.name, shooter: shooter?.id });
   w.makeNoise(from, weapon.loudness);
   if (!hit) return false;
   const wasAlive = t.alive;
@@ -64,6 +64,7 @@ export function updateCombat(w: World, dt: number): void {
   for (const s of w.squads) {
     if (!s.alive || s.stunned > 0 || s.climb) continue; // hands on the ladder
     if (s.def.category === 'civilian') continue; // unarmed
+    if (s.inVehicle != null) continue; // STATUS #51: riding, not shooting
     const order = s.currentOrder;
     const busy = order?.type === 'build' || order?.type === 'charge' || order?.type === 'deconstruct' || order?.type === 'repair' || order?.type === 'upgrade' || order?.type === 'heal';
     // forced target (right-clicked zombie) overrides threat priority once it's in range and visible
@@ -77,12 +78,12 @@ export function updateCombat(w: World, dt: number): void {
     if (forcedOk) s.targetId = forced.id;
     const t = forcedOk ? forced : acquire(w, s, s.faction, weapon, undefined, !!g);
     if (!t) continue;
-    if (!s.moving) s.facing = Math.atan2(t.pos.y - s.pos.y, t.pos.x - s.pos.x);
+    if (!s.moving && s.def.category !== 'vehicle') s.facing = Math.atan2(t.pos.y - s.pos.y, t.pos.x - s.pos.x); // (a vehicle's gun turns, not its body)
     // round 12 #140: engineers at work (building, repairing, planting a charge, installing) don't shoot;
     // on the way there they only answer danger-close threats
     if (busy && !s.moving) continue;
     if (busy && dist(t.pos, s.pos) > BALANCE.combat.dangerCloseRadius + 2) continue;
-    const accMult = s.moving ? 0.5 : 1; // round 11 #128: firing on the move (was 0.6)
+    const accMult = s.moving ? (s.def.category === 'vehicle' ? 0.75 : 0.5) : 1; // round 11 #128: firing on the move (was 0.6); STATUS #51: a mounted gun copes better
     for (const m of s.members) {
       if (!m.alive) continue;
       m.cooldown -= dt;
@@ -125,7 +126,7 @@ export function updateCombat(w: World, dt: number): void {
   // Bloater clouds hurt the living, not the dead
   for (const cl of w.clouds) {
     cl.remaining -= dt;
-    for (const s of w.squads) if (s.alive && dist(s.pos, cl.pos) < cl.radius + s.radius) w.damageSquad(s, cl.dps * dt, 'toxic');
+    for (const s of w.squads) if (s.alive && s.inVehicle == null && dist(s.pos, cl.pos) < cl.radius + s.radius) w.damageSquad(s, cl.dps * dt, 'toxic');
   }
   w.clouds = w.clouds.filter((c) => c.remaining > 0);
 

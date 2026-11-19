@@ -49,6 +49,12 @@ export class SquadLayer {
       if (!s.alive) continue;
       seen.add(s.id);
       const v = this.view(s);
+      // STATUS #51: a squad riding in a vehicle isn't drawn or labelled
+      v.group.visible = s.inVehicle == null;
+      if (s.inVehicle != null) {
+        v.label.style.display = 'none';
+        continue;
+      }
       v.group.position.set(s.pos.x, 0, s.pos.y);
       v.ring.visible = f.selected.has(s.id);
       if (this.placeholders) s.members.forEach((m, i) => {

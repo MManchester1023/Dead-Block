@@ -28,7 +28,7 @@ export type Mode =
  * Owns the fixed-step loop, pause/speed (doc §2), the current selection and the
  * input mode. Input and HUD talk to the world only through here.
  */
-const SELECTABLE = new Set(['commandPost', 'barracks', 'outpost']);
+const SELECTABLE = new Set(['commandPost', 'barracks', 'outpost', 'vehicleBay']);
 
 /** Something squads can hide behind: an abandoned car, a pump island, or built sandbags/walls. */
 interface CoverSpot {
@@ -142,6 +142,15 @@ export class Game {
     return !err;
   }
 
+  /** STATUS #51: U / the Unload button: the selected vehicles' passengers climb out. */
+  unload(): void {
+    const vehicles = this.selectedSquads.filter((s) => s.def.seats);
+    if (!vehicles.length) return;
+    const err = this.world.orderUnload(vehicles);
+    if (err) this.toast(err);
+    this.changed();
+  }
+
   /** STATUS #20: K / the Heal button. */
   startHeal(): void {
     if (!this.selectedMedics.length) {
@@ -158,6 +167,8 @@ export class Game {
 
   select(ids: number[], add = false): void {
     if (!add) this.selected.clear();
+    // STATUS #51: squads riding in a vehicle aren't selectable (select the vehicle)
+    ids = ids.filter((id) => this.world.squads.find((s) => s.id === id)?.inVehicle == null);
     if (ids.length || !add) this.selectedStructure = null;
     for (const id of ids) this.selected.add(id);
     if (this.mode.kind !== 'normal' && !this.selectedEngineers.length && this.mode.kind !== 'attackMove' && this.mode.kind !== 'patrol' && this.mode.kind !== 'rally' && this.mode.kind !== 'support' && !(this.mode.kind === 'heal' && this.selectedMedics.length)) this.mode = { kind: 'normal' };
@@ -193,6 +204,31 @@ export class Game {
       sq = sq.filter((s) => !civ.includes(s));
       if (!sq.length) {
         this.renderer.marker(p, 0x9fd0ff);
+        return;
+      }
+    }
+
+    // STATUS #51: infantry right-clicking a Humvee climb in
+    const veh = w.squads.find((v) => v.alive && v.def.seats && !sq.includes(v) && dist(v.pos, p) < 3.5);
+    if (veh) {
+      const riders = sq.filter((s) => s.def.category === 'infantry');
+      if (riders.length) {
+        const err = w.orderBoard(riders, veh, queue);
+        if (err) this.toast(err);
+        else this.renderer.marker(veh.pos, 0x7ab0e0);
+        sq = sq.filter((s) => !riders.includes(s));
+        if (!sq.length) return;
+      }
+    }
+    // STATUS #51: vehicles just drive there (or go for the zombie you clicked): no cover, towers or searching
+    const vehicles = sq.filter((s) => s.def.category === 'vehicle');
+    if (vehicles.length) {
+      const z = w.zombieHash.query(p, 2.2).filter((x) => x.alive).sort((a, b) => dist(a.pos, p) - dist(b.pos, p))[0];
+      if (z) w.orderAttack(vehicles, z, queue);
+      else w.issueOrder(vehicles, { type: 'move', pos: w.grid.nearestFree(p) }, queue, { shape: this.formation });
+      sq = sq.filter((s) => !vehicles.includes(s));
+      if (!sq.length) {
+        this.renderer.marker(p, 0x9fe07a);
         return;
       }
     }

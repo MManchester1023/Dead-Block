@@ -7,12 +7,15 @@ import type { DamageType } from '../sim/types';
  * New features (building collapse, airstrikes, Last Stand…) add event types here.
  */
 export interface GameEvents {
-  shot: { from: Vec2; to: Vec2; faction: string; heavy?: boolean; weapon?: string };
+  shot: { from: Vec2; to: Vec2; faction: string; heavy?: boolean; weapon?: string; shooter?: number };
   explosion: { pos: Vec2; radius: number; type: DamageType };
   /** STATUS #20: a medic team treated a squad. */
   squadHealed: { medicId: number; targetId: number; amount: number; rejoined: number };
   /** STATUS #50: a significant building was looted (`first`: the first one ever, for the tutorial pop-up). */
   landmarkLooted: { buildingId: number; kind: string; pos: Vec2; first: boolean; firstOfKind: boolean; supplies: number; money: number };
+  /** STATUS #51: a squad climbed into / out of a vehicle (`bailOut`: the vehicle was destroyed). */
+  squadBoarded: { vehicleId: number; squadId: number };
+  squadUnloaded: { vehicleId: number; squadId: number; bailOut: boolean };
   memberKilled: { squadId: number; squadName: string; pos: Vec2; facing: number; unitId: string; low?: boolean; member?: number };
   squadWiped: { squadId: number; squadName: string };
   zombieKilled: { id: number; defId: string; pos: Vec2; facing: number; districtId: string | null };

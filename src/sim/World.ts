@@ -150,7 +150,7 @@ export class World {
   nextSquadName(defId: string): string {
     if (defId === 'civilians') return `Survivors ${++this.survivorGroups}`;
     const n = SQUAD_NAMES[this.nameCounter++ % SQUAD_NAMES.length];
-    return defId === 'engineer' ? `Sapper ${n}` : defId === 'medic' ? `Medic ${n}` : n;
+    return defId === 'engineer' ? `Sapper ${n}` : defId === 'medic' ? `Medic ${n}` : defId === 'humvee' ? `Hummer ${n}` : n;
   }
 
   /** Name counters, for save/load. */
@@ -348,6 +348,14 @@ export class World {
     return Commands.upgradeStructure(this, st);
   }
 
+  orderBoard(squads: Squad[], vehicle: Squad, queue = false): string | null {
+    return Commands.orderBoard(this, squads, vehicle, queue);
+  }
+
+  orderUnload(vehicles: Squad[]): string | null {
+    return Commands.orderUnload(this, vehicles);
+  }
+
   orderHeal(medics: Squad[], target: Squad, queue = false): string | null {
     return Commands.orderHeal(this, medics, target, queue);
   }
@@ -502,7 +510,7 @@ export class World {
     this.zombieHash.clear();
     for (const z of this.zombies) if (z.alive) this.zombieHash.insert(z);
     this.squadHash.clear();
-    for (const s of this.squads) if (s.alive) this.squadHash.insert(s);
+    for (const s of this.squads) if (s.alive && s.inVehicle == null) this.squadHash.insert(s); // (riders are out of reach)
 
     updateOrders(this, dt);
     updateCombat(this, dt);

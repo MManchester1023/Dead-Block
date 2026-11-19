@@ -33,6 +33,8 @@ export interface UnitDef {
   unlockKey?: string;
   canBuild?: string[];
   abilities?: string[];
+  /** Vehicles that carry a squad (STATUS #51): how many soldiers fit. */
+  seats?: number;
   tags?: string[];
 }
 
@@ -74,7 +76,9 @@ export const UNITS: Record<string, UnitDef> = {
   sniper: { id: 'sniper', name: 'Sniper Team', category: 'infantry', members: 2, memberHp: 34, speed: 6, weapon: { name: 'Marksman rifle', range: 36, damage: 45, cooldown: 2.4, accuracy: 0.92, type: 'bullet', loudness: 3.5 }, cost: { money: 110, supplies: 25 }, upkeep: 4, command: 2, buildTime: 16, producedAt: 'armory', requires: 'powerStations', unlock: 'Main Street power / Armory' },
   flame: { id: 'flame', name: 'Flame Team', category: 'infantry', members: 3, memberHp: 44, speed: 5.6, weapon: { name: 'Flamethrower', range: 9, damage: 14, cooldown: 0.3, accuracy: 0.95, type: 'fire', loudness: 1.5 }, cost: { money: 130, supplies: 35 }, upkeep: 5, command: 3, buildTime: 18, producedAt: 'armory', requires: 'powerStations', unlock: 'Harbor power / Armory Lv2' },
   mortar: { id: 'mortar', name: 'Mortar Team', category: 'infantry', members: 3, memberHp: 38, speed: 4.8, weapon: { name: '81mm mortar', range: 52, damage: 40, cooldown: 4, accuracy: 0.6, type: 'explosive', loudness: 6 }, cost: { money: 150, supplies: 40 }, upkeep: 6, command: 3, buildTime: 20, producedAt: 'armory', requires: 'artillery', unlock: 'Harbor power / Armory Lv2' },
-  gunJeep: { id: 'gunJeep', name: 'Gun Jeep', category: 'vehicle', members: 1, memberHp: 220, speed: 14, weapon: { name: 'Mounted MG', range: 20, damage: 7, cooldown: 0.15, accuracy: 0.6, type: 'bullet', loudness: 4 }, cost: { money: 160, supplies: 40 }, upkeep: 6, command: 3, buildTime: 20, producedAt: 'armorStation', requires: 'vehicles', unlock: 'Industrial Park power' },
+  // STATUS #51 (owner): the Humvee, made at the Vehicle Bay: the MG emplacement's gun on a turret that turns all
+  // the way round, and room for one squad of up to 5 (an Elite rifle squad). Was the "Gun Jeep" placeholder.
+  humvee: { id: 'humvee', name: 'Humvee', category: 'vehicle', members: 1, memberHp: 420, speed: 12, weapon: { name: 'Mounted HMG', range: 35, damage: 12, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 }, cost: { money: 160, supplies: 40 }, upkeep: 6, command: 3, buildTime: 20, producedAt: 'vehicleBay', unlock: 'Build a Vehicle Bay', seats: 5, tags: ['transport'] },
   supplyTruck: { id: 'supplyTruck', name: 'Supply Truck', category: 'vehicle', members: 1, memberHp: 260, speed: 11, weapon: { name: 'None', range: 0, damage: 0, cooldown: 99, accuracy: 0, type: 'bullet', loudness: 0 }, cost: { money: 120, supplies: 30 }, upkeep: 4, command: 2, buildTime: 18, producedAt: 'armorStation', requires: 'outpostResupply', unlock: 'Industrial Park power', tags: ['resupply'] },
   lav: { id: 'lav', name: 'LAV', category: 'vehicle', members: 1, memberHp: 480, speed: 10, weapon: { name: '25mm autocannon', range: 26, damage: 22, cooldown: 0.5, accuracy: 0.7, type: 'explosive', loudness: 5 }, cost: { money: 260, supplies: 60 }, upkeep: 8, command: 4, buildTime: 28, producedAt: 'armorStation', requires: 'vehicles', unlock: 'Stadium power / Armor Station Lv2' },
   tank: { id: 'tank', name: 'Battle Tank', category: 'vehicle', members: 1, memberHp: 900, speed: 7.6, weapon: { name: '120mm main gun', range: 32, damage: 120, cooldown: 3.5, accuracy: 0.85, type: 'explosive', loudness: 9 }, cost: { money: 420, supplies: 90 }, upkeep: 12, command: 6, buildTime: 40, producedAt: 'armorStation', requires: 'vehicles', unlock: 'Stadium power / Armor Station Lv2', tags: ['crushesCars', 'damagesBuildings'] },

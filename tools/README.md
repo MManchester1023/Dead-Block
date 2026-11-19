@@ -30,6 +30,7 @@ Slow runs that print results instead of passing or failing. Not part of `npm tes
 | `round13.cjs` | Round 13 in the real game: squad labels hidden until hovered, MG nests turned to their aim |
 | `perf.cjs [zombies] [seconds]` | STATUS #47: a busy scene (a crowd closing on a squad) with the CPU profiler on: the game's own readout (sim / scene / draw / HUD per frame), draw calls, triangles, the hottest functions. No GPU here, so draw and FPS aren't representative |
 | `graphics.cjs` | Settings → performance readout and graphics quality (High/Medium/Low change pixel ratio, shadow map, zombie shadows; both survive a reload) |
+| `humvee.cjs` | STATUS #51: the Vehicle Bay panel builds a Humvee (owner's model), a rifle squad right-clicks it and boards (hidden), its card and Unload button, U unloads, its gun fires |
 | `landmarks.cjs` | STATUS #50 in the real game: the run-down Med Bay (tent model, dark, label), the hospital (label once region 2 opens, roof cross), searching it by right-click, the significant-buildings briefing, engineers repairing the Med Bay (medics unlock), the Vehicle Bay (Y, built, garage model) |
 | `round16.cjs` | Round 16 fixes (v4.74): no flash for a Bloater burst (a real explosion still flashes), cars duller than their model, hive labels only on hover, the power card without a pause |
 | `round15.cjs` | Round 15 quick fixes (v4.71): no hive stage on the HUD, muzzle flashes drawn for at least two frames, explosion flashes, finished effects freeing their GPU memory |

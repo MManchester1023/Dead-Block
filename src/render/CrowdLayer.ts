@@ -122,6 +122,7 @@ export class CrowdLayer {
     this.frame++;
     for (const s of w.squads) {
       if (!s.alive) continue;
+      if (s.def.category === 'vehicle' || s.inVehicle != null) continue; // STATUS #51: drawn by the vehicle layer / riding
       const squadKey = squadCrowd(s.def.id);
       const order = s.currentOrder?.type;
       const working = !s.moving && (order === 'upgrade' || order === 'build' || order === 'repair' || order === 'deconstruct' || order === 'charge' || order === 'search' || order === 'heal');

@@ -14,6 +14,7 @@ import { PlacementGhost } from './PlacementGhost';
 import { SupplyDrops } from './SupplyDrops';
 import { Popups } from './Popups';
 import { RouteLayer } from './RouteLayer';
+import { VehicleLayer } from './VehicleLayer';
 import { HiveLayer, SquadLayer, StructureLayer } from './UnitLayers';
 
 export type Quality = 'high' | 'medium' | 'low';
@@ -56,6 +57,7 @@ export class Renderer {
   private ctx: RenderCtx;
   private city: CityLayer;
   /** Animated character crowds (null → box placeholders, e.g. if the models failed to load). */
+  private vehicles: VehicleLayer;
   private crowds: CrowdLayer | null = null;
   /** Box zombies, only without the character models. */
   private zombieMeshes = new Map<string, THREE.InstancedMesh>();
@@ -125,6 +127,7 @@ export class Renderer {
     this.squads = new SquadLayer(this.ctx, !this.crowds);
     this.structures = new StructureLayer(this.ctx, (p) => this.fx.explosion(p, 1.5, 0x9a8a6a));
     this.hives = new HiveLayer(this.ctx);
+    this.vehicles = new VehicleLayer(this.ctx);
     this.drops = new SupplyDrops(this.scene, world);
     this.popups = new Popups(this.ctx);
     this.routes = new RouteLayer(this.ctx);
@@ -224,6 +227,7 @@ export class Renderer {
     if (!this.crowds) this.updateBoxZombies();
     this.structures.update(f);
     this.hives.update(f);
+    this.vehicles.update(f);
     this.drops.update();
     this.popups.update(realDt);
     this.routes.update(f, this.formationPreview);
