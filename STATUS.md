@@ -14,8 +14,10 @@ With `npm run dev` running (the game at http://localhost:5173):
 
 ## Next, in order
 
-**Ranked by importance, open items only.** Item numbers are fixed ("work on #13" always means the same thing); new items take the next free number (**#64** next) and go where they rank. Finished items move to Done.
+**Ranked by importance, open items only.** Item numbers are fixed ("work on #13" always means the same thing); new items take the next free number (**#66** next) and go where they rank. Finished items move to Done.
 
+- **#64** **Humvee driving** (round 19): trees block it (#225); remembers what it hit and plans round it, backs out properly (#226); reverses to spots close behind (#227); carries on through queued waypoints (#229); run-over only under its body (#223).
+- **#65** **Humvee gun, sound and labels** (round 19): MG damage up, also on the tuning page (#222, owner to OK 20); the turret has to finish turning before it fires (#231); drive-off sound follows the idle's distance rules (#224); MG sound quieter zoomed out (#230); "REPAIRING" not "TREATING" (#228).
 - **#63** **Dev menu: units and buildings** (round 18 #221): spawn any friendly unit and any buildable structure, free.
 - **#51** **Region 3 spice** (round 15 #184). ✔ v4.77: the **Humvee** (owner's model, "Low poly Humvee" by SIpriv): built at the Vehicle Bay (select it: $160 · 40▣, 20 s); the MG emplacement's gun on a turret that fires all round (75% accuracy on the move; a guess); carries one squad of up to 5 (an Elite rifle squad): right-click it with infantry to board, **U** (or the button) to unload; riders are hidden, can't be reached and don't shoot; if it's destroyed they bail out. **Tabled by the owner for now:** the build incentives (hordes going for structures, a hold-the-line event, outposts earning per minute, night waves).
 - **#52** **Pile-up climbing** (round 15 #183): crowds pressing on a structure pile up and climb over or onto it; **any structure** can be climbed (owner).
