@@ -1,5 +1,6 @@
+import { devSpawnHive, devSpawnZombies } from './sim/rules/dev';
 import { BALANCE } from './config/balance';
-import { STRUCTURES } from './config/units';
+import { STRUCTURES, ZOMBIES } from './config/units';
 import { dist, type Vec2 } from './core/math';
 import { World } from './sim/World';
 import { loadWorld, saveWorld, type SaveData } from './sim/save';
@@ -22,7 +23,9 @@ export type Mode =
   /** Round 14 #174: clicking patrol points; `started` once the first point is down (later clicks add to the loop). */
   | { kind: 'patrol'; started: boolean }
   /** STATUS #20: medics pick a squad to treat. */
-  | { kind: 'heal' };
+  | { kind: 'heal' }
+  /** STATUS #59: the dev menu: clicks drop zombies or a hive. */
+  | { kind: 'dev'; what: 'zombies' | 'hive' };
 
 /**
  * Owns the fixed-step loop, pause/speed (doc §2), the current selection and the
@@ -73,6 +76,8 @@ export class Game {
   groups = new Map<number, number[]>();
   /** Pause menu (round 10 #105): set by the HUD; Esc with nothing else to cancel calls it. */
   openMenu: (() => void) | null = null;
+  /** STATUS #59: the HUD's dev menu toggle (the ` key). */
+  toggleDev: (() => void) | null = null;
   menuOpen = false;
   mode: Mode = { kind: 'normal' };
   /** The shape several squads move in (round 14 #177); set from the squad panel, remembered. */
@@ -142,6 +147,25 @@ export class Game {
     return !err;
   }
 
+  /** STATUS #59: the dev menu's settings (open with the ` key). */
+  readonly dev = { open: false, zombie: 'walker', count: 5, hunt: true, stage: 1 };
+
+  /** STATUS #59: drop what the dev menu is set to at a point on the map. */
+  devPlace(p: Vec2): void {
+    if (this.mode.kind !== 'dev') return;
+    const w = this.world;
+    if (this.mode.what === 'hive') {
+      const h = devSpawnHive(w, p, this.dev.stage);
+      this.toast(`Dev: stage ${h.stage} hive placed (${w.districts.get(h.districtId)?.def.name ?? h.districtId})`);
+      this.renderer.marker(h.pos, 0xd2443a);
+    } else {
+      const z = devSpawnZombies(w, this.dev.zombie, p, this.dev.count, this.dev.hunt);
+      this.toast(z.length ? `Dev: ${z.length} ${ZOMBIES[this.dev.zombie].name}${z.length === 1 ? '' : 's'}${this.dev.hunt ? ', hunting' : ''}` : 'Dev: zombie cap reached');
+      this.renderer.marker(p, 0xd2443a);
+    }
+    this.changed();
+  }
+
   /** STATUS #51: U / the Unload button: the selected vehicles' passengers climb out. */
   unload(): void {
     const vehicles = this.selectedSquads.filter((s) => s.def.seats);
@@ -171,7 +195,7 @@ export class Game {
     ids = ids.filter((id) => this.world.squads.find((s) => s.id === id)?.inVehicle == null);
     if (ids.length || !add) this.selectedStructure = null;
     for (const id of ids) this.selected.add(id);
-    if (this.mode.kind !== 'normal' && !this.selectedEngineers.length && this.mode.kind !== 'attackMove' && this.mode.kind !== 'patrol' && this.mode.kind !== 'rally' && this.mode.kind !== 'support' && !(this.mode.kind === 'heal' && this.selectedMedics.length)) this.mode = { kind: 'normal' };
+    if (this.mode.kind !== 'normal' && !this.selectedEngineers.length && this.mode.kind !== 'attackMove' && this.mode.kind !== 'patrol' && this.mode.kind !== 'rally' && this.mode.kind !== 'support' && !(this.mode.kind === 'heal' && this.selectedMedics.length) && this.mode.kind !== 'dev') this.mode = { kind: 'normal' };
     this.changed();
   }
 

@@ -305,3 +305,24 @@ h3.collapsible:hover { color: #fff; }
 .hud-card ul { margin: 0 0 7px; padding-left: 16px; }
 .hud-card li { margin: 2px 0; }
 .hud-card .cmd { padding: 3px 10px; font-size: 12px; }
+
+/* STATUS #59: dev menu (` key) */
+.dev-panel {
+  position: fixed;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 290px;
+  z-index: 40;
+  background: rgba(40, 14, 14, 0.94);
+  border: 1px solid #a8483c;
+  border-radius: 4px;
+  padding: 8px 10px;
+  color: #f0e4dc;
+  font-size: 12px;
+}
+.dev-panel .row { display: flex; justify-content: space-between; align-items: center; }
+.dev-panel h4 { margin: 8px 0 4px; font-size: 11px; letter-spacing: 0.1em; color: #e8a090; }
+.dev-panel .opts { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+.dev-panel .cmd { padding: 3px 8px; font-size: 11px; }
+.dev-panel .hint { margin: 6px 0 0; color: #c8a8a0; }

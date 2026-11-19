@@ -89,6 +89,12 @@ export class Input {
       g.setMode({ kind: 'normal' });
       return;
     }
+    if (g.mode.kind === 'dev') {
+      // STATUS #59: drop zombies / a hive (Shift keeps placing)
+      g.devPlace(p);
+      if (!e.shiftKey) g.setMode({ kind: 'normal' });
+      return;
+    }
     if (g.mode.kind === 'heal') {
       // STATUS #20: click the squad to treat
       const t = this.squadAt(e.clientX, e.clientY);
@@ -299,6 +305,10 @@ export class Input {
         break;
       case 'h':
         g.hold();
+        break;
+      case '`':
+        // STATUS #59: the dev menu
+        g.toggleDev?.();
         break;
       case 'u':
         // STATUS #51: unload the selected Humvee

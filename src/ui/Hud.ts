@@ -1,7 +1,8 @@
 import { BALANCE } from '../config/balance';
 import { QUALITY, type Quality } from '../render/Renderer';
+import { devClearZombies } from '../sim/rules/dev';
 import { SAVE_VERSION, SLOTS, deleteSlot, latestSlot, requestLoad, slotMeta, writeSlot, type SlotId } from '../sim/save';
-import { ABILITIES, STRUCTURES, UNITS } from '../config/units';
+import { ABILITIES, STRUCTURES, UNITS, ZOMBIES } from '../config/units';
 import { isEnabled } from '../config/features';
 import type { Game } from '../Game';
 import type { FormationShape } from '../sim/types';
@@ -95,6 +96,7 @@ const CONTROLS: [string, [string, string][]][] = [
     [K('G'), 'Crouch / stand (half cover anywhere, slower on the move)'],
     [K('K'), 'Medics: heal a squad (or right-click a hurt squad)'],
     [K('U'), 'Humvee: unload its squad (right-click a Humvee with infantry to board)'],
+    [K('`'), 'Dev menu: spawn zombies and hives for testing'],
     [`${K('Ctrl')}+${K('S')}`, 'Stop'],
     [`${K('Ctrl')}+${K('1')}–${K('9')} / ${K('1')}–${K('9')}`, 'Save / recall a group (press twice to centre)'],
   ]],
@@ -182,6 +184,7 @@ export class Hud {
     game.onChange(() => (this.dirty = true));
     game.toast = (m) => this.toast(m);
     game.openMenu = () => this.toggleMenu();
+    game.toggleDev = () => this.toggleDev();
 
     // act on pointerdown: the HUD re-renders several times a second, and a 'click' is lost if the
     // button is replaced between mousedown and mouseup (that was the "click twice" bug)
@@ -294,6 +297,18 @@ export class Hud {
         break;
       case 'heal': g.startHeal(); break;
       case 'unload': g.unload(); break;
+      // STATUS #59: dev menu
+      case 'devz': g.dev.zombie = arg; this.renderDev(); break;
+      case 'devn': g.dev.count = Number(arg); this.renderDev(); break;
+      case 'devhunt': g.dev.hunt = !g.dev.hunt; this.renderDev(); break;
+      case 'devstage': g.dev.stage = Number(arg); this.renderDev(); break;
+      case 'devplace':
+        g.setMode({ kind: 'dev', what: arg as 'zombies' | 'hive' });
+        this.renderDev();
+        break;
+      case 'devclear': this.toast(`Dev: ${devClearZombies(g.world)} zombies cleared`); this.renderDev(); break;
+      case 'devcash': g.world.money += 1000; g.world.addSupplies(500); this.toast('Dev: +$1000, +500▣'); break;
+      case 'devclose': this.toggleDev(); break;
       case 'patrol': g.setMode({ kind: 'patrol', started: false }); break;
       case 'formation': g.setFormation(arg as FormationShape); break;
       case 'stop': g.stop(); break;
@@ -410,6 +425,42 @@ export class Hud {
     this.renderObjectives();
     this.renderSelection();
     this.renderBuildBar();
+  }
+
+  /** STATUS #59: the dev menu (` key): spawn zombies and hives while playing, for testing. */
+  private devEl: HTMLElement | null = null;
+  toggleDev(): void {
+    const g = this.game;
+    g.dev.open = !g.dev.open;
+    if (!g.dev.open && g.mode.kind === 'dev') g.setMode({ kind: 'normal' });
+    this.renderDev();
+  }
+
+  private renderDev(): void {
+    const g = this.game;
+    if (!this.devEl) {
+      this.devEl = document.createElement('div');
+      this.devEl.className = 'dev-panel';
+      this.root.appendChild(this.devEl);
+    }
+    this.devEl.style.display = g.dev.open ? '' : 'none';
+    if (!g.dev.open) return;
+    const D = g.dev;
+    const placing = g.mode.kind === 'dev' ? g.mode.what : null;
+    const kinds = Object.values(ZOMBIES);
+    const opt = (act: string, label: string, on: boolean) => `<button class="cmd ${on ? 'on' : ''}" data-act="${act}">${label}</button>`;
+    const alive = g.world.zombies.reduce((n, z) => n + (z.alive ? 1 : 0), 0);
+    this.devEl.innerHTML = `<div class="row"><b>DEV MENU</b><button class="cmd" data-act="devclose" title="Close (\`)">✕</button></div>
+      <h4>Zombies</h4>
+      <div class="opts">${kinds.map((z) => opt(`devz:${z.id}`, z.name, D.zombie === z.id)).join('')}</div>
+      <div class="opts">${[1, 5, 10, 25, 50].map((n) => opt(`devn:${n}`, `×${n}`, D.count === n)).join('')}${opt('devhunt', D.hunt ? 'Hunting your squads' : 'Wandering', D.hunt)}</div>
+      ${opt('devplace:zombies', placing === 'zombies' ? 'Click the map…' : `Drop ${D.count} ${ZOMBIES[D.zombie].name}${D.count === 1 ? '' : 's'}`, placing === 'zombies')}
+      <h4>Hive</h4>
+      <div class="opts">${[1, 2, 3, 4].map((n) => opt(`devstage:${n}`, `Stage ${n}`, D.stage === n)).join('')}</div>
+      ${opt('devplace:hive', placing === 'hive' ? 'Click the map…' : `Place a stage ${D.stage} hive`, placing === 'hive')}
+      <h4>Other</h4>
+      <div class="opts">${opt('devclear', 'Clear all zombies', false)}${opt('devcash', '+$1000 · +500▣', false)}</div>
+      <p class="hint">${alive} zombies alive · ${g.world.hives.filter((h) => h.alive).length} hives · Shift+click keeps placing</p>`;
   }
 
   /** STATUS #47: frames per second and where the time goes, 4× a second. */
@@ -622,6 +673,7 @@ export class Hud {
       : mode.kind === 'attackMove' ? 'Attack-move: click a destination'
       : mode.kind === 'charge' ? 'Click a hive to plant a demo charge'
       : mode.kind === 'heal' ? 'Heal: click a hurt squad · right-click to cancel'
+      : mode.kind === 'dev' ? `Dev: click the map to drop ${mode.what === 'hive' ? 'a hive' : 'zombies'} · Shift+click to keep placing · right-click to stop`
       : mode.kind === 'deconstruct' ? 'Click something your engineers built to take it down (unstarted: full refund, built: half)'
       : civOnly ? 'Right-click to walk them · get them to the Command Post to evacuate them'
       : `${sq.length} selected · right-click a zombie to focus it · right-click a building to search it · Shift+right-click queues`;
