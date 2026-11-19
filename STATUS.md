@@ -14,8 +14,14 @@ With `npm run dev` running (the game at http://localhost:5173):
 
 ## Next, in order
 
-**Ranked by importance, open items only.** Item numbers are fixed ("work on #13" always means the same thing); new items take the next free number (**#70** next) and go where they rank. Finished items move to Done.
+**Ranked by importance, open items only.** Item numbers are fixed ("work on #13" always means the same thing); new items take the next free number (**#76** next) and go where they rank. Finished items move to Done.
 
+- **#70** **Quick round 21 changes**: region 2's hive starts at stage 1 (#249); noise cooldown 60 s (#250); longer between hive stages (#255, owner to say how much); "Heavy MG Nest" (#253).
+- **#71** **Top bar** (round 21 #245): one compact strip ($ · ▣ · troops, pause and speed), a 24-hour clock and a Districts toggle on the right; no rotate, ops-map, sound, UI or menu buttons; a total kill counter (#252) where the owner wants it. Bottom HUD ideas to choose from (#246).
+- **#72** **Zombie hordes** (round 21 #251): each zombie drifts off the shared route, weaves, spreads over the road: a horde, not a conga line.
+- **#73** **New tutorial** (round 21 #247): event-driven prompts with the thing to click pulsing; training starts with no units (click the Barracks); levels, the cap, searching, right-click attack and the commands, outposts need defences, no region locks after the tutorial. After #71 (it points at the new HUD).
+- **#74** **Open-world start** (round 21 #248): a start option with the three starter regions open, no fences, no cap, no tutorial.
+- **#75** **Infantry routes** (round 21 #254): bigger search budget, straighter first leg; owner to say where a squad went the long way.
 - **#69** **Reloading** (round 20 #237): magazines, staggered reloads across a squad; the owner will send a rifle and a pistol reload clip and a reload sound.
 - **#51** **Region 3 spice** (round 15 #184). ✔ v4.77: the **Humvee** (owner's model, "Low poly Humvee" by SIpriv): built at the Vehicle Bay (select it: $160 · 40▣, 20 s); the MG emplacement's gun on a turret that fires all round (75% accuracy on the move; a guess); carries one squad of up to 5 (an Elite rifle squad): right-click it with infantry to board, **U** (or the button) to unload; riders are hidden, can't be reached and don't shoot; if it's destroyed they bail out. **Tabled by the owner for now:** the build incentives (hordes going for structures, a hold-the-line event, outposts earning per minute, night waves).
 - **#52** **Pile-up climbing** (round 15 #183): crowds pressing on a structure pile up and climb over or onto it; **any structure** can be climbed (owner).
