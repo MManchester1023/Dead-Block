@@ -1,6 +1,6 @@
-import { devSpawnHive, devSpawnZombies } from './sim/rules/dev';
+import { devPlaceStructure, devSpawnHive, devSpawnUnit, devSpawnZombies } from './sim/rules/dev';
 import { BALANCE } from './config/balance';
-import { STRUCTURES, ZOMBIES } from './config/units';
+import { STRUCTURES, UNITS, ZOMBIES } from './config/units';
 import { dist, type Vec2 } from './core/math';
 import { World } from './sim/World';
 import { loadWorld, saveWorld, type SaveData } from './sim/save';
@@ -15,7 +15,8 @@ import type { Targetable } from './sim/types';
 export type Mode =
   | { kind: 'normal' }
   | { kind: 'attackMove' }
-  | { kind: 'build'; defId: string; rotated: boolean; aim: number }
+  /** `dev`: placed by the dev menu: free, finished, no engineers needed (round 18 #221). */
+  | { kind: 'build'; defId: string; rotated: boolean; aim: number; dev?: boolean }
   | { kind: 'charge' }
   | { kind: 'deconstruct' }
   | { kind: 'support'; id: string }
@@ -25,7 +26,7 @@ export type Mode =
   /** STATUS #20: medics pick a squad to treat. */
   | { kind: 'heal' }
   /** STATUS #59: the dev menu: clicks drop zombies or a hive. */
-  | { kind: 'dev'; what: 'zombies' | 'hive' }
+  | { kind: 'dev'; what: 'zombies' | 'hive' | 'unit' }
   /** Round 18 #220: engineers repair whatever is clicked next. */
   | { kind: 'repair' };
 
@@ -150,13 +151,20 @@ export class Game {
   }
 
   /** STATUS #59: the dev menu's settings (open with the ` key). */
-  readonly dev = { open: false, zombie: 'walker', count: 5, hunt: true, stage: 1 };
+  readonly dev = { open: false, zombie: 'walker', count: 5, hunt: true, stage: 1, unit: 'rifle' };
 
   /** STATUS #59: drop what the dev menu is set to at a point on the map. */
   devPlace(p: Vec2): void {
     if (this.mode.kind !== 'dev') return;
     const w = this.world;
-    if (this.mode.what === 'hive') {
+    if (this.mode.what === 'unit') {
+      // round 18 #221: a friendly unit, free
+      const s = devSpawnUnit(w, this.dev.unit, p);
+      if (s) {
+        this.toast(`Dev: ${s.name} (${UNITS[s.def.id].name})`);
+        this.renderer.marker(s.pos, 0x7fb6e8);
+      }
+    } else if (this.mode.what === 'hive') {
       const h = devSpawnHive(w, p, this.dev.stage);
       this.toast(`Dev: stage ${h.stage} hive placed (${w.districts.get(h.districtId)?.def.name ?? h.districtId})`);
       this.renderer.marker(h.pos, 0xd2443a);
@@ -197,7 +205,7 @@ export class Game {
     ids = ids.filter((id) => this.world.squads.find((s) => s.id === id)?.inVehicle == null);
     if (ids.length || !add) this.selectedStructure = null;
     for (const id of ids) this.selected.add(id);
-    if (this.mode.kind !== 'normal' && !this.selectedEngineers.length && this.mode.kind !== 'attackMove' && this.mode.kind !== 'patrol' && this.mode.kind !== 'rally' && this.mode.kind !== 'support' && !(this.mode.kind === 'heal' && this.selectedMedics.length) && this.mode.kind !== 'dev' && !(this.mode.kind === 'repair' && this.selectedEngineers.length)) this.mode = { kind: 'normal' };
+    if (this.mode.kind !== 'normal' && !this.selectedEngineers.length && this.mode.kind !== 'attackMove' && this.mode.kind !== 'patrol' && this.mode.kind !== 'rally' && this.mode.kind !== 'support' && !(this.mode.kind === 'heal' && this.selectedMedics.length) && this.mode.kind !== 'dev' && !(this.mode.kind === 'build' && this.mode.dev) && !(this.mode.kind === 'repair' && this.selectedEngineers.length)) this.mode = { kind: 'normal' };
     this.changed();
   }
 
@@ -565,6 +573,18 @@ export class Game {
   placeBuild(p: Vec2, queue: boolean): void {
     if (this.mode.kind !== 'build') return;
     const { defId, rotated, aim } = this.mode;
+    if (this.mode.dev) {
+      // round 18 #221: the dev menu: finished and free, right here
+      const st = devPlaceStructure(this.world, defId, this.buildTile(p, defId, rotated), rotated, aim);
+      if (typeof st === 'string') this.toast(`Dev: ${st}`);
+      else {
+        this.toast(`Dev: ${st.def.name} placed`);
+        this.renderer.marker(st.pos, 0x7fb6e8);
+        if (!queue) this.setMode({ kind: 'normal' });
+      }
+      this.changed();
+      return;
+    }
     const err = this.world.orderBuild(this.selectedEngineers, defId, this.buildTile(p, defId, rotated), queue, rotated, aim);
     if (err) this.toast(err);
     else {

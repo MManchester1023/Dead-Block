@@ -1,6 +1,6 @@
 import { BALANCE } from '../config/balance';
 import { QUALITY, type Quality } from '../render/Renderer';
-import { devClearZombies } from '../sim/rules/dev';
+import { devBuildings, devClearZombies, devUnits } from '../sim/rules/dev';
 import { SAVE_VERSION, SLOTS, deleteSlot, latestSlot, requestLoad, slotMeta, writeSlot, type SlotId } from '../sim/save';
 import { ABILITIES, STRUCTURES, UNITS, ZOMBIES } from '../config/units';
 import { isEnabled } from '../config/features';
@@ -308,6 +308,16 @@ export class Hud {
         g.setMode({ kind: 'dev', what: arg as 'zombies' | 'hive' });
         this.renderDev();
         break;
+      // round 18 #221: units and buildings
+      case 'devunit':
+        g.dev.unit = arg;
+        g.setMode({ kind: 'dev', what: 'unit' });
+        this.renderDev();
+        break;
+      case 'devbuild':
+        g.setMode({ kind: 'build', defId: arg, rotated: false, aim: 0, dev: true });
+        this.renderDev();
+        break;
       case 'devclear': this.toast(`Dev: ${devClearZombies(g.world)} zombies cleared`); this.renderDev(); break;
       case 'devcash': g.world.money += 1000; g.world.addSupplies(500); this.toast('Dev: +$1000, +500▣'); break;
       case 'devclose': this.toggleDev(); break;
@@ -449,6 +459,8 @@ export class Hud {
     if (!g.dev.open) return;
     const D = g.dev;
     const placing = g.mode.kind === 'dev' ? g.mode.what : null;
+    const building = g.mode.kind === 'build' && g.mode.dev ? g.mode.defId : null;
+    const units = devUnits();
     const kinds = Object.values(ZOMBIES);
     const opt = (act: string, label: string, on: boolean) => `<button class="cmd ${on ? 'on' : ''}" data-act="${act}">${label}</button>`;
     const alive = g.world.zombies.reduce((n, z) => n + (z.alive ? 1 : 0), 0);
@@ -460,6 +472,11 @@ export class Hud {
       <h4>Hive</h4>
       <div class="opts">${[1, 2, 3, 4].map((n) => opt(`devstage:${n}`, `Stage ${n}`, D.stage === n)).join('')}</div>
       ${opt('devplace:hive', placing === 'hive' ? 'Click the map…' : `Place a stage ${D.stage} hive`, placing === 'hive')}
+      <h4>Units <span class="sub">free, placed as yours</span></h4>
+      <div class="opts">${units.filter((u) => u.ready).map((u) => opt(`devunit:${u.id}`, u.name, placing === 'unit' && D.unit === u.id)).join('')}</div>
+      <div class="opts later" title="Not in the game yet: they work as plain squads or vehicles until they get their own models and behaviour">${units.filter((u) => !u.ready).map((u) => opt(`devunit:${u.id}`, u.name, placing === 'unit' && D.unit === u.id)).join('')}</div>
+      <h4>Buildings <span class="sub">finished, free, unlocked or not</span></h4>
+      <div class="opts">${devBuildings().map((b) => opt(`devbuild:${b.id}`, b.name, building === b.id)).join('')}</div>
       <h4>Other</h4>
       <div class="opts">${opt('devclear', 'Clear all zombies', false)}${opt('devcash', '+$1000 · +500▣', false)}</div>
       <p class="hint">${alive} zombies alive · ${g.world.hives.filter((h) => h.alive).length} hives · Shift+click keeps placing</p>`;
@@ -672,13 +689,13 @@ export class Hud {
     // engineers' build tools live in the bottom-centre build bar (round 9 #104; see renderBuildBar)
     void eng;
     const modeHint =
-      mode.kind === 'build' ? `Placing ${STRUCTURES[mode.defId].name} — click to place · R ${STRUCTURES[mode.defId].arc ? `turns its ${STRUCTURES[mode.defId].arc}° field of fire` : 'rotate'} · Shift to keep placing · right-click cancel`
+      mode.kind === 'build' ? `${mode.dev ? 'Dev: ' : ''}Placing ${STRUCTURES[mode.defId].name}${mode.dev ? ' (finished, free)' : ''} — click to place · R ${STRUCTURES[mode.defId].arc ? `turns its ${STRUCTURES[mode.defId].arc}° field of fire` : 'rotate'} · Shift to keep placing · right-click cancel`
       : mode.kind === 'patrol' ? 'Patrol: click the points of the loop · Shift+click to keep adding · right-click to cancel'
       : mode.kind === 'attackMove' ? 'Attack-move: click a destination'
       : mode.kind === 'charge' ? 'Click a hive to plant a demo charge'
       : mode.kind === 'heal' ? 'Heal: click a hurt squad · right-click to cancel'
       : mode.kind === 'repair' ? 'Repair: click a damaged vehicle or building · right-click to cancel'
-      : mode.kind === 'dev' ? `Dev: click the map to drop ${mode.what === 'hive' ? 'a hive' : 'zombies'} · Shift+click to keep placing · right-click to stop`
+      : mode.kind === 'dev' ? `Dev: click the map to drop ${mode.what === 'hive' ? 'a hive' : mode.what === 'unit' ? `a ${UNITS[g.dev.unit].name}` : 'zombies'} · Shift+click to keep placing · right-click to stop`
       : mode.kind === 'deconstruct' ? 'Click something your engineers built to take it down (unstarted: full refund, built: half)'
       : civOnly ? 'Right-click to walk them · get them to the Command Post to evacuate them'
       : `${sq.length} selected · right-click a zombie to focus it · right-click a building to search it · Shift+right-click queues`;

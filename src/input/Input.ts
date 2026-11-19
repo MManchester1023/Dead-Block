@@ -219,7 +219,7 @@ export class Input {
     if (g.mode.kind !== 'build' || !this.mouse.inside) return;
     const p = this.ground(this.mouse.x === 0 && this.mouse.y === 0 ? { clientX: innerWidth / 2, clientY: innerHeight / 2 } : { clientX: this.mouse.x, clientY: this.mouse.y });
     const tile = g.buildTile(p, g.mode.defId, g.mode.rotated);
-    const ok = !g.world.canPlace(g.mode.defId, tile, g.mode.rotated);
+    const ok = !g.world.canPlace(g.mode.defId, tile, g.mode.rotated, !!g.mode.dev);
     const def = STRUCTURES[g.mode.defId];
     g.renderer.setGhost(tile, g.world.footprint(g.mode.defId, g.mode.rotated), ok, def.weapon?.range ?? 0, def.arc ? { aim: g.mode.aim, deg: def.arc } : undefined, structureExit(def, tile, g.mode.rotated, g.world.grid.cell));
   }

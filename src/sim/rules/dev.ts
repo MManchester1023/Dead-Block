@@ -2,8 +2,8 @@
 // they stay deterministic like everything else; the in-game dev menu (` key) calls them.
 import type { Vec2 } from '../../core/math';
 import { BALANCE } from '../../config/balance';
-import { ZOMBIES } from '../../config/units';
-import { Hive, type Zombie } from '../entities';
+import { STRUCTURES, UNITS, ZOMBIES } from '../../config/units';
+import { Hive, type Squad, type Structure, type Zombie } from '../entities';
 import type { World } from '../World';
 
 /** Drop `count` zombies of a type around a point (a loose spiral); `hunt`: they go for the nearest squad. */
@@ -54,4 +54,36 @@ export function devClearZombies(w: World): number {
       n++;
     }
   return n;
+}
+
+/**
+ * Round 18 #221: every friendly unit the dev menu can drop: what's in the game first, then the ones still to come
+ * (they work as plain squads or vehicles until they get their own models and behaviour).
+ */
+export function devUnits(): { id: string; name: string; ready: boolean }[] {
+  const ready = (id: string) => {
+    const u = UNITS[id];
+    return u.producedAt === 'none' || (!!STRUCTURES[u.producedAt] && !u.requires);
+  };
+  const ids = Object.keys(UNITS);
+  return [...ids.filter(ready), ...ids.filter((id) => !ready(id))].map((id) => ({ id, name: UNITS[id].name, ready: ready(id) }));
+}
+
+/** …and every structure engineers can build. */
+export function devBuildings(): { id: string; name: string }[] {
+  const ids = new Set(Object.values(UNITS).flatMap((u) => u.canBuild ?? []));
+  return [...ids].filter((id) => STRUCTURES[id]).map((id) => ({ id, name: STRUCTURES[id].name }));
+}
+
+/** A friendly unit at a point, free (no cost, no command cap); it waits there. */
+export function devSpawnUnit(w: World, defId: string, at: Vec2): Squad | null {
+  if (!UNITS[defId]) return null;
+  return w.spawnSquad(defId, { x: at.x, y: at.y });
+}
+
+/** A finished structure, free and whether unlocked or not; it still has to fit. Returns it, or why not. */
+export function devPlaceStructure(w: World, defId: string, tile: { x: number; y: number }, rotated = false, aim = 0): Structure | string {
+  const err = w.canPlace(defId, tile, rotated, true);
+  if (err) return err;
+  return w.addStructure(defId, tile, true, rotated, aim);
 }

@@ -173,11 +173,12 @@ export function footprint(defId: string, rotated = false): { w: number; h: numbe
 }
 
 /** Validates a construction site (doc §6: engineers can build anywhere). */
-export function canPlace(w: World, defId: string, tile: { x: number; y: number }, rotated = false): string | null {
+export function canPlace(w: World, defId: string, tile: { x: number; y: number }, rotated = false, dev = false): string | null {
   const def = STRUCTURES[defId];
   if (!def) return 'Unknown structure';
-  if (def.requires && !isEnabled(def.requires as never)) return 'Locked';
-  if (def.unlock && !w.unlocked.has(def.unlock)) return 'Not unlocked yet';
+  // round 18 #221: the dev menu places anything for free, unlocked or not; it still has to fit
+  if (!dev && def.requires && !isEnabled(def.requires as never)) return 'Locked';
+  if (!dev && def.unlock && !w.unlocked.has(def.unlock)) return 'Not unlocked yet';
   if (def.restore) return "Can't be built: it's restored where it stands";
   if (def.baseOnly) {
     const fp0 = footprint(defId, rotated);
@@ -190,12 +191,12 @@ export function canPlace(w: World, defId: string, tile: { x: number; y: number }
     const d = w.districtAt({ x: (tile.x + fp.w / 2) * w.grid.cell, y: (tile.y + fp.h / 2) * w.grid.cell });
     if (!d || d.def.id === 'base') return 'Outposts go in a district';
     if (d.outpostId) return 'District already has an outpost';
-    if (w.hives.some((h) => h.alive && h.districtId === d.def.id)) return 'Destroy the hive first';
-    if (d.infestation > BALANCE.infestation.outpostMax) return `Infestation must be ${BALANCE.infestation.outpostMax}% or less (now ${Math.ceil(d.infestation)}%)`;
+    if (!dev && w.hives.some((h) => h.alive && h.districtId === d.def.id)) return 'Destroy the hive first';
+    if (!dev && d.infestation > BALANCE.infestation.outpostMax) return `Infestation must be ${BALANCE.infestation.outpostMax}% or less (now ${Math.ceil(d.infestation)}%)`;
   }
   const c = { x: (tile.x + fp.w / 2) * w.grid.cell, y: (tile.y + fp.h / 2) * w.grid.cell };
   for (const z of w.zombieHash.query(c, Math.max(fp.w, fp.h) * w.grid.cell * 0.5 + 1.5)) if (z.alive) return 'Zombies in the way';
-  if (!w.canAfford(def.cost)) return 'Not enough money or supplies';
+  if (!dev && !w.canAfford(def.cost)) return 'Not enough money or supplies';
   return null;
 }
 

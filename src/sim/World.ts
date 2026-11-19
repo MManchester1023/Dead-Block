@@ -382,8 +382,8 @@ export class World {
   footprint(defId: string, rotated = false): { w: number; h: number } {
     return Commands.footprint(defId, rotated);
   }
-  canPlace(defId: string, tile: { x: number; y: number }, rotated = false): string | null {
-    return Commands.canPlace(this, defId, tile, rotated);
+  canPlace(defId: string, tile: { x: number; y: number }, rotated = false, dev = false): string | null {
+    return Commands.canPlace(this, defId, tile, rotated, dev);
   }
   orderBuild(engineers: Squad[], defId: string, tile: { x: number; y: number }, queue = false, rotated = false, aim = 0): string | null {
     return Commands.orderBuild(this, engineers, defId, tile, queue, rotated, aim);
