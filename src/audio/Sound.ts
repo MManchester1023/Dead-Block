@@ -26,10 +26,12 @@ import type { Vec2 } from '../core/math';
  *   parachute     the crate's chute opening (v4.39, #113)
  *   crate_land    the supply crate hitting the ground (v4.41, #113)
  *   mg_loop       the MG emplacement firing: a seamless 1.3 s stretch of a 50-cal burst, looped while it shoots (v4.55)
- *   power_on      the power station starting up (v4.41, round 10 #112; from the owner's recording)
+ *   power_on      the power station starting up (v4.80: the owner's new recording)
+ *   humvee_idle   a Humvee's engine idling, looped per vehicle; humvee_drive  it driving off when given a move (round 17)
+ *                 (both only when the camera is zoomed in and close: owner's call)
  */
 
-type Bank = 'rifle' | 'carbine' | 'pistol' | 'death' | 'groan' | 'scream' | 'explosion' | 'bloater' | 'human' | 'click' | 'radio' | 'hive' | 'flyby' | 'chute' | 'power' | 'thud';
+type Bank = 'drive' | 'rifle' | 'carbine' | 'pistol' | 'death' | 'groan' | 'scream' | 'explosion' | 'bloater' | 'human' | 'click' | 'radio' | 'hive' | 'flyby' | 'chute' | 'power' | 'thud';
 const FILES: Record<Bank, string[]> = {
   human: ['human_death_1', 'human_death_2', 'human_death_3'],
   click: ['ui_click'],
@@ -37,6 +39,7 @@ const FILES: Record<Bank, string[]> = {
   flyby: ['plane_flyby'],
   chute: ['parachute'],
   power: ['power_on'],
+  drive: ['humvee_drive'],
   thud: ['crate_land'],
   radio: ['radio_1', 'radio_2', 'radio_3', 'radio_4', 'radio_5', 'radio_6', 'radio_7', 'radio_8'],
   rifle: ['rifle_1', 'rifle_2', 'rifle_3'],
@@ -65,6 +68,7 @@ const LIMITS: Record<Bank, { voices: number; gap: number; volume: number }> = {
   flyby: { voices: 2, gap: 1, volume: 0.45 },
   chute: { voices: 2, gap: 0.3, volume: 0.6 },
   power: { voices: 1, gap: 1, volume: 0.8 },
+  drive: { voices: 3, gap: 0.15, volume: 0.75 },
   thud: { voices: 2, gap: 0.2, volume: 0.7 },
 };
 
@@ -77,6 +81,13 @@ const BUILD_LOOP = 'build_loop';
 const BUILD_VOLUME = 0.5;
 /** MG emplacements (v4.55): their burst loops while they fire, fading out this long after the last shot. */
 const MG_LOOP = 'mg_loop';
+/** Round 17: vehicles' engines (owner's recordings). Heard only zoomed in and close (VEHICLE_ZOOM, VEHICLE_NEAR). */
+const IDLE_LOOP = 'humvee_idle';
+const IDLE_VOLUME = 0.45;
+/** Camera zoom: silent at or below the first, full from the second (the game starts at 1.6, max 6). */
+const VEHICLE_ZOOM = [2, 3];
+/** Metres from the middle of the view: full volume within the first, silent beyond the second. */
+const VEHICLE_NEAR = [20, 40];
 const MG_VOLUME = 0.7;
 const MG_HOLD = 0.35;
 /** Orders that mean "engineers hammering away" once they're standing at the job. */
@@ -128,6 +139,7 @@ export class Sound {
   /** One looping work sound per crew at a job (squad id → its nodes). */
   private work = new Map<number, { src: AudioBufferSourceNode; g: GainNode; p: StereoPannerNode }>();
   /** Firing MG emplacements: their loop, where they are, and when they last fired (v4.55). */
+  private idles = new Map<number, { src: AudioBufferSourceNode; g: GainNode; p: StereoPannerNode }>();
   private mgs = new Map<string, { src: AudioBufferSourceNode; g: GainNode; p: StereoPannerNode; pos: Vec2; last: number }>();
   /** Master volume, one of VOLUMES (remembered per browser). */
   volume = 1;
@@ -167,6 +179,11 @@ export class Sound {
     ev.on('powerRestored', (e) => {
       const st = game.world.structures.find((s) => s.id === e.id);
       if (st) this.play('power', st.pos);
+    });
+    // round 17 #207: a vehicle sent somewhere drives off (once per order, fading out after a couple of seconds)
+    ev.on('vehicleOrdered', (e) => {
+      const v = game.world.squads.find((s) => s.id === e.id);
+      if (v) this.play('drive', v.pos, { near: true });
     });
     ev.on('memberKilled', (e) => this.play('human', e.pos, { rate: 0.92 + Math.random() * 0.16 }));
     ev.on('radio', (e) => {
@@ -210,7 +227,7 @@ export class Sound {
         });
     }
     const load = async (n: string) => this.ctx!.decodeAudioData(await (await fetch(`audio/${n}.mp3`)).arrayBuffer());
-    for (const n of [BUILD_LOOP, MG_LOOP])
+    for (const n of [BUILD_LOOP, MG_LOOP, IDLE_LOOP])
       load(n)
         .then((b) => (this.loops[n] = b))
         .catch(() => {});
@@ -240,6 +257,52 @@ export class Sound {
     gain *= rig.strategic ? 0.35 : 1; // zoomed far out (ops map), the battlefield is quieter
     const sp = this.game.renderer.worldToScreen(pos);
     return { gain, pan: Math.max(-0.9, Math.min(0.9, (sp.x / innerWidth) * 2 - 1)) };
+  }
+
+  /** Round 17: vehicles are only heard zoomed in and close (owner): 0…1 by zoom and distance from the view's middle. */
+  private closeUp(pos: Vec2): number {
+    const rig = this.game.renderer.rig;
+    const z = Math.max(0, Math.min(1, (rig.zoom - VEHICLE_ZOOM[0]) / (VEHICLE_ZOOM[1] - VEHICLE_ZOOM[0])));
+    const d = Math.hypot(pos.x - rig.target.x, pos.y - rig.target.z);
+    const n = Math.max(0, Math.min(1, 1 - (d - VEHICLE_NEAR[0]) / (VEHICLE_NEAR[1] - VEHICLE_NEAR[0])));
+    return z * n;
+  }
+
+  /** Round 17 #201: each vehicle's engine idles on a loop (a bit louder on the move), heard only up close. */
+  private updateVehicles(): void {
+    const ctx = this.ctx!;
+    const buf = this.loops[IDLE_LOOP];
+    if (!buf || !this.master) return;
+    const now = ctx.currentTime;
+    const live = new Set<number>();
+    for (const s of this.game.world.squads) {
+      if (!s.alive || s.def.category !== 'vehicle') continue;
+      live.add(s.id);
+      let v = this.idles.get(s.id);
+      if (!v) {
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.loop = true;
+        const g = ctx.createGain();
+        g.gain.value = 0;
+        const p = ctx.createStereoPanner();
+        src.connect(g).connect(p).connect(this.master);
+        src.start(0, Math.random() * buf.duration);
+        v = { src, g, p };
+        this.idles.set(s.id, v);
+      }
+      const near = this.closeUp(s.pos);
+      const on = this.game.paused ? 0 : IDLE_VOLUME * near * (s.moving ? 1.3 : 1);
+      v.g.gain.setTargetAtTime(on, now, 0.15);
+      v.p.pan.setTargetAtTime(this.place(s.pos).pan, now, 0.1);
+      v.src.playbackRate.setTargetAtTime(s.moving ? 1.12 : 1, now, 0.4); // revs a little higher on the move
+    }
+    for (const [id, v] of this.idles)
+      if (!live.has(id)) {
+        v.g.gain.setTargetAtTime(0, now, 0.1);
+        v.src.stop(now + 0.5);
+        this.idles.delete(id);
+      }
   }
 
   /** An MG emplacement fired (a shot from it): start or keep its burst loop going. */
@@ -326,6 +389,7 @@ export class Sound {
     if (!this.ctx) return;
     this.updateWork();
     this.updateMgs();
+    this.updateVehicles();
     if (this.game.paused) return;
     this.updateCrates();
     // now and then, quieter chatter from somewhere on the net
@@ -365,7 +429,7 @@ export class Sound {
   }
 
   /** Play a clip from a bank at a world position (null = everywhere, e.g. a distant scream). */
-  private play(bank: Bank, pos: Vec2 | null, opt: { rate?: number; gain?: number; offset?: number } = {}): void {
+  private play(bank: Bank, pos: Vec2 | null, opt: { rate?: number; gain?: number; offset?: number; near?: boolean } = {}): void {
     const ctx = this.ctx;
     const bufs = this.buffers[bank];
     if (!ctx || !this.master || !bufs?.length || this.volume === 0) return;
@@ -378,7 +442,7 @@ export class Sound {
     let pan = 0;
     if (pos) {
       const at = this.place(pos);
-      gain *= at.gain;
+      gain *= opt.near ? this.closeUp(pos) : at.gain;
       if (gain < 0.01) return;
       pan = at.pan;
     }

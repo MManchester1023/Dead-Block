@@ -1,6 +1,6 @@
 import { BALANCE } from '../../config/balance';
 import { dist, norm, sub, type Vec2 } from '../../core/math';
-import { ABILITIES } from '../../config/units';
+import { ABILITIES, vehicleHandling } from '../../config/units';
 import { Hive, Squad, Structure } from '../entities';
 import { newId } from '../entities';
 import { findPath } from '../pathfinding';
@@ -30,6 +30,7 @@ export function updateOrders(w: World, dt: number): void {
       for (const m of s.members) (m.pos.x = v.pos.x), (m.pos.y = v.pos.y);
       continue;
     }
+    if (s.def.category === 'vehicle' && w.time - s.drivenAt > dt * 1.5) s.vel = 0;
     applyKnock(w, s, dt);
     if (s.stunned > 0) {
       s.stunned -= dt;
@@ -214,6 +215,7 @@ function applyKnock(w: World, s: Squad, dt: number): void {
 
 /** Returns true on arrival. */
 export function moveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: number): boolean {
+  if (s.def.category === 'vehicle') return driveToward(w, s, dest, dt, arrive); // round 17 #203: like a car
   if (dist(s.pos, dest) <= arrive) return true;
   if (s.pathFor && dist(s.pathFor, dest) > 3) s.path = []; // destination moved (chasing a target)
   if (!s.path.length || s.pathVersion !== w.navVersion) {
@@ -236,6 +238,105 @@ export function moveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: n
   // a destination right against a car or wall can be unreachable for a body this wide: close enough is arrived
   if (blocked && left <= arrive + BODY * 2) return true;
   return !s.path.length && left <= arrive + 1.8;
+}
+
+const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+
+/**
+ * Round 17 #203: vehicles drive like cars. They follow their route by steering toward a point a few metres
+ * ahead; they turn only while moving (around their class's turning circle), slow down for sharp turns and to
+ * stop at the destination, and back up for a moment when a turn is too tight or they hit something.
+ * Routes avoid lamp posts (#208), and a post that gets too close is driven round, not through.
+ */
+function driveToward(w: World, s: Squad, dest: Vec2, dt: number, arrive: number): boolean {
+  const H = vehicleHandling(s.def);
+  s.drivenAt = w.time;
+  const left = dist(s.pos, dest);
+  if (left <= arrive) {
+    // stop where we are
+    s.vel += Math.max(-H.brake * dt, Math.min(H.brake * dt, -s.vel));
+    if (Math.abs(s.vel) < 0.4) {
+      s.vel = 0;
+      s.moving = false;
+      return true;
+    }
+    stepVehicle(w, s, H, dt);
+    return false;
+  }
+  if (s.pathFor && dist(s.pathFor, dest) > 3) s.path = [];
+  if (!s.path.length || s.pathVersion !== w.navVersion) {
+    s.path = findPath(w.grid, s.pos, dest, 6000, w.vehicleHazard()) ?? [];
+    s.pathVersion = w.navVersion;
+    s.pathFor = { ...dest };
+    s.driveAnchor = { x: s.pos.x, y: s.pos.y };
+    s.driveSince = w.time;
+    if (!s.path.length) return true; // unreachable: give up gracefully
+  }
+  // boxed in (hasn't actually got 2 m anywhere in 4 s; a U-turn moving away still counts as moving): close enough
+  if (s.driveAnchor && Math.hypot(s.pos.x - s.driveAnchor.x, s.pos.y - s.driveAnchor.y) > 2) {
+    s.driveAnchor = { x: s.pos.x, y: s.pos.y };
+    s.driveSince = w.time;
+  } else if (!s.driveAnchor) {
+    s.driveAnchor = { x: s.pos.x, y: s.pos.y };
+    s.driveSince = w.time;
+  } else if (w.time - s.driveSince > 4) {
+    s.vel = 0;
+    s.moving = false;
+    return true;
+  }
+  while (s.path.length > 1 && dist(s.pos, s.path[0]) < 3) s.path.shift();
+  const LOOK = H.turnRadius;
+  let aim = s.path[s.path.length - 1];
+  for (const p of s.path)
+    if (dist(s.pos, p) >= LOOK) {
+      aim = p;
+      break;
+    }
+  if (dist(s.pos, aim) < 0.5) aim = dest;
+  const err = wrapAngle(Math.atan2(aim.y - s.pos.y, aim.x - s.pos.x) - s.facing);
+  // too tight to make going forward (or stuck on something): back up for a moment, steering the nose round
+  if (s.reverseFor > 0) {
+    s.reverseFor -= dt;
+    if (s.reverseFor <= 0) s.path = []; // backed out: plan again from here
+  } else if (Math.abs(err) > 2.1 && dist(s.pos, aim) < H.turnRadius * 2.2) {
+    s.reverseFor = 1.1;
+    s.reverseSteer = Math.sign(err) || 1;
+  }
+  const reversing = s.reverseFor > 0;
+  const turnSlow = 1 - 0.6 * Math.min(1, Math.abs(err) / (Math.PI / 2));
+  const stopping = Math.sqrt(2 * H.brake * 0.6 * Math.max(0, left - arrive));
+  const target = reversing ? -H.reverseSpeed : Math.min(s.def.speed * w.grid.slowAt(s.pos) * turnSlow, stopping + 1);
+  s.vel += Math.max(-H.brake * dt, Math.min(H.accel * dt, target - s.vel));
+  const before = { x: s.pos.x, y: s.pos.y };
+  const blocked = stepVehicle(w, s, H, dt);
+  // the nose swings toward the aim by as much as the distance actually covered allows on its turning
+  // circle (either direction of travel): no turning on the spot, and no swinging round while scraping a wall
+  const turn = Math.min(1.5 * dt, Math.hypot(s.pos.x - before.x, s.pos.y - before.y) / H.turnRadius);
+  // backing out of a dead end with the target straight ahead: swing the nose to one side so the next try
+  // doesn't hit the same thing
+  const want = reversing && Math.abs(err) < 0.6 ? s.reverseSteer * Math.PI : err;
+  s.facing = wrapAngle(s.facing + Math.max(-turn, Math.min(turn, want)));
+  if (blocked && !reversing && s.vel > 0.5) {
+    s.reverseFor = 1.6;
+    s.reverseSteer = Math.abs(err) > 0.25 ? Math.sign(err) : (s.reverseSteer || 1);
+    s.vel = 0;
+  }
+  return false;
+}
+
+/** Move a vehicle along its heading at its speed; slide around lamp posts. True if it ran into something. */
+function stepVehicle(w: World, s: Squad, H: ReturnType<typeof vehicleHandling>, dt: number): boolean {
+  const step = s.vel * dt;
+  const blocked = moveWithCollision(w.grid, s.pos, Math.cos(s.facing) * step, Math.sin(s.facing) * step, H.body);
+  if (!H.crushes)
+    for (const p of w.lampPosts()) {
+      const dx = s.pos.x - p.x, dy = s.pos.y - p.y;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) continue;
+      const d = Math.hypot(dx, dy), min = H.body + 0.3;
+      if (d < min && d > 0.001) moveWithCollision(w.grid, s.pos, (dx / d) * (min - d), (dy / d) * (min - d), H.body);
+    }
+  s.moving = Math.abs(s.vel) > 0.3;
+  return blocked;
 }
 
 /** STATUS #51: walk to the vehicle and climb in (if there's still room). */
@@ -588,11 +689,13 @@ function approachPoint(w: World, s: Squad, target: Vec2, radius: number): Vec2 {
 function separate(w: World, s: Squad, dt: number): void {
   for (const o of w.squadHash.query(s.pos, 4.5)) {
     if (o === s) continue;
+    // round 17 #204: a vehicle isn't shoved about by soldiers (they step aside for it, below)
+    if (s.def.category === 'vehicle' && o.def.category !== 'vehicle') continue;
     // round 11 #126: a squad settled in cover holds its ground; whoever arrives later steps aside
     if (s.coverPropId != null && !s.moving && o.coverPropId == null) continue;
     const d = dist(s.pos, o.pos);
     // two squads holding behind the same car can stand closer (round 7 #81: they used to shove each other out of cover)
-    const min = s.holding && o.holding && !s.moving && !o.moving ? 2.4 : 4;
+    const min = o.def.category === 'vehicle' && s.def.category !== 'vehicle' ? 4.5 : s.holding && o.holding && !s.moving && !o.moving ? 2.4 : 4;
     if (d < min && d > 0.001) {
       const push = ((min - d) / min) * 5 * dt;
       const dir = norm(sub(s.pos, o.pos));

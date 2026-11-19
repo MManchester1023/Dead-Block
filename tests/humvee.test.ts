@@ -43,7 +43,7 @@ describe('the Humvee (STATUS #51, v4.77)', () => {
     // rides along
     w.issueOrder([hv], { type: 'move', pos: w.grid.nearestFree({ x: hv.pos.x, y: hv.pos.y + 30 }) });
     run(w, 4);
-    expect(Math.hypot(rifle.pos.x - hv.pos.x, rifle.pos.y - hv.pos.y)).toBeLessThan(0.01);
+    expect(Math.hypot(rifle.pos.x - hv.pos.x, rifle.pos.y - hv.pos.y)).toBeLessThan(1); // (a tick behind: riders are hidden)
     // out of the zombies' reach (not in the squad hash) and not shooting
     expect(w.squadHash.query(hv.pos, 5).includes(rifle)).toBe(false);
     const z = w.spawnZombie('walker', { x: hv.pos.x + 8, y: hv.pos.y })!;
@@ -101,5 +101,59 @@ describe('the Humvee (STATUS #51, v4.77)', () => {
     w.events.on('shot', (e) => e.shooter === hv.id && shots++);
     run(w, 3);
     expect(shots).toBeGreaterThan(3);
+  });
+
+  it('drives like a car: no spinning on the spot, turns only while moving (round 17 #203)', () => {
+    const w = quiet();
+    const hv = w.spawnSquad('humvee', w.grid.nearestFree({ x: 150, y: 100 }));
+    hv.facing = 0;
+    // a destination right behind it
+    const dest = w.grid.nearestFree({ x: hv.pos.x - 40, y: hv.pos.y });
+    w.issueOrder([hv], { type: 'move', pos: dest });
+    let maxTurnStill = 0;
+    let prev = hv.facing;
+    let arrived = false;
+    for (let i = 0; i < 30 * 30 && !arrived; i++) {
+      const p0 = { ...hv.pos };
+      w.step(1 / 30);
+      const moved = Math.hypot(hv.pos.x - p0.x, hv.pos.y - p0.y);
+      const turn = Math.abs(Math.atan2(Math.sin(hv.facing - prev), Math.cos(hv.facing - prev)));
+      if (moved < 0.005) maxTurnStill = Math.max(maxTurnStill, turn);
+      // never faster than its speed allows on a 6 m turning circle (plus slack for a tick)
+      expect(turn).toBeLessThanOrEqual(Math.min(1.5, (moved * 30) / 6) / 30 + 1e-6);
+      prev = hv.facing;
+      arrived = !hv.currentOrder;
+    }
+    expect(arrived).toBe(true);
+    expect(maxTurnStill).toBeLessThan(0.001); // (creeping a few millimetres turns it a hair, as its turning circle allows)
+    expect(Math.hypot(hv.pos.x - dest.x, hv.pos.y - dest.y)).toBeLessThan(4);
+  });
+
+  it("infantry can't push it; it moves them aside (round 17 #204)", () => {
+    const w = quiet();
+    const rifle = w.squads.find((s) => s.def.id === 'rifle')!;
+    const hv = w.spawnSquad('humvee', w.grid.nearestFree({ x: rifle.pos.x + 2, y: rifle.pos.y }));
+    w.issueOrder([hv], { type: 'hold', pos: { ...hv.pos } });
+    w.issueOrder([rifle], { type: 'hold', pos: { ...rifle.pos } });
+    const h0 = { ...hv.pos }, r0 = { ...rifle.pos };
+    run(w, 2);
+    expect(Math.hypot(hv.pos.x - h0.x, hv.pos.y - h0.y)).toBeLessThan(0.01);
+    expect(Math.hypot(rifle.pos.x - r0.x, rifle.pos.y - r0.y)).toBeGreaterThan(0.5);
+  });
+
+  it('routes keep off lamp posts, and it never drives through one (round 17 #208)', () => {
+    const w = quiet();
+    const posts = w.lampPosts();
+    expect(posts.length).toBeGreaterThan(10);
+    // drive the length of a street lined with posts
+    const p = posts[Math.floor(posts.length / 2)];
+    const hv = w.spawnSquad('humvee', w.grid.nearestFree({ x: p.x - 30, y: p.y }));
+    w.issueOrder([hv], { type: 'move', pos: w.grid.nearestFree({ x: p.x + 30, y: p.y }) });
+    let closest = Infinity;
+    for (let i = 0; i < 30 * 25 && hv.currentOrder; i++) {
+      w.step(1 / 30);
+      for (const q of posts) closest = Math.min(closest, Math.hypot(hv.pos.x - q.x, hv.pos.y - q.y));
+    }
+    expect(closest).toBeGreaterThan(1.3); // its body (1.3 m) never overlaps a post
   });
 });

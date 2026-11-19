@@ -3,6 +3,7 @@ import { Rng } from '../core/rng';
 import { inRect, type Vec2 } from '../core/math';
 import { BALANCE, DIFFICULTY, HORDE, type DifficultyTier } from '../config/balance';
 import { STRUCTURES, UNITS, ZOMBIES } from '../config/units';
+import { scatterDecor, type DecorPlacement } from './decor';
 import { buildStarterMap, type BuildingDef, type CityMap, type DistrictDef } from './map';
 import { NavGrid } from './grid';
 import { FlowFields } from './flowfield';
@@ -119,6 +120,28 @@ export class World {
     for (const d of this.map.districts) if (d.locked && d.borders) Campaign.setBorder(this, d, true);
 
     if (opts.populate !== false) Campaign.populate(this);
+  }
+
+  // ---------- street furniture (round 17 #208) ----------
+
+  private decorCache: DecorPlacement[] | null = null;
+  /** Street furniture and greenery (sim/decor.ts), worked out once; the renderer draws this same list. */
+  decor(): DecorPlacement[] {
+    return (this.decorCache ??= scatterDecor(this.map, this.grid));
+  }
+  private posts: Vec2[] | null = null;
+  /** Lamp posts: vehicles steer around them (armored ones will knock them over, later). */
+  lampPosts(): Vec2[] {
+    return (this.posts ??= this.decor().filter((d) => d.kind === 'streetlight').map((d) => ({ x: d.x, y: d.z })));
+  }
+  private vHazard: { version: number; nav: number; cells: Uint8Array } | null = null;
+  /** Route costs for vehicles: the toxic clouds everyone avoids, plus every cell with a lamp post. */
+  vehicleHazard(): Uint8Array {
+    if (this.vHazard && this.vHazard.version === this.hazardVersion) return this.vHazard.cells;
+    const cells = Uint8Array.from(this.hazard);
+    for (const p of this.lampPosts()) cells[this.grid.c(p.y) * this.grid.width + this.grid.c(p.x)] = 1;
+    this.vHazard = { version: this.hazardVersion, nav: this.navVersion, cells };
+    return cells;
   }
 
   // ---------- setup ----------

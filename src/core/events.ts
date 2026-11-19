@@ -16,6 +16,8 @@ export interface GameEvents {
   /** STATUS #51: a squad climbed into / out of a vehicle (`bailOut`: the vehicle was destroyed). */
   squadBoarded: { vehicleId: number; squadId: number };
   squadUnloaded: { vehicleId: number; squadId: number; bailOut: boolean };
+  /** Round 17 #207: a vehicle was sent somewhere (its drive-off sound). */
+  vehicleOrdered: { id: number; pos: Vec2 };
   memberKilled: { squadId: number; squadName: string; pos: Vec2; facing: number; unitId: string; low?: boolean; member?: number };
   squadWiped: { squadId: number; squadName: string };
   zombieKilled: { id: number; defId: string; pos: Vec2; facing: number; districtId: string | null };

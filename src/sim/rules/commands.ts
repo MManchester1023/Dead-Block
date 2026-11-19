@@ -40,6 +40,9 @@ export function formationSlots(n: number, shape: FormationShape, width?: number)
 }
 
 export function issueOrder(w: World, squads: Squad[], order: Order, queue = false, formation?: Formation): void {
+  // round 17 #207: a vehicle told where to go revs off (a sound cue; once per order)
+  if (['move', 'attackMove', 'attack', 'patrol'].includes(order.type))
+    for (const s of squads) if (s.def.category === 'vehicle') w.events.emit('vehicleOrdered', { id: s.id, pos: { ...s.pos } });
   for (const s of squads) {
     if (!queue) {
       s.autoCrouch = false;

@@ -17,9 +17,18 @@ interface Job {
   tris: number;
   /** Only this node (and what's under it), e.g. one building out of a pack. */
   node?: string;
+  /**
+   * Round 17 #202: split a model into pieces that still line up: `only` keeps one part (e.g. a turret),
+   * `exclude` leaves it out, and both are placed and scaled by the WHOLE model. `pivot` then centres the
+   * piece on its own middle (x/z) and reports where that middle sits in the whole model.
+   */
+  only?: string;
+  exclude?: string;
+  /** true: the piece's own middle; a part name: that part's middle (e.g. a turret's ring). */
+  pivot?: boolean | string;
 }
 
-async function exportProp(job: Job): Promise<{ b64: string; tris: number; srcTris: number; size: number[] }> {
+async function exportProp(job: Job): Promise<{ b64: string; tris: number; srcTris: number; size: number[]; pivot?: number[] }> {
   await MeshoptSimplifier.ready;
   const root = (await new GLTFLoader().loadAsync(job.url)).scene;
   root.updateMatrixWorld(true);
@@ -29,9 +38,17 @@ async function exportProp(job: Job): Promise<{ b64: string; tris: number; srcTri
   const col: number[] = [];
   const v = new THREE.Vector3();
   const c = new THREE.Color();
-  pick.traverse((o) => {
+  const only = job.only ? root.getObjectByName(job.only) : null;
+  const exclude = job.exclude ? root.getObjectByName(job.exclude) : null;
+  if ((job.only && !only) || (job.exclude && !exclude)) throw new Error(`no node ${job.only ?? job.exclude}`);
+  const under = (o: THREE.Object3D, n: THREE.Object3D) => {
+    for (let p: THREE.Object3D | null = o; p; p = p.parent) if (p === n) return true;
+    return false;
+  };
+  (only ?? pick).traverse((o) => {
     const m = o as THREE.Mesh;
     if (!m.isMesh) return;
+    if (exclude && under(m, exclude)) return;
     const g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry;
     const mat = (Array.isArray(m.material) ? m.material[0] : m.material) as THREE.MeshStandardMaterial;
     const sample = mat.map ? texSampler(mat.map) : null;
@@ -50,17 +67,34 @@ async function exportProp(job: Job): Promise<{ b64: string; tris: number; srcTri
   let g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  g.computeBoundingBox();
-  let size = g.boundingBox!.getSize(new THREE.Vector3());
+  // placement and size come from the whole model (or the picked node), not just this piece
+  const ref = new THREE.Box3().setFromObject(pick, true);
+  let size = ref.getSize(new THREE.Vector3());
   // long side along the footprint's long side
-  if ((size.x < size.z) !== (job.w < job.d)) g.rotateY(Math.PI / 2);
-  g.computeBoundingBox();
-  const bb = g.boundingBox!;
+  const turn = (size.x < size.z) !== (job.w < job.d);
+  if (turn) g.rotateY(Math.PI / 2);
+  // the same turn applied to the reference box: x' = z, z' = -x
+  const bb = turn ? new THREE.Box3(new THREE.Vector3(ref.min.z, ref.min.y, -ref.max.x), new THREE.Vector3(ref.max.z, ref.max.y, -ref.min.x)) : ref;
   size = bb.getSize(new THREE.Vector3());
   const ctr = bb.getCenter(new THREE.Vector3());
   g.translate(-ctr.x, -bb.min.y, -ctr.z);
   const s = Math.min(job.w / size.x, job.d / size.z);
   g.scale(s, s, s);
+  let pivot: number[] | undefined;
+  if (job.pivot) {
+    g.computeBoundingBox();
+    let pc = g.boundingBox!.getCenter(new THREE.Vector3());
+    if (typeof job.pivot === 'string') {
+      // that part's middle, put through the same turn / move / scale as the model
+      const part = root.getObjectByName(job.pivot);
+      if (!part) throw new Error(`no node ${job.pivot}`);
+      const c0 = new THREE.Box3().setFromObject(part, true).getCenter(new THREE.Vector3());
+      const x = turn ? c0.z : c0.x, z = turn ? -c0.x : c0.z;
+      pc = new THREE.Vector3((x - ctr.x) * s, 0, (z - ctr.z) * s);
+    }
+    pivot = [+pc.x.toFixed(3), +pc.z.toFixed(3)];
+    g.translate(-pc.x, 0, -pc.z);
+  }
   const welded = mergeVertices(g, 1e-4);
   const idx = new Uint32Array(welded.index!.array);
   const [simple] = MeshoptSimplifier.simplify(idx, welded.attributes.position.array as Float32Array, 3, Math.min(idx.length, job.tris * 3), 0.02);
@@ -93,7 +127,7 @@ async function exportProp(job: Job): Promise<{ b64: string; tris: number; srcTri
   const bytes = new Uint8Array(glb);
   let bin = '';
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return { b64: btoa(bin), tris: simple.length / 3, srcTris, size: g.boundingBox!.getSize(new THREE.Vector3()).toArray().map((x) => +x.toFixed(2)) };
+  return { b64: btoa(bin), tris: simple.length / 3, srcTris, size: g.boundingBox!.getSize(new THREE.Vector3()).toArray().map((x) => +x.toFixed(2)) , pivot };
 }
 
 (window as unknown as Record<string, unknown>).exportProp = exportProp;

@@ -89,5 +89,8 @@
   },
   "humvee": {
     "url": "props/humvee.glb"
+  },
+  "humveeTurret": {
+    "url": "props/humvee_turret.glb"
   }
 }

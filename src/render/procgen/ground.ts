@@ -22,6 +22,8 @@ const LAWN: [number, number, number] = [86, 112, 54];
 /** What every chunk of a map shares: lawn cells, the scatter of tufts, road intersections (computed once). */
 interface GroundShared {
   lawnCells: Set<number>;
+  /** Round 17 #205: the ground to paint under a (non-house) building's cells. */
+  underTile: Map<number, number>;
   tufts: { x: number; y: number; w: number; h: number; color: string }[];
   intersections: Rect[];
 }
@@ -30,8 +32,27 @@ function sharedFor(map: CityMap): GroundShared {
   let s = shared.get(map);
   if (s) return s;
   const lawnCells = new Set<number>();
-  for (const b of map.buildings)
-    if (b.kind === 'houses') for (let y = b.cells.y; y < b.cells.y + b.cells.h; y++) for (let x = b.cells.x; x < b.cells.x + b.cells.w; x++) lawnCells.add(y * map.cols + x);
+  // round 17 #205: other buildings' footprints take the ground that's most common around them (they're often
+  // smaller than their cells, and the flat grey under them showed as a band)
+  const underTile = new Map<number, number>();
+  for (const b of map.buildings) {
+    const c = b.cells;
+    if (b.kind === 'houses') {
+      for (let y = c.y; y < c.y + c.h; y++) for (let x = c.x; x < c.x + c.w; x++) lawnCells.add(y * map.cols + x);
+      continue;
+    }
+    const count = new Map<number, number>();
+    for (let y = c.y - 1; y <= c.y + c.h; y++)
+      for (let x = c.x - 1; x <= c.x + c.w; x++) {
+        if (x >= c.x && x < c.x + c.w && y >= c.y && y < c.y + c.h) continue; // the ring just outside
+        if (x < 0 || y < 0 || x >= map.cols || y >= map.rows) continue;
+        const t = map.tiles[y * map.cols + x];
+        if (t === Tile.Building || t === Tile.Road || t === Tile.Rail) continue;
+        count.set(t, (count.get(t) ?? 0) + 1);
+      }
+    const best = [...count].sort((a, b) => b[1] - a[1])[0]?.[0] ?? Tile.Dirt;
+    for (let y = c.y; y < c.y + c.h; y++) for (let x = c.x; x < c.x + c.w; x++) underTile.set(y * map.cols + x, best);
+  }
   // grass tufts and dirt patches, scattered over the whole map once (each chunk draws the ones in it)
   const rng = new Rng(4242);
   const tufts: GroundShared['tufts'] = [];
@@ -45,7 +66,7 @@ function sharedFor(map: CityMap): GroundShared {
     const t = map.tiles[Math.min(map.rows - 1, Math.floor(y / map.cell)) * map.cols + Math.min(map.cols - 1, Math.floor(x / map.cell))];
     if (t === Tile.Grass || t === Tile.Dirt) tufts.push({ x, y, w, h, color });
   }
-  s = { lawnCells, tufts, intersections: findIntersections(map.roads) };
+  s = { lawnCells, underTile, tufts, intersections: findIntersections(map.roads) };
   shared.set(map, s);
   return s;
 }
@@ -75,7 +96,7 @@ export function groundJob(map: CityMap, win: Rect, P = GROUND_PX): { canvas: HTM
   canvas.width = W;
   canvas.height = H;
   const g = canvas.getContext('2d')!;
-  const { lawnCells, tufts, intersections } = sharedFor(map);
+  const { lawnCells, underTile, tufts, intersections } = sharedFor(map);
 
   // 1) per-pixel base colour from the tile map, with noise (row by row, resumable)
   const img = g.createImageData(W, H);
@@ -89,7 +110,8 @@ export function groundJob(map: CityMap, win: Rect, P = GROUND_PX): { canvas: HTM
         const wxp = win.x + px / P;
         const cx = Math.max(0, Math.min(map.cols - 1, Math.floor(wxp / map.cell)));
         const ci = cy * map.cols + cx;
-        const t = map.tiles[ci];
+        const t0 = map.tiles[ci];
+        const t = t0 === Tile.Building ? (underTile.get(ci) ?? t0) : t0;
         let [r, gg, b] = lawnCells.has(ci) ? LAWN : TILE_COLORS[t] ?? [90, 90, 90];
         if ((t === Tile.Grass || t === Tile.Dirt) && !lawnCells.has(ci)) {
           // organic scrub: blend dirt↔grass with smooth noise instead of 3 m tile squares

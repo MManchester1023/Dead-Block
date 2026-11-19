@@ -13,6 +13,36 @@ export interface WeaponDef {
 
 export type UnitCategory = 'infantry' | 'vehicle' | 'helicopter' | 'support' | 'civilian';
 
+/**
+ * Vehicle classes (round 17, owner: "the start of a vehicles class", like zombies' normal / medium / boss).
+ * Every vehicle drives like a car (it turns only while moving, around a turning circle, and backs up when a
+ * turn is too tight) with its class's handling; a vehicle can override any of it (`handling`).
+ *   light   (Humvee, supply truck): quick, nimble, steers around lamp posts, trees and cars.
+ *   armored (LAV, tank; later): slower, wider, and `crushes`: knocks over lamp posts and trees, flattens cars.
+ */
+export type VehicleClass = 'light' | 'armored';
+export interface VehicleHandling {
+  /** Metres: the tightest circle it can drive. */
+  turnRadius: number;
+  /** m/s²: speeding up / braking. */
+  accel: number;
+  brake: number;
+  /** m/s when backing up. */
+  reverseSpeed: number;
+  /** Collision radius (m) against walls and posts. */
+  body: number;
+  /** Knocks over lamp posts and trees and flattens cars instead of going round (armored; not built yet). */
+  crushes: boolean;
+}
+export const VEHICLE_CLASSES: Record<VehicleClass, VehicleHandling> = {
+  light: { turnRadius: 6, accel: 7, brake: 12, reverseSpeed: 3, body: 1.3, crushes: false },
+  armored: { turnRadius: 7.5, accel: 4, brake: 8, reverseSpeed: 2.5, body: 1.8, crushes: true },
+};
+/** A vehicle's handling: its class, with its own overrides. */
+export function vehicleHandling(def: UnitDef): VehicleHandling {
+  return { ...VEHICLE_CLASSES[def.vehicleClass ?? 'light'], ...def.handling };
+}
+
 export interface UnitDef {
   id: string;
   name: string;
@@ -35,6 +65,9 @@ export interface UnitDef {
   abilities?: string[];
   /** Vehicles that carry a squad (STATUS #51): how many soldiers fit. */
   seats?: number;
+  /** Vehicles (round 17): which class it drives like, and anything it does differently. */
+  vehicleClass?: VehicleClass;
+  handling?: Partial<VehicleHandling>;
   tags?: string[];
 }
 
@@ -78,10 +111,10 @@ export const UNITS: Record<string, UnitDef> = {
   mortar: { id: 'mortar', name: 'Mortar Team', category: 'infantry', members: 3, memberHp: 38, speed: 4.8, weapon: { name: '81mm mortar', range: 52, damage: 40, cooldown: 4, accuracy: 0.6, type: 'explosive', loudness: 6 }, cost: { money: 150, supplies: 40 }, upkeep: 6, command: 3, buildTime: 20, producedAt: 'armory', requires: 'artillery', unlock: 'Harbor power / Armory Lv2' },
   // STATUS #51 (owner): the Humvee, made at the Vehicle Bay: the MG emplacement's gun on a turret that turns all
   // the way round, and room for one squad of up to 5 (an Elite rifle squad). Was the "Gun Jeep" placeholder.
-  humvee: { id: 'humvee', name: 'Humvee', category: 'vehicle', members: 1, memberHp: 420, speed: 12, weapon: { name: 'Mounted HMG', range: 35, damage: 12, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 }, cost: { money: 160, supplies: 40 }, upkeep: 6, command: 3, buildTime: 20, producedAt: 'vehicleBay', unlock: 'Build a Vehicle Bay', seats: 5, tags: ['transport'] },
-  supplyTruck: { id: 'supplyTruck', name: 'Supply Truck', category: 'vehicle', members: 1, memberHp: 260, speed: 11, weapon: { name: 'None', range: 0, damage: 0, cooldown: 99, accuracy: 0, type: 'bullet', loudness: 0 }, cost: { money: 120, supplies: 30 }, upkeep: 4, command: 2, buildTime: 18, producedAt: 'armorStation', requires: 'outpostResupply', unlock: 'Industrial Park power', tags: ['resupply'] },
-  lav: { id: 'lav', name: 'LAV', category: 'vehicle', members: 1, memberHp: 480, speed: 10, weapon: { name: '25mm autocannon', range: 26, damage: 22, cooldown: 0.5, accuracy: 0.7, type: 'explosive', loudness: 5 }, cost: { money: 260, supplies: 60 }, upkeep: 8, command: 4, buildTime: 28, producedAt: 'armorStation', requires: 'vehicles', unlock: 'Stadium power / Armor Station Lv2' },
-  tank: { id: 'tank', name: 'Battle Tank', category: 'vehicle', members: 1, memberHp: 900, speed: 7.6, weapon: { name: '120mm main gun', range: 32, damage: 120, cooldown: 3.5, accuracy: 0.85, type: 'explosive', loudness: 9 }, cost: { money: 420, supplies: 90 }, upkeep: 12, command: 6, buildTime: 40, producedAt: 'armorStation', requires: 'vehicles', unlock: 'Stadium power / Armor Station Lv2', tags: ['crushesCars', 'damagesBuildings'] },
+  humvee: { id: 'humvee', name: 'Humvee', category: 'vehicle', members: 1, memberHp: 420, speed: 12, weapon: { name: 'Mounted HMG', range: 35, damage: 12, cooldown: 0.2, accuracy: 0.6, type: 'bullet', loudness: 3.2 }, cost: { money: 160, supplies: 40 }, upkeep: 6, command: 3, buildTime: 20, producedAt: 'vehicleBay', unlock: 'Build a Vehicle Bay', seats: 5, vehicleClass: 'light', tags: ['transport'] },
+  supplyTruck: { id: 'supplyTruck', name: 'Supply Truck', category: 'vehicle', vehicleClass: 'light', members: 1, memberHp: 260, speed: 11, weapon: { name: 'None', range: 0, damage: 0, cooldown: 99, accuracy: 0, type: 'bullet', loudness: 0 }, cost: { money: 120, supplies: 30 }, upkeep: 4, command: 2, buildTime: 18, producedAt: 'armorStation', requires: 'outpostResupply', unlock: 'Industrial Park power', tags: ['resupply'] },
+  lav: { id: 'lav', name: 'LAV', category: 'vehicle', vehicleClass: 'armored', members: 1, memberHp: 480, speed: 10, weapon: { name: '25mm autocannon', range: 26, damage: 22, cooldown: 0.5, accuracy: 0.7, type: 'explosive', loudness: 5 }, cost: { money: 260, supplies: 60 }, upkeep: 8, command: 4, buildTime: 28, producedAt: 'armorStation', requires: 'vehicles', unlock: 'Stadium power / Armor Station Lv2' },
+  tank: { id: 'tank', name: 'Battle Tank', category: 'vehicle', vehicleClass: 'armored', members: 1, memberHp: 900, speed: 7.6, weapon: { name: '120mm main gun', range: 32, damage: 120, cooldown: 3.5, accuracy: 0.85, type: 'explosive', loudness: 9 }, cost: { money: 420, supplies: 90 }, upkeep: 12, command: 6, buildTime: 40, producedAt: 'armorStation', requires: 'vehicles', unlock: 'Stadium power / Armor Station Lv2', tags: ['crushesCars', 'damagesBuildings'] },
   howitzer: { id: 'howitzer', name: 'SP Howitzer (candidate)', category: 'vehicle', members: 1, memberHp: 600, speed: 6.8, weapon: { name: '155mm howitzer', range: 120, damage: 150, cooldown: 7, accuracy: 0.5, type: 'explosive', loudness: 10 }, cost: { money: 480, supplies: 100 }, upkeep: 12, command: 6, buildTime: 45, producedAt: 'armorStation', requires: 'artillery', unlock: 'Stadium power (proposed)', abilities: ['strikePatterns'] },
   hawk: { id: 'hawk', name: 'Hawk Helicopter', category: 'helicopter', members: 1, memberHp: 500, speed: 20, weapon: { name: 'Door miniguns', range: 22, damage: 6, cooldown: 0.08, accuracy: 0.5, type: 'bullet', loudness: 7 }, cost: { money: 400, supplies: 80 }, upkeep: 10, command: 5, buildTime: 40, producedAt: 'airfield', requires: 'airfield', unlock: 'Airport power', abilities: ['transport8', 'rappel'] },
   sparrow: { id: 'sparrow', name: 'Sparrow light helo', category: 'helicopter', members: 1, memberHp: 300, speed: 26, weapon: { name: 'Miniguns', range: 20, damage: 6, cooldown: 0.07, accuracy: 0.5, type: 'bullet', loudness: 6 }, cost: { money: 300, supplies: 60 }, upkeep: 8, command: 4, buildTime: 32, producedAt: 'airfield', requires: 'airfield', unlock: 'Airport power', abilities: ['transport4'] },

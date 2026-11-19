@@ -3,7 +3,7 @@ import type { Rect } from '../core/math';
 import type { BuildingDef, PropDef } from '../sim/map';
 import { groundJob, GROUND_PX } from './procgen/ground';
 import { buildCity } from './procgen/buildings';
-import { drawDecor, makeCar, scatterDecor, makePumpIsland, drawCanopy, makeBorder, type DecorPlacement } from './procgen/props';
+import { drawDecor, makeCar, makePumpIsland, drawCanopy, makeBorder, type DecorPlacement } from './procgen/props';
 import { Batch } from './procgen/batch';
 import { models } from './ModelLibrary';
 import { PAL } from './palette';
@@ -21,6 +21,7 @@ function variants(base: string): string[] {
   return v;
 }
 const carKinds = () => variants('car');
+const UP = new THREE.Vector3(0, 1, 0);
 
 /** Round 16 #193: the car pack's colours toned down (share of grey mixed in, then brightness). */
 const CAR_TONE = { desaturate: 0.3, brightness: 0.85 };
@@ -111,7 +112,7 @@ export class CityLayer {
       }
     const chunkAt = (x: number, y: number) => this.chunks[Math.min(ny - 1, Math.max(0, Math.floor(y / CHUNK))) * nx + Math.min(nx - 1, Math.max(0, Math.floor(x / CHUNK)))];
     for (const b of m.buildings) chunkAt(b.rect.x + b.rect.w / 2, b.rect.y + b.rect.h / 2).buildings.push(b);
-    for (const d of scatterDecor(m, world.grid)) chunkAt(d.x, d.z).decor.push(d);
+    for (const d of world.decor()) chunkAt(d.x, d.z).decor.push(d); // (round 17: the same list the sim uses for lamp posts)
     for (const p of m.props) chunkAt(p.pos.x, p.pos.y).props.push(p);
     for (const r of m.canopies) chunkAt(r.x + r.w / 2, r.y + r.h / 2).canopies.push(r);
 
@@ -225,14 +226,14 @@ export class CityLayer {
     const m = world.map;
     const grp = new THREE.Group();
     const treeKinds = variants('tree');
+    // round 17 #209: trees and shrubs are drawn in batches (one draw per model per chunk, not one per tree)
+    const batches = new Map<string, THREE.Matrix4[]>();
+    const place = (key: string, x: number, z: number, rotY: number, scale: number) => {
+      const m = new THREE.Matrix4().compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion().setFromAxisAngle(UP, rotY), new THREE.Vector3(scale, scale, scale));
+      (batches.get(key) ?? batches.set(key, []).get(key)!).push(m);
+    };
     const plant = (x: number, z: number, scale: number, seed: number) => {
-      const t = models.instance(treeKinds[Math.abs(seed) % treeKinds.length]);
-      if (!t) return;
-      t.position.set(x, 0, z);
-      t.rotation.y += (seed % 628) / 100;
-      t.scale.multiplyScalar(scale);
-      t.userData.shared = true;
-      grp.add(t);
+      if (treeKinds.length) place(treeKinds[Math.abs(seed) % treeKinds.length], x, z, (seed % 628) / 100, scale);
     };
     buildCity(
       m,
@@ -268,6 +269,10 @@ export class CityLayer {
       // v4.58: trees and shrubs from the owner's tree packs (tree1…, shrub1…), one per spot by its seed;
       // v4.59: palms too (the packs have none), so no procedural tree is left once the models load
       const vs = variants(d.kind === 'palm' ? 'tree' : d.kind);
+      if ((d.kind === 'tree' || d.kind === 'palm' || d.kind === 'shrub') && vs.length) {
+        place(vs[Math.abs(d.seed) % vs.length], d.x, d.z, -d.ry, d.scale);
+        continue;
+      }
       const model = models.instance(vs.length ? vs[Math.abs(d.seed) % vs.length] : d.kind);
       if (model) {
         model.position.set(d.x, 0, d.z);
@@ -278,6 +283,23 @@ export class CityLayer {
       } else drawDecor(decor, d);
     }
     if (c.decor.length) grp.add(decor.build());
+    for (const [key, mats] of batches) {
+      const proto = models.instance(key);
+      if (!proto) continue;
+      proto.updateMatrixWorld(true);
+      proto.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const inst = new THREE.InstancedMesh(mesh.geometry, mesh.material, mats.length);
+        const rel = mesh.matrixWorld;
+        mats.forEach((m, i) => inst.setMatrixAt(i, new THREE.Matrix4().multiplyMatrices(m, rel)));
+        inst.instanceMatrix.needsUpdate = true;
+        inst.computeBoundingSphere();
+        inst.castShadow = inst.receiveShadow = true;
+        inst.userData.instancedShared = true; // geometry and materials belong to the model library
+        grp.add(inst);
+      });
+    }
     for (const r of c.canopies) {
       const cb = new Batch();
       drawCanopy(cb, r);
@@ -310,7 +332,10 @@ export class CityLayer {
   private dropContent(c: Chunk): void {
     if (!c.content) return;
     this.ctx.scene.remove(c.content);
-    c.content.traverse((o) => {
+    // free what this chunk made itself; never the model library's shared geometry and materials (round 17:
+    // a shared model's children used to be freed too, which cost a re-upload when another chunk drew them)
+    const free = (o: THREE.Object3D) => {
+      if (o.userData.instancedShared) return void (o as THREE.InstancedMesh).dispose();
       if (o.userData.shared) return;
       const mesh = o as THREE.Mesh;
       if (mesh.isMesh) {
@@ -318,7 +343,9 @@ export class CityLayer {
         const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
         for (const mt of mats) mt.dispose();
       }
-    });
+      for (const ch of o.children) free(ch);
+    };
+    free(c.content);
     c.content = null;
     c.occluders = [];
   }
