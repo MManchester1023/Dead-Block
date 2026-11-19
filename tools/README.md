@@ -30,6 +30,7 @@ Slow runs that print results instead of passing or failing. Not part of `npm tes
 | `round13.cjs` | Round 13 in the real game: squad labels hidden until hovered, MG nests turned to their aim |
 | `perf.cjs [zombies] [seconds]` | STATUS #47: a busy scene (a crowd closing on a squad) with the CPU profiler on: the game's own readout (sim / scene / draw / HUD per frame), draw calls, triangles, the hottest functions. No GPU here, so draw and FPS aren't representative |
 | `graphics.cjs` | Settings → performance readout and graphics quality (High/Medium/Low change pixel ratio, shadow map, zombie shadows; both survive a reload) |
+| `round15.cjs` | Round 15 quick fixes (v4.71): no hive stage on the HUD, muzzle flashes drawn for at least two frames, explosion flashes, finished effects freeing their GPU memory |
 | `balance.cjs` | Difficulty tuning (`dev-balance.html`, v4.68): groups and region estimates shown, edits highlighted, Save stores them, Download gives balance.json, the game starts with the tuned values and says so, Reset clears |
 | `mapeditor.cjs` | Map editor (`dev-map.html`): no problems in the starter map, Save with no edits gives exactly the repo file, dragging moves a building, Play starts the game on the edit |
 | `chunks.cjs` | City streaming on a 1.8 km test map (100 chunks): only chunks near the camera are built, memory stays within budget while crossing the map, the ops map uses low detail |

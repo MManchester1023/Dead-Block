@@ -20,12 +20,12 @@ export class Effects {
   private tracerPos = new Float32Array(1024 * 6);
   private activeSprays = 0;
   /** Round 11 #127: muzzle flashes, two pooled point clouds (rifles/carbines, and big guns). Real time. */
-  private flashes: { p: Vec2; life: number; big: boolean }[] = [];
+  private flashes: { p: Vec2; life: number; big: boolean; shown: number }[] = [];
   private flashSets = [false, true].map((big) => {
     const pos = new Float32Array(512 * 3);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ map: flashTexture(), size: big ? 2.4 : 1.4, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, color: 0xffd890 }));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ map: flashTexture(), size: big ? 3.4 : 2.1, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, color: 0xffd890 }));
     pts.frustumCulled = false;
     pts.renderOrder = 3;
     return { big, pos, geo, pts };
@@ -45,7 +45,9 @@ export class Effects {
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const l = Math.hypot(dx, dy) || 1;
-    this.flashes.push({ p: { x: from.x + (dx / l) * 0.75, y: from.y + (dy / l) * 0.75 }, life: big ? 0.07 : 0.05, big });
+    // round 15 #188: bigger, a little longer, and always drawn for at least two frames (a 0.05 s flash timed in
+    // real time could fall between frames entirely when the frame rate dips)
+    this.flashes.push({ p: { x: from.x + (dx / l) * 0.75, y: from.y + (dy / l) * 0.75 }, life: big ? 0.1 : 0.08, big, shown: 0 });
   }
 
   tracer(from: Vec2, to: Vec2, heavy: boolean): void {
@@ -58,6 +60,24 @@ export class Effects {
   }
 
   explosion(p: Vec2, r: number, color: number): void {
+    // round 15 #188: a bright flash at the blast (a sprite, and a glow on the ground) for the first instant.
+    // No real light: every extra light costs every lit pixel every frame, explosion or not.
+    const flash = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTexture(), color: 0xfff2c8, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    flash.position.set(p.x, 1.6, p.y);
+    flash.renderOrder = 6;
+    this.add(flash, 0.16, (_t, fx) => {
+      const k = 1 - fx.life / fx.max;
+      flash.scale.setScalar(r * (2.6 + k * 2.2));
+      flash.material.opacity = 1 - k * k;
+    });
+    const glow = new THREE.Mesh(new THREE.CircleGeometry(1, 16), new THREE.MeshBasicMaterial({ color: 0xffb860, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    glow.rotation.x = -Math.PI / 2;
+    glow.position.set(p.x, 0.08, p.y);
+    this.add(glow, 0.3, (_t, fx) => {
+      const k = 1 - fx.life / fx.max;
+      glow.scale.setScalar(r * (1.4 + k));
+      (glow.material as THREE.MeshBasicMaterial).opacity = 0.85 * (1 - k);
+    });
     const m = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false }));
     m.position.set(p.x, 1.2, p.y);
     this.add(m, 0.45, (t, fx) => {
@@ -196,7 +216,7 @@ export class Effects {
     for (const set of this.flashSets) {
       let k = 0;
       for (const fl of this.flashes) {
-        if (fl.big !== set.big || fl.life <= 0 || k >= 512) continue;
+        if (fl.big !== set.big || (fl.life <= 0 && fl.shown >= 2) || k >= 512) continue;
         set.pos[k * 3] = fl.p.x;
         set.pos[k * 3 + 1] = 1.25;
         set.pos[k * 3 + 2] = fl.p.y;
@@ -205,14 +225,24 @@ export class Effects {
       set.geo.setDrawRange(0, k);
       (set.geo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
     }
-    for (const fl of this.flashes) fl.life -= realDt;
-    this.flashes = this.flashes.filter((fl) => fl.life > 0);
+    for (const fl of this.flashes) (fl.life -= realDt), fl.shown++;
+    this.flashes = this.flashes.filter((fl) => fl.life > 0 || fl.shown < 2);
 
     for (const f of this.fx) {
       f.life -= simDt > 0 ? simDt : 0;
       f.update(time, f);
     }
-    for (const f of this.fx) if (f.life <= 0) this.scene.remove(f.obj);
+    for (const f of this.fx)
+      if (f.life <= 0) {
+        this.scene.remove(f.obj);
+        // round 15 (#47): free each finished effect's geometry and material (they're all made per effect;
+        // textures such as the shared flash glow are left alone), so long fights don't pile up GPU memory
+        f.obj.traverse((o) => {
+          const m = o as THREE.Mesh;
+          m.geometry?.dispose();
+          for (const mat of ([] as THREE.Material[]).concat((m.material as THREE.Material | THREE.Material[] | undefined) ?? [])) mat.dispose();
+        });
+      }
     this.fx = this.fx.filter((f) => f.life > 0);
   }
 }

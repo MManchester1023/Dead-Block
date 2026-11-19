@@ -63,12 +63,18 @@ export function streetlight(B: Batch, x: number, z: number, ry: number): void {
   B.box(0.7, 0.05, 0.3, 0xe8e0b0, x + ax * 2.2, 7.2, z + az * 2.2, -ry);
 }
 
+/** Round 15 #189: a square of soil with a low kerb, for a street tree that has no grass to stand in. */
+function treePit(B: Batch, x: number, z: number): void {
+  B.box(1.7, 0.07, 1.7, 0x8e8a80, x, 0.035, z);
+  B.box(1.35, 0.09, 1.35, 0x4a3a2a, x, 0.045, z);
+}
+
 function hydrant(B: Batch, x: number, z: number): void {
   B.cyl(0.15, 0.18, 0.7, 6, 0xb0302a, x, 0.35, z);
   B.box(0.45, 0.12, 0.12, 0xb0302a, x, 0.45, z);
 }
 
-export type DecorKind = 'palm' | 'tree' | 'shrub' | 'streetlight' | 'hydrant';
+export type DecorKind = 'palm' | 'tree' | 'shrub' | 'streetlight' | 'hydrant' | 'pit';
 export interface DecorPlacement {
   kind: DecorKind;
   x: number;
@@ -85,6 +91,7 @@ export function drawDecor(B: Batch, p: DecorPlacement): void {
   else if (p.kind === 'tree') leafyTree(B, p.x, p.z, rng, p.scale);
   else if (p.kind === 'shrub') shrub(B, p.x, p.z, rng);
   else if (p.kind === 'streetlight') streetlight(B, p.x, p.z, p.ry);
+  else if (p.kind === 'pit') treePit(B, p.x, p.z);
   else hydrant(B, p.x, p.z);
 }
 
@@ -119,7 +126,19 @@ export function scatterDecor(map: CityMap, grid: NavGrid): DecorPlacement[] {
         if (inBase(x, y) || nearIntersection(x, y) || tile(x, y) !== Tile.Sidewalk || grid.isBlockedXY(x, y)) continue;
         const k = Math.round(s / 12);
         if (k % 2 === 0) put('streetlight', x, y, horiz ? (side < 0 ? Math.PI / 2 : -Math.PI / 2) : side < 0 ? 0 : Math.PI);
-        else if (rng.chance(0.75)) put('palm', x, y);
+        else if (rng.chance(0.75)) {
+          // round 15 #189: not out of the concrete: on the grass just past the sidewalk if there is some,
+          // otherwise in a tree pit
+          const out = side < 0 ? -map.cell : map.cell;
+          const gx = horiz ? x : x + out;
+          const gy = horiz ? y + out : y;
+          const g = tile(gx, gy);
+          if ((g === Tile.Grass || g === Tile.Dirt) && !grid.isBlockedXY(gx, gy)) put('palm', gx, gy);
+          else {
+            put('pit', x, y);
+            put('palm', x, y);
+          }
+        }
         if (rng.chance(0.08)) put('hydrant', x + 1.2, y + 0.6);
       }
     }

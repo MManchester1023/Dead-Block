@@ -44,7 +44,7 @@ const BUILD_MENU: { kind: 'structure' | 'tool'; id: string; name: string; key: s
   { kind: 'structure', id: 'guardTower', name: 'Guard Tower', key: 'V', icon: 'tower', tip: 'One squad mans it: +40% range, sees over cover', unlock: 'opens with Gas Station Strip' },
   { kind: 'structure', id: 'medBay', name: 'Med Bay', key: 'N', icon: 'med', tip: 'In the base; resting squads heal (needs power)', unlock: 'restore the Rail Siding power station' },
   { kind: 'structure', id: 'outpost', name: 'Outpost', key: 'O', icon: 'outpost', tip: 'Secures a district once its hives are dead and infestation is 2% or less' },
-  { kind: 'tool', id: 'charge', name: 'Demo Charge', key: 'C', icon: 'charge', tip: 'Click a hive: 3 s to plant, getting hit restarts it' },
+  { kind: 'tool', id: 'charge', name: 'Demo Charge', key: 'C', icon: 'charge', tip: `Click a hive: ${ABILITIES.demoCharge.plantTime} s to plant, getting hit restarts it` },
   { kind: 'tool', id: 'deconstruct', name: 'Deconstruct', key: 'X', icon: 'decon', tip: 'Take down something you built (full refund if unstarted, half if built)' },
 ];
 
@@ -473,7 +473,6 @@ export class Hud {
         <div class="row"><b class="dname" data-act="goto-district:${d.def.id}" title="Show on the map">${d.def.name}</b>${status}</div>
         <label>Infestation ${Math.ceil(d.infestation)}%${!d.secured && !hive.length ? ` · ${w.deadIn(d.def.id)} dead left` : ''}</label><div class="bar red"><i style="width:${d.infestation}%"></i></div>
         <label>Noise</label><div class="bar amber"><i style="width:${d.noise}%"></i></div>
-        ${hive.map((h) => `<div class="row small"><span>Hive stage ${h.stage}/4</span></div>`).join('')}
         ${(() => {
           const st = w.structures.find((x) => x.alive && x.def.restore && x.districtId === d.def.id);
           return st ? `<div class="row small"><span>Power station</span>${st.built ? '<span class="good">ONLINE</span>' : '<span class="bad">OFFLINE</span>'}</div>` : '';
