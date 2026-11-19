@@ -68,7 +68,8 @@ assets are free-licence downloads, credited in `CREDITS.md`.
 
 ## Checking work
 
-- `npm test` (~5 s, must pass) and `npx tsc --noEmit`. `npm run build` for the bundle (~11 MB).
+- `npm test` (~5 s, must pass) and `npx tsc --noEmit`. `npm run build` for the bundle (~11 MB). Vite 8 / Vitest 5 since v4.70.
+- Performance: Settings → Performance readout in the game; `node tools/browser/perf.cjs` profiles here (no GPU: CPU numbers only).
 - Changes that shouldn't alter behaviour: `TAG=before`/`TAG=after npm run probe -- simhash` (identical
   files), `tools/browser/screens.cjs` + `pngdiff.py`, `tools/browser/bakecheck.cjs --compare`.
 - Gameplay paths: `node tools/browser/smoke.cjs`. Balance bots (crude, only a sanity check; Mat judges difficulty): `npm run probe -- region1|region2|region3|roaming`.
