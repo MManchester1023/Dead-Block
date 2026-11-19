@@ -22,7 +22,7 @@ import type { Vec2 } from '../core/math';
  *   amb_suburb    suburban ambience bed (v4.38)
  *   radio_1–8     military radio chatter, cut from one recording at its pauses (v4.38)
  *   hive_death    a wet mud explosion when a hive is destroyed (v4.39, round 10 #110)
- *   plane_flyby   a jet passing overhead, timed to peak as the supply plane's shadow crosses the drop (v4.39, #113)
+ *   plane_flyby   a C-130 propeller plane passing overhead (round 16 #200; it was a jet), timed to peak as the supply plane's shadow crosses the drop
  *   parachute     the crate's chute opening (v4.39, #113)
  *   crate_land    the supply crate hitting the ground (v4.41, #113)
  *   mg_loop       the MG emplacement firing: a seamless 1.3 s stretch of a 50-cal burst, looped while it shoots (v4.55)
@@ -80,8 +80,9 @@ const MG_LOOP = 'mg_loop';
 const MG_VOLUME = 0.7;
 const MG_HOLD = 0.35;
 /** Orders that mean "engineers hammering away" once they're standing at the job. */
-/** Seconds into plane_flyby where the jet is loudest (directly overhead); crates fall for 6 s after that. */
-const FLYBY_PEAK = 11;
+/** Seconds into plane_flyby where the plane is loudest (directly overhead); crates fall for 6 s after that.
+ *  Round 16 #200: the C-130 recording peaks at 9–10.5 s. */
+const FLYBY_PEAK = 10;
 const CRATE_FALL_SEC = 6;
 const WORK_ORDERS = new Set(['build', 'repair', 'upgrade', 'deconstruct']);
 /** Radio traffic from these speakers gets a burst of chatter (squads' own lines don't). */

@@ -91,7 +91,8 @@ v4.39 (uploaded by the owner; authors to fill in where blank):
 | File | Used as |
 |---|---|
 | `muddy-explosion-gfx-sounds-wet-mud-explosion-4-4-0m06s.mp3` (GFX Sounds) | Hive destroyed (`hive_death`) |
-| `freesound_community-commercial-jet-flies-overhead-53746.mp3` (Pixabay, freesound_community) | Supply plane fly-by, 26 s cut around the loudest pass (`plane_flyby`) |
+| `freesound_community-commercial-jet-flies-overhead-53746.mp3` (Pixabay, freesound_community) | Supply plane fly-by, 26 s cut around the loudest pass (`plane_flyby`) Replaced in v4.75 by the C-130 below; kept as a source. |
+| `transportation-prop-plane-c-130-flyby-close-distance-short-01.wav` (owner's upload; source to fill in) | Supply plane fly-by since v4.75 (round 16 #200): a C-130 propeller plane, the whole 23 s pass, +2.3 dB with a limiter (`plane_flyby`) |
 | `foley-cloth-parachute-open-slide-impact-03.wav` | Supply crate's chute opening (`parachute`) |
 | `freesound_community-fighter-jets-passing-overhead-30115.mp3` | Not used yet (kept for air support later) |
 | `2026-11-18 11-19-32.mp4` | First try at the new Bloater burst: silent audio, not used |
