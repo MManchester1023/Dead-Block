@@ -6,7 +6,7 @@ assets are free-licence downloads, credited in `CREDITS.md`.
 ## Where things are
 
 - **`docs/Dead_Block_Command_Design_Doc_v4.md`** is the source of truth: version table at the top (one row
-  per change, newest first), §21 roadmap, **§22 playtest log** (rounds of numbered notes, #1–#180 so far (round 14)).
+  per change, newest first), §21 roadmap, **§22 playtest log** (rounds of numbered notes, #1–#191 so far (round 15)).
 - **`STATUS.md`** is the short, ranked to-do list plus what's done. **Item numbers are fixed** ("work on #13" always means
   item **#13**): never renumber; new items take the next free number and go where they rank. Keep "Next, in
   order" **ranked by importance with open items only**; finished items move to Done → Finished items.
@@ -22,8 +22,9 @@ assets are free-licence downloads, credited in `CREDITS.md`.
 
 - Straightforward, honest answers; light-hearted is welcome. Say when something is a guess (most balance
   numbers are until a playtest) and when you didn't check something.
-- **No screenshots for Mat** (he asked): don't send or describe screenshots; check visuals with the scripted
-  browser checks and say what was checked. Screenshot only if something can't be checked any other way.
+- **No screenshots at all** (Mat asked twice; round 15 #191): don't take them, not even private ones to check
+  your own work (they cost usage). Check visuals with the scripted browser checks and say what was checked;
+  anything only eyes can judge, ask Mat to look at.
 - **Mat's long-term plans stay** (vehicles, air support, bosses, human faction, the whole roadmap). Don't suggest
   dropping or parking them; when asked for opinions, suggest additions, changes and order, not cuts.
 - **Mat decides difficulty from his own playtests.** The balance bots don't build or think, so don't run
