@@ -6,33 +6,33 @@ Reclaim it block by block. A persistent, open-world-ish military RTS-lite set in
 
 ### Current direction
 
-Single-player strategy and tactical action • Continuous city battlefield • Isometric 3D with pixel-inspired art direction • Browser-first development with desktop migration if needed.
+Single-player strategy and tactical action • Continuous city battlefield • Isometric 3D with pixel/low poly-inspired art direction • Browser-first development with desktop migration planned.
 
 This document incorporates the design decisions confirmed during the November 2026 design review, including the latest map sequence, engineer construction rules, Elite armory access, and hive progression. Numerical balance and implementation details remain subject to playtesting.
 
 ## 1. Pitch and design pillars
 
-Dead Block Command is a top-down/isometric RTS-lite in which the player commands modern military units from a fortified safe zone on the edge of a ruined city. The player produces squads and vehicles, sends them into nearby streets, clears infestations, secures districts, establishes outposts, and gradually pushes deeper into the city. The city is one persistent battlefield rather than a collection of separately loaded missions.
+Dead Block Command is a isometric RTS-lite in which the player commands modern military units from a fortified safe zone on the edge of a ruined city. The player produces squads and vehicles, sends them into nearby streets, clears infestations, secures districts, establishes outposts, saves civilians, and gradually pushes deeper into the city. The city is one persistent battlefield rather than a collection of separately loaded missions.
 
-- One persistent city: The player can move between strategic overview and detailed street-level combat without loading separate district maps. Units must travel between the main base, outposts, and operational areas.
+- One persistent city: The player can move between strategic overview and detailed street-level combat without loading separate district maps or loading screens. Units must travel between the main base, outposts, and operational areas.
 
 - Reclaim it block by block: Infestation recedes, nests are destroyed, outposts are built, power is restored, and the map visibly changes as the city is retaken.
 
-- Command a force, not a spreadsheet: Squads act autonomously under clear orders, while the player can take direct control of a selected squad, vehicle, or helicopter when needed.
+- Command a force, not a spreadsheet: Squads act autonomously under clear orders, while the player can take direct control of a selected squad, vehicle, or helicopter when needed for an FPS experience.
 
 - Every loss matters: Infantry members are lost individually. A squad wiped out is permanently gone, including its accumulated experience.
 
-- Noise has consequences: Gunfire, engines, and heavy weapons attract attention. The player trades speed and firepower against the risk of drawing a larger horde.
+- Noise has consequences: Gunfire, engines, building and heavy weapons attract attention. The player trades speed and firepower against the risk of drawing a larger horde.
 
-- Build and hold: Engineers establish outposts and construct defensive emplacements only at the main base or established outposts.
+- Build and hold: Engineers establish outposts and construct defensive emplacements.
 
 - Gritty but fun: A ruined, atmospheric city, recognizable military-inspired hardware, readable combat, and dry radio chatter.
 
-Format: single-player, real-time strategy with tactical direct control. Working title: Dead Block Command.
+Format: single-player, real-time strategy with tactical direct control. Working title: Dead Block Command. Final title: TBD.
 
 ## 2. The city: one continuous battlefield
 
-The city is designed as one connected world. Districts are named regions of that world, not separate missions or maps that the player loads into. The player begins at a safe zone on the city's edge and must physically move forces out to the districts and back. The strategic map and the detailed battlefield are two views of the same simulation.
+The city is designed as one connected world with seperate districts/regions. Districts are named regions of that world, not separate missions or maps that the player loads into. The player begins at a safe zone on the city's edge and must physically move forces out to the districts and back. The strategic map and the detailed battlefield are two views of the same simulation.
 
 - Seamless zoom: Scrolling into a street on the operations map reveals the live battlefield. Scrolling back out returns to the strategic overview while the simulation continues.
 
@@ -44,23 +44,23 @@ The city is designed as one connected world. Districts are named regions of that
 
 - Pause and speed: The player can pause or run the operations-map view at up to 4× speed. The detailed battlefield and strategic overview represent the same ongoing simulation.
 
-- Fog of war: Unexplored areas show estimated infestation. Recon units reveal more accurate information and provide battlefield vision.
+- Fog of war: Unexplored areas show estimated infestation. Recon units reveal more accurate information and provide battlefield vision. Battlefield foggy until explored. This is measured by units' vision cones.
 
 ### District structure
 
-The campaign is organized as a connected world and introduces its geography in stages. The opening sequence contains seven starter areas: three small starter zones, each 64 × 64 world units, followed by the remaining four starter districts arranged into two larger maps (two districts per larger map). These five playable map areas establish the core systems before hives and bosses are introduced. After this opening sequence, the campaign expands into the larger district progression. The player can only push into territory connected to areas already held. The exact geography should support the continuous-world layout.
+The campaign is organized as a connected city built of districts. It is only restricted when doing the tutorial . Otherwise, the player is loaded into the open world. The tutorial section locks the player to 3 regions. Two small and one large, one region at a time. If the player chooses to skip the tutorial, they load in with all regions unlocked.
 
 ```text
 District                 Terrain / identity                                  Key progression or threat
-Roadside Motel           Motel rooms, parking lots                           Starter district; Walkers
-Gas Station Strip        Pumps and convenience stores                        Starter district; Walkers
+
+Roadside Motel           Motel rooms, parking lots                           Tutorial district; Walkers & runners. Introduces basics
+Gas Station Strip        Pumps and convenience stores                        Tutorial district; Walkers, runners, & boomers. Introduces searching, important buildings, and civilians
+Rail Siding              Boxcars and small depot                             Walkers, Runners, and boomers. Introduces power stations
+Trailer Park             Tight rows, little cover                            Walkers, Bigger Runner packs
+Parking Garage           Stacked decks and ramps                             First Pukers
+Fire Station             Garage bays and open yard                            stronghold
+Checkpoint               Fortified highway interchange                       Walkers and runners
 Corner Market            Small shops and loading docks                       Walkers, first Runners
-Rail Siding              Boxcars and small depot                             Walkers and Runners
-Trailer Park             Tight rows, little cover                            Runner packs
-Parking Garage           Stacked decks and ramps                             First Bloaters
-Fire Station             Garage bays and open yard                           Starter stronghold
-Checkpoint               Fortified highway interchange                       First full-size district; Walkers
-and Runners
 Suburbs                  Houses, fences, back yards                          Runner packs; Barracks upgrade
 Main Street              Narrow shops and alleys                             Hives; Armory unlock
 Industrial Park          Warehouses and rail yard                            Bloaters; Repair and Armor Stations
@@ -68,7 +68,7 @@ Hospital Row             Tight wards and parking decks                       Scr
 Harbor                   Docks and container stacks                          Brutes; Flame and Mortar Teams
 Stadium                  Large open bowl and stands                          Dense crowds; advanced armor
 Airport                  Runways and hangars                                 Airfield unlock; Dispatcher
-Downtown Core            Skyscraper canyons                                  Final district; Patient Zero
+Downtown Core            Skyscraper canyons                                  Final district; Patient Zero largest of all districts and dangerous enough that players will avoid it until the having the airfield.
 ```
 
 The Airport must be reached and its Airfield unlocked before the endgame. The player should have a meaningful opportunity to use the airfield's unlocks before entering Downtown Core; it must not be an optional late unlock with no practical payoff.
@@ -436,94 +436,52 @@ automatically attack hordes it detects. ability
 The zombie roster combines basic crowd threats, tougher special types, persistent hives, and bosses. Zombies beyond the basic Walker and Runner classes should have additional health, but not so much that ordinary special zombies feel like bosses. Bosses remain a distinct tier and are introduced after the opening sequence of three 64 × 64 starter zones and two larger maps.
 
 ```text
-Zombie              Behavior / threat
-```
+Zombie|             Behavior / threat                                                                   
 
-Counterplay
+Walker|             Slow, weak individually, dangerous in crowds. Large groups can stop            
+                    smaller vehicles and pile over walls.                                      
 
-```text
-Walker             Slow, weak individually, dangerous in crowds.                                        Machine
-guns, flame weapons, vehicle
-```
+Runner|            Fast and weak; sprints toward noise.                                                 
 
-run-over.
+Boomer|            Slow, swollen zombie that bursts into a toxic cloud when killed. Cloud is flammable,                    
 
-```text
-Runner             Fast and weak; sprints toward noise.                                                 Rifle
-```
+Shrieker|          Stays back and shrieks, filling the district noise meter. A lot of health                           
 
-squads in cover; vehicle run-over.
+Brute|             Armored, hits hard, resists rifle fire. Dangerous to all vehicles.                                            
 
-```text
-Bloater            Slow, swollen zombie that bursts into a toxic cloud when killed.                     Snipers
-at range; avoid killing beside
-friendly
-```
+Dragger|           Uses an extremely long tongue to wrap one infantry member and slowly pull them away.
+                   If the pull continues long enough, the member suffocates. Any damage to the Dragger 
+				   makes it immediately release the victim. Can target vehicles and helicopters to damage 
+				   them, but cannot pull them.
 
-squads. Cloud is flammable.
+Puker|             Spits an acidic goo that remains on the ground temporarily. Does a lot of damage to infantry. 
+                   Can target all vehicles.
 
-```text
-Screamer           Stays back and shrieks, filling the district noise meter.                            Snipers
-```
-
-or fast recon units.
-
-```text
-Brute              Armored, hits hard, resists rifle fire.                                              Snipers,
-```
-
-Battle Tank, Anvil Gunship.
-
-```text
-Dragger            Uses an extremely long tongue to wrap one infantry member and slowly
-```
-
-Prioritize and damage the Dragger
-
-```text
-pull them away. If the pull continues long enough, the member dies. Any              quickly
-```
-
-to interrupt the pull. damage to the Dragger makes it immediately release the victim. Can target vehicles and helicopters to damage them, but cannot pull them.
-
-```text
-Puker               Spits an acidic goo that remains on the ground for approximately three              Avoid
-contaminated ground and
-seconds. Can target armor and helicopters.                                          eliminate
-it before it can deny
-```
-
-movement.
-
-```text
-Hive               Infested structure that continuously spawns zombies while active.                   Fire or
-explosives; ordinary small-arms
-fire
-```
-
-cannot destroy it. Hive progression and destruction Hives continuously spawn zombies for as long as they remain active. Each hive progresses independently through four permanent threat stages. A hive never naturally regresses to an earlier stage. Its current stage is visible through the map/intelligence view.
-
+Hive|              Infested structure that continuously spawns zombies while active. 4 levels, each spawning more 
+                   zombies and each with more health than the last. A hive never naturally regresses to an earlier stage. 
+				   Bullets damage them. Fire and explosives are 
+				   very effective.
+			   
 - Stage 1 — Dormant: Small groups spawn periodically, with limited roaming around the hive.
 
 - Stage 2 — Growing: Spawn frequency increases and larger groups begin roaming, threatening nearby infrastructure.
 
 - Stage 3 — Established: Zombie production and roaming groups increase substantially; nearby defensive positions face sustained pressure.
 
-- Stage 4 — Overrun: The hive reaches maximum production and sends large roaming hordes that can overwhelm nearby positions. Hives can only be destroyed with fire or explosives. Small-arms fire does not destroy them. Valid methods may include incendiary weapons, Flame Teams, grenades, explosive charges, rockets, artillery, or suitable air-delivered ordnance. Destroying a hive permanently stops its zombie production; destroyed hives do not respawn. Destroying a hive does not automatically spawn a boss. Boss encounters are separate campaign events. To control simulation load, each hive uses a spawn budget and contributes to a defined maximum active-zombie population. When the population cap is reached, hives pause or throttle additional spawning until active zombies are removed. The exact cap and spawn rates are balancing values.
+- Stage 4 — Overrun: The hive reaches maximum production and sends large roaming hordes that can overwhelm nearby positions.Destroying a hive permanently stops its zombie production; destroyed hives do not respawn. Zombies can build a new hive if they destroy the districts outpost. Destroying a hive does not automatically spawn a boss. Boss encounters are separate campaign  in certain districts. To control simulation load, each hive uses a spawn budget and contributes to a defined maximum active-zombie population. When the population cap is reached, hives pause or throttle additional spawning until active zombies are removed. The exact cap and spawn rates are balancing values.
+```
 
 ### Horde behavior and environmental threats
 
-- Horde pulses grow in size according to the difficulty of the region sending them. More dangerous districts should create larger and more threatening pulses.
-
-- Noise remains a core mechanic. Weapons, engines, and other loud actions contribute to a noise level that attracts hordes. Quiet weapons and Sneak orders can reduce the chance of detection.
+- Noise is a core mechanic. Weapons, engines, building, explosions, and other loud actions contribute to a noise level that attracts hordes. Quiet weapons and Sneak orders can reduce the chance of detection.
 
 - Zombies can pile up and climb over one another to scale reinforcements, vehicles, and small buildings. Defensive height and barriers are therefore not guaranteed to stop a sufficiently large horde.
 
 - Basic Walkers and Runners can cling to helicopters that are hovering close to the ground or have landed. This makes low-altitude hovering and landing risky in infested areas.
 
-- Vehicles can run over basic zombies such as Walkers and Runners without taking damage from those impacts. Special zombies, including Pukers and Draggers, can damage vehicles.
+- Vehicles can run over basic zombies such as Walkers and Runners without taking damage from those impacts provided they're going fast enough. Special zombies, can damage vehicles. Basic zombie hordes can hault slow, smaller vehicles.
 
-- Soldiers killed by the horde can rise again as zombies, potentially adding to the threat facing the surviving force.
+- Soldiers killed by the horde rise again as zombies, adding to the threat facing the surviving force.
 
 ### Bosses
 
@@ -531,30 +489,23 @@ The original boss structure remains: from Hospital Row onward, each major campai
 
 ```text
 Boss                       District                       Defining mechanic
-The Matron                 Hospital Row                   Heals nearby zombies and raises downed ones until
+
+The Matron |                                 Heals nearby zombies and raises downed ones until killed.
+
+The Foreman |                                Throws shipping containers from range, changing cover 
+                                             and blocking streets.
+
+The Stampede |                               A stadium-sized horde charges toward the loudest sound. (need better idea)
+
+The Dispatcher |                             Coordinates Runner waves and has heigtened sense of hearing 
+                                             and directs zombies with it.
+
+Sentient Hive |                              A hive that's grown for so long, it's merged with the zombies is spews 
+                                             and gained sentience. Contantly drops normal and medium zombies until 
+											 killed. Dies in a large gassy explosion.
+
+Patient Zero |        "Final" Region         Calls surviving hives across the city to aid the final fight.(need better idea)
 ```
-
-killed.
-
-```text
-Boss                         District                  Defining mechanic
-The Foreman                  Harbor                    Throws shipping containers from range, changing cover
-```
-
-and blocking streets.
-
-```text
-The Stampede                 Stadium                   A stadium-sized horde charges toward the loudest sound.
-The Dispatcher               Airport                   Coordinates Runner waves and makes noise especially
-```
-
-dangerous in the district.
-
-```text
-Patient Zero                 Downtown Core             Calls surviving hives across the city to aid the final
-```
-
-fight. The Bloater's toxic cloud remains flammable. Flame Teams or incendiary ammunition can ignite it, creating a powerful area attack that can also harm friendly units.
 
 ## 10. Civilians and guerrilla recruits
 
@@ -568,75 +519,83 @@ Civilians may occasionally be found hiding in buildings or other locations in in
 
 - Rescue opportunities should be occasional rather than guaranteed in every district.
 
+- Later regions will require the player to rescue civilians to secure that region.
+
 ## 11. Economy, upkeep, and servicing
 
 The economy uses two resources: money and supplies. Money is the harder-to-obtain resource and the main limiter on expansion. Supplies are more readily available and support unit creation, daily upkeep, repairs, and restoration of squad members. The game does not simulate ammunition and fuel as resources that the player must continually purchase.
 
 ```text
-Resource              Earned from                                                        Spent on
-Money ($)            Income from secured districts, one-time clear rewards,              Recruiting units and
-vehicles, construction, and air-support
-civilian evacuations, and searched buildings.                       calls where applicable.
-Supplies             Base/outpost income, supply crates, cleared buildings,              Unit and vehicle
-production costs, daily upkeep for active
-and district rewards.                                               units, repairs, and
-```
+Resource             
+                                                      
+Money ($)  | Earned from killing zombies (harder zombies earn you more $), re-taking regions, destroying hives, restoring power, rescuing civilians and searching buildings.          
 
-restoring lost squad members.
+Supplies   | Earned the same way as money but is more available to the player. Supplies are also used for unit and building upkeep.          
 
-- Each active unit consumes supplies once per in-game day. This is a predictable upkeep payment rather than a constant drain during combat.
+- Each active unit and buidling consumes supplies and money once per in-game day. This is a predictable upkeep payment rather than a constant drain during combat.
 
-- Supplies are not spent on ammunition or fuel. The player does not need to manage individual ammo or fuel inventories.
+- Supplies are not spent on ammunition or fuel. The player does not need to manage individual ammo or fuel inventories yet but may need to in the future.
 
-- Vehicles still need to RTB (return to base) for servicing, rearming where relevant, or other operational requirements. RTB is a behavior/order requirement, not a detailed fuel-management minigame.
+- Vehicles need to RTB (return to base) or be repaired by an engineer for servicing, rearming where relevant, or other operational requirements. RTB is a behavior/order requirement, not a detailed fuel-management minigame.
 
 - Repairs and restoring lost infantry members consume supplies.
 
-- Supplies should be much more available than money, so the player is generally constrained by finances and force capacity rather than constant supply starvation.
+- Supplies should be much more available than money, so the player is generally constrained by finances rather than constant supply starvation.
 
 - The original shared-supply-pool concept remains: supplies are a common resource for the whole force.
+```
 
 ### Starting economy and balance targets
 
-The original starting target was $250, 100 supplies (150 storage cap), and a command cap of 8, with two Rifle Squads and one Engineer Team. These values should be revisited after daily upkeep and supply costs are implemented.
+The tutorial starting target was $250, 100 supplies. No tutorial will be higher money and supplies.
 
 ### Horde counterattacks
 
-Infested neighboring districts periodically send horde pulses toward the nearest outpost. The original target cadence was approximately every four minutes. The loudest neighbor sends the largest pulse, and pulse size also scales with the difficulty of the source region. Garrisons and constructed defenses help hold these attacks.
+Horde counterattacks are only sent when the noise meter for that district is full.
 
 ## 12. Unlocks and campaign progression
 
-Unlocks continue to be driven primarily by restoring power in key districts rather than by a separate sprawling technology tree. Securing districts provides income, experience, and occasional reward items. Restored power connects campaign progress to base facilities and new unit types.
+Unlocks continue to be driven primarily by restoring power in key districts rather than by a separate sprawling technology tree. Securing districts provides income, experience, and occasional reward items. Restored power and special buildings connects campaign progress to base facilities and new unit types.
 
+##Progression
+Players are able to progress however they'd like. (open world) Jumping in over your head will have obvious consequences. Each district unlocked and each power station restored will unlock the next thing.
 ```text
-Progress point                     Unlock / reward
-Suburbs power                        Barracks level 2; Medic Team and Recon Pair.
-Main Street power                    Armory; Machine Gun Team and Sniper Team.
-Industrial Park power                Repair Station and Armor Station; Gun Jeep and Supply Truck.
-Hospital Row power                   Medbay; restores lost squad members at base.
-Harbor power                         Armory level 2; Flame Team and Mortar Team; larger Supply Depot.
-Stadium power                        Armor Station level 2; LAV and Battle Tank.
-Airport power                   Airfield; Hauler Helicopter, Hornet and Anvil gunships, plus aircraft and
-drone support abilities as they are
+Progress point                                            Unlock / reward
+
+1st Power Station & 3 regions cleared                     Vehicle Bay
+
+2nd Power Station & Region                                Vehicle Bay LVL 2; Logi truck.
+
+3rd Power Station & Region                                Barracks LVL 2; Recon unit, Flame Team, and Mortar Team
+
+4th Power Station & Region                                Medbay LVL 2; Medic Humvee (carries 3 medic squads and heals units in a small AOE)
+
+5th Power Station & Region                                Command Post LVL 2; larger Supply Depot, artillery units in vehicle b
+
+6th Power Station & Region                                Vehicle Bay LVL 3; LAV and Battle Tank.
+
+7th Power Station & Region                                Airfield; Hauler Helicopter, Hornet and Anvil gunships, plus aircraft and drone support. (must be available before the final district, not after it)
+
+Downtown Core                                             Final campaign district; securing it and defeating Patient Zero wins the campaign.
 ```
 
-developed.
 
-```text
-Downtown Core                        Final campaign district; securing it and defeating Patient Zero wins the
-```
-
-campaign. The Command Post level 2 and artillery support should be connected to the Airport / late-campaign progression as appropriate. The Airport must be available before the final district, not after it.
 
 ### Reward items
 
-Approximately one district in three, and every boss, can drop a one-off reward item such as suppressor kits, ceramic plates, thermal optics, or other squad equipment. Items are assigned to a squad and create meaningful force specialization.
+Approximately one district in three, and every boss, can drop a one-off reward item such as suppressor kits, ceramic plates, enhacnced optics, or other squad equipment. Items are assigned to a squad and create meaningful force specialization. These "power ups" still need to be designed and fleshed out.
+
+text```
+Supressor Kit: every memeber of a unit gets a surpressor if they don't already have one. This cuts sound output in half for that unit.
+Ceramic Plates: Double health
+Enhanced Optics: Double vision cone length
+Med Bag: Unit heals passively over time.
+```
 
 ## 13. Win conditions, defeat, and base security
 
 - Current campaign loss model: The main base cannot be destroyed in the initial version. Losing outposts can cost district income and territory, but does not immediately end the campaign.
-
-- Future endgame challenge: A special late-game loss test may introduce a major horde attempting to break into the main base. If the horde breaches the base, the player loses. This is a possible later feature, not part of the current core rules.
+The player loses when zombies overrun the HQ and destroy the Command Post.
 
 - Win condition: Secure Downtown Core and defeat Patient Zero.
 
@@ -644,7 +603,7 @@ Approximately one district in three, and every boss, can drop a one-off reward i
 
 ## 14. Visual and audio direction
 
-The art direction is changing from traditional 2D pixel sprites to a 3D isometric world with pixel-inspired styling. The goal is more realistic and detailed than simple pixel art while retaining a deliberately stylized, chunky, readable look. This should feel like a detailed miniature battlefield rather than flat sprites or a block-built voxel game.
+The art is  3D isometric world with pixel/low poly-inspired styling. The goal is more realistic and detailed than simple art while retaining a deliberately stylized, chunky, readable look. This should feel like a detailed miniature battlefield rather than flat sprites or a block-built voxel game.
 
 - Camera: Isometric perspective with smooth zoom between strategic overview and close battlefield view.
 
@@ -763,17 +722,17 @@ This addendum records the latest confirmed decisions about the seven-mission tut
 
 ## 17. Seven-mission starter tutorial and open-world transition
 
-**Seven introductory missions.** The opening campaign consists of seven tutorial missions/regions. The first three are small 64 × 64 starter zones. The remaining four starter regions are arranged into two larger maps, with two regions represented in each larger map. The tutorial teaches the core systems progressively before the wider campaign opens.
+**Introductory missions.** The opening campaign consists of three tutorial missions/regions.The tutorial teaches the core systems progressively before the wider campaign opens.
 
 **Restricted access during the tutorial.** Until the player completes the full seven-mission introductory sequence, access is limited to the main base and the starter tutorial sections made available by the tutorial. The player cannot freely enter the rest of the city or the wider open-world campaign during this period.
 
-**Open-world unlock.** Upon completion of all seven introductory missions, the seven tutorial regions become part of the accessible open world. They remain connected parts of the same persistent city simulation rather than being discarded or replay-only tutorial levels. The player can travel back through them, defend them, and respond to renewed infestations.
+**Open-world unlock.** Upon completion of all introductory missions, the tutorial regions become part of the accessible open world. They remain connected parts of the same persistent city simulation rather than being discarded or replay-only tutorial levels. The player can travel back through them, defend them, and respond to renewed infestations.
 
 ## 18. Tutorial presentation and final test
 
 The starter sequence is a guided tutorial, not simply a set of ordinary missions. During tutorial instruction, the game pauses while clear on-screen prompts explain the relevant mechanic and tell the player what to do. The simulation resumes when the player dismisses or completes the prompt, so the player has time to understand each new system without pressure from an advancing battle. Progressive instruction. Prompts should introduce controls and systems in a deliberate order, demonstrating each mechanic in the relevant starter area. Tutorial prompts should be concise, actionable, and tied to the current objective or interaction.
 
-**Final test.** The last one or two larger starter regions serve as a practical final test of what the player has learned. These sections should combine previously introduced mechanics and require the player to apply them with less step-by-step instruction. They remain part of the tutorial sequence and must be completed before the wider open world unlocks.
+**Final test.** The last larger starter region serves as a practical final test of what the player has learned. This section should combine previously introduced mechanics and require the player to apply them with less step-by-step instruction. They remain part of the tutorial sequence and must be completed before the wider open world unlocks.
 
 ## 19. Region loss, hive takeover, and progression regression
 
